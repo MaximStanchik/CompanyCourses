@@ -32,7 +32,7 @@ export default class ShowCategory extends Component {
           (error.response && error.response.status === 401) ||
           (error.response && error.response.status === 403)
         ) {
-          window.location.href = "/login";
+          window.location.href = "/";
         } else {
           console.log(error);
         }

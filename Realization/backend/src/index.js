@@ -1,4 +1,4 @@
-require("dotenv").config({ path: "D:/User/Documents/GitHub/CourseProject_6_sem/Realization/backend/.env" });
+require("dotenv").config({ path: "D:/User/Documents/GitHub/CompanyCourses/Realization/backend/.env" });
 const express = require("express");
 const cors = require("cors");
 const path = require("path");

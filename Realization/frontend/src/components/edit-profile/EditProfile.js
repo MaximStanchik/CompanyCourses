@@ -17,7 +17,7 @@ class EditProfile extends Component {
       jobTitle: "",
       city: "",
       country: "",
-      status: "",
+      goal: "",
       errors: {}
     };
 
@@ -48,7 +48,7 @@ class EditProfile extends Component {
         jobTitle: profile.jobTitle || "",
         city: profile.city || "",
         country: profile.country || "",
-        status: profile.status || ""
+        goal: profile.goal || ""
       });
     }
   }
@@ -64,7 +64,7 @@ class EditProfile extends Component {
       jobTitle: this.state.jobTitle,
       city: this.state.city,
       country: this.state.country,
-      status: this.state.status
+      goal: this.state.goal
     };
 
     this.props.createProfile(profileData, this.props.history);
@@ -79,29 +79,104 @@ class EditProfile extends Component {
 
     const jobOptions = [
       { label: "* Select Job Title", value: "" },
-      { label: "Android Developer", value: "Android Developer" },
-      { label: "Backend Developer", value: "Backend Developer" },
-      { label: "DevOps", value: "DevOps" },
-      { label: "Enterprise Java Developer", value: "Enterprise Java Developer" },
-      { label: "Frontend Developer", value: "Frontend Developer" },
-      { label: "Fullstack Developer", value: "Fullstack Developer" },
-      { label: "Java Developer", value: "Java Developer" },
-      { label: "iOS Developer", value: "iOS Developer" },
-      { label: "QA Automation Engineer", value: "QA Automation Engineer" },
-      { label: "Software Developer", value: "Software Developer" },
-      { label: "System Engineer", value: "System Engineer" },
-      { label: "Software Architect", value: "Software Architect" },
-      { label: "Technical Lead", value: "Technical Lead" },
-      { label: "Team Lead", value: "Team Lead" },
-      { label: "Web Java Developer", value: "Web Java Developer" }
+      { label: "Back End Developer/Engineer", value: "Back End Developer/Engineer" },
+      { label: "Data Scientist", value: "Data Scientist" },
+      { label: "Technology Consultant", value: "Technology Consultant" },
+      { label: "Machine Learning Engineer", value: "Machine Learning Engineer" },
+      { label: "Product Manager", value: "Product Manager" },
+      { label: "Business/Management Analyst", value: "Business/Management Analyst" },
+      { label: "Data Warehouse Developer", value: "Data Warehouse Developer" },
+      { label: "Cyber Security Engineer", value: "Cyber Security Engineer" },
+      { label: "Video Game Developer", value: "Video Game Developer" },
+      { label: "Data Architect", value: "Data Architect" },
+      { label: "Marketing Analytics Specialist", value: "Marketing Analytics Specialist" },
+      { label: "Logistics/Supply Chain Analyst", value: "Logistics/Supply Chain Analyst" },
+      { label: "IT Project Manager", value: "IT Project Manager" },
+      { label: "Business Intelligence Analyst", value: "Business Intelligence Analyst" },
+      { label: "Data Analyst", value: "Data Analyst" },
+      { label: "Statistician", value: "Statistician" },
+      { label: "Mainframe Developer", value: "Mainframe Developer" },
+      { label: "Project Manager", value: "Project Manager" },
+      { label: "Business Analyst (general)", value: "Business Analyst (general)" },
+      { label: "Tax Analyst/Specialist", value: "Tax Analyst/Specialist" },
+      { label: "Automation Engineer", value: "Automation Engineer" },
+      { label: "Cyber/Information Security Engineer/Analyst", value: "Cyber/Information Security Engineer/Analyst" },
+      { label: "Real Estate Agent", value: "Real Estate Agent" },
+      { label: "Technical Support Engineer/Analyst", value: "Technical Support Engineer/Analyst" },
+      { label: "Social Media Strategist/Specialist", value: "Social Media Strategist/Specialist" },
+      { label: "UI/UX Manager", value: "UI/UX Manager" },
+      { label: "Data Engineer", value: "Data Engineer" },
+      { label: "iOS Developer/Engineer", value: "iOS Developer/Engineer" },
+      { label: "Cloud Architect", value: "Cloud Architect" },
+      { label: "Sales Representative", value: "Sales Representative" },
+      { label: "Human Resources Specialist", value: "Human Resources Specialist" },
+      { label: "Scrum Master", value: "Scrum Master" },
+      { label: "Full Stack Developer", value: "Full Stack Developer" },
+      { label: "Sales Development Representative", value: "Sales Development Representative" },
+      { label: "Digital Marketing Specialist", value: "Digital Marketing Specialist" },
+      { label: "Bookkeeper / Accounting Clerk", value: "Bookkeeper / Accounting Clerk" },
+      { label: "Solutions/Application Architect", value: "Solutions/Application Architect" },
+      { label: "Network/Systems Administrator", value: "Network/Systems Administrator" },
+      { label: "Customer Service Representative", value: "Customer Service Representative" },
+      { label: "Front End Developer", value: "Front End Developer" },
+      { label: "Application Developer/Engineer", value: "Application Developer/Engineer" },
+      { label: "Network Engineer/Architect", value: "Network Engineer/Architect" },
+      { label: "Cyber Security Specialist/Technician", value: "Cyber Security Specialist/Technician" },
+      { label: "Actuary", value: "Actuary" },
+      { label: "DevOps Engineer", value: "DevOps Engineer" },
+      { label: "Sales Operations Specialist", value: "Sales Operations Specialist" },
+      { label: "Android Developer/Engineer", value: "Android Developer/Engineer" },
+      { label: "Risk Consultant", value: "Risk Consultant" },
+      { label: "Computer Support Specialist", value: "Computer Support Specialist" },
+      { label: "Business Intelligence Architect/Developer", value: "Business Intelligence Architect/Developer" },
+      { label: "Chief Data Officer", value: "Chief Data Officer" },
+      { label: "Career Counselor", value: "Career Counselor" },
+      { label: "Computer Scientist", value: "Computer Scientist" },
+      { label: "Analytics Manager", value: "Analytics Manager" },
+      { label: "Risk Analyst", value: "Risk Analyst" },
+      { label: "Market Research Analyst", value: "Market Research Analyst" },
+      { label: "Strategic Planner/Analyst", value: "Strategic Planner/Analyst" },
+      { label: "Business/Management Consultant", value: "Business/Management Consultant" },
+      { label: "DEI Specialist", value: "Diversity, Equity, and Inclusion Specialist" },
+      { label: "Aerospace Engineer", value: "Aerospace Engineer" },
+      { label: "Fraud Examiner/Analyst", value: "Fraud Examiner/Analyst" },
+      { label: "Corporate Development Analyst", value: "Corporate Development Analyst" },
+      { label: "Data/Data Mining Analyst", value: "Data/Data Mining Analyst" },
+      { label: "Advertising/Promotions Manager", value: "Advertising/Promotions Manager" },
+      { label: "Business Program Analyst", value: "Business Program Analyst" },
+      { label: "Program Manager", value: "Program Manager" },
+      { label: "Pricing Analyst", value: "Pricing Analyst" },
+      { label: "Researcher/Research Associate", value: "Researcher/Research Associate" },
+      { label: "Marketing Analyst", value: "Marketing Analyst" },
+      { label: "Data Manager", value: "Data Manager" },
+      { label: "Biologist", value: "Biologist" },
+      { label: "Talent Acquisition/Recruiting Manager", value: "Talent Acquisition/Recruiting Manager" },
+      { label: "Business Development Manager", value: "Business Development Manager" },
+      { label: "Business Analysis Manager", value: "Business Analysis Manager" },
+      { label: "Sustainability Specialist", value: "Sustainability Specialist" },
+      { label: "Supply Chain Analyst", value: "Supply Chain Analyst" },
+      { label: "HR Consultant", value: "Human Resources Consultant" },
+      { label: "E-commerce Analyst", value: "E-commerce Analyst" },
+      { label: "Compensation/Benefits Analyst", value: "Compensation/Benefits Analyst" },
+      { label: "Financial Quantitative Analyst", value: "Financial Quantitative Analyst" },
+      { label: "Human Resources Analyst", value: "Human Resources Analyst" },
+      { label: "Project Management Analyst", value: "Project Management Analyst" },
+      { label: "Writer", value: "Writer" },
+      { label: "Director of Project Management", value: "Director of Project Management" },
+      { label: "Product Development Manager", value: "Product Development Manager" },
+      { label: "Chemical/Process Engineer", value: "Chemical/Process Engineer" },
+      { label: "Systems Integration Engineer/Specialist", value: "Systems Integration Engineer/Specialist" }
+    ];
+    
+
+    const goalOptions = [
+      { label: "* What is your goal?", value: "" },
+      { label: "Start a career", value: "Start a career" },
+      { label: "Change careers", value: "Change careers" },
+      { label: "Improve within your current role", value: "Improve within your current role" },
+      { label: "Explore topics unrelated to work", value: "Explore topics unrelated to work" }
     ];
 
-    const statusOptions = [
-      { label: "* Select Status", value: "" },
-      { label: "Learning programming", value: "Learning programming" },
-      { label: "Working as a programmer", value: "Working as a programmer" },
-      { label: "Not a programmer", value: "Not a programmer" }
-    ];
 
     return (
       <div className="edit-profile">
@@ -156,12 +231,12 @@ class EditProfile extends Component {
                 />
 
                 <SelectListGroup
-                  name="status"
-                  value={this.state.status}
+                  name="goal"
+                  value={this.state.goal}
                   onChange={this.onChange}
-                  options={statusOptions}
-                  error={errors.status}
-                  info="Your current professional status"
+                  options={goalOptions}
+                  error={errors.goal}
+                  info="Your current goal"
                 />
 
                 <TextFieldGroup
