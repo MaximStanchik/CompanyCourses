@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "lastActivityTime" SET DATA TYPE TIMESTAMP(3);

@@ -1,0 +1,10 @@
+/* Sticky footer flexbox layout */
+.page-flex-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-content-flex {
+  flex: 1 0 auto;
+} 

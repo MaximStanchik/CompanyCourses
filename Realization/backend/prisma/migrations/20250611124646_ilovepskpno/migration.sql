@@ -1,0 +1,11 @@
+-- AlterTable
+ALTER TABLE "User" ALTER COLUMN "updatedAt" DROP DEFAULT;
+
+-- AddColumn
+ALTER TABLE "User" ADD COLUMN "avatar" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastDevice" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastOS" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastIP" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastCountry" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastBrowser" TEXT;
+ALTER TABLE "User" ADD COLUMN "lastActivityTime" TIMESTAMP;

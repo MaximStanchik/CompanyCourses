@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="354c6dd5-bb43-43ef-bf49-18eeb9cc3d2a" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/prisma/schema.prisma" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Controllers/authController.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Controllers/authController.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Controllers/profileController.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Controllers/profileController.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Middleware/authMiddleware.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Middleware/authMiddleware.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Routes/authRouter.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Routes/authRouter.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Routes/profileRouter.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Routes/profileRouter.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Validation/profile.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Validation/profile.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/Validation/register.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Validation/register.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/public/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/public/index.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/actions/authActions.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/actions/authActions.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/actions/profileActions.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/actions/profileActions.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/actions/types.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/actions/types.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/auth/Login.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/auth/Login.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/auth/Register.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/auth/Register.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/auth/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/auth/style.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/blog/Notification.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/blog/Notification.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/FinalDashboard.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/HeroSliderTwo.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/HeroSliderTwo.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/NavBar.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/NavBar.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/create-profile/CreateProfile.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/create-profile/CreateProfile.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/dashboard/Dashboard.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/dashboard/Dashboard.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/edit-profile/EditProfile.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/edit-profile/EditProfile.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/not-found/NotFound.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/not-found/NotFound.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/components/profile/ProfileGithub.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/profile/ProfileGithub.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/hooks/useTheme.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/hooks/useTheme.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/index.css" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/index.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/index.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/listOfCourses/Courses.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/listOfCourses/Courses.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/listOfCourses/CoursesForStudent.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/listOfCourses/CoursesForStudent.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/404.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/404.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/reducers/errorReducer.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/reducers/errorReducer.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../frontend/src/reducers/profileReducer.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/reducers/profileReducer.js" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
+  </component>
+  <component name="ProjectCodeStyleSettingsMigration">
+    <option name="version" value="2" />
+  </component>
+  <component name="ProjectId" id="2yb29aScyLrtFLjs4s0EcnjZUrz" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="354c6dd5-bb43-43ef-bf49-18eeb9cc3d2a" name="Changes" comment="" />
+      <created>1750088809294</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1750088809294</updated>
+      <workItem from="1750088820907" duration="29000" />
+      <workItem from="1752695451103" duration="3000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+</project>

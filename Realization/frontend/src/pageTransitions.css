@@ -1,0 +1,18 @@
+.page-fade-enter {
+  opacity: 0;
+  transform: scale(0.97);
+}
+.page-fade-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+.page-fade-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+.page-fade-exit-active {
+  opacity: 0;
+  transform: scale(0.97);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+} 

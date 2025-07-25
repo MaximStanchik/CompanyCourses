@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "passport-dribbble": "^1.0.1",
+    "passport-yandex": "^0.0.5"
+  }
+}

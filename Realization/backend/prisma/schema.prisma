@@ -1,0 +1,174 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Category {
+  id       Int        @id @default(autoincrement())
+  name     String     @unique
+  nameEn   String?    // Название на английском
+  nameRu   String?    // Название на русском
+  parentId Int?       // ID родительской категории
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children Category[] @relation("CategoryHierarchy")
+  Course   Course[]
+}
+
+model Course {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  description   String?
+  status        String         @default("draft") // draft | open | inactive
+  category      Int?
+  Category      Category?      @relation(fields: [category], references: [id], onDelete: Cascade)
+  enrollments   Enrollment[]
+  lectures      Lecture[]
+  notifications Notification[]
+  favorites     FavoriteCourse[]
+}
+
+model Enrollment {
+  id        Int     @id @default(autoincrement())
+  user_id   Int?
+  course_id Int?
+  approved  Boolean @default(false)
+  Course    Course? @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  User      User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+}
+
+// =====  Избранные курсы  =====
+model FavoriteCourse {
+  id        Int     @id @default(autoincrement())
+  user_id   Int
+  course_id Int
+
+  User      User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Course    Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, course_id])
+}
+
+model Lecture {
+  id        Int     @id @default(autoincrement())
+  name      String
+  videoLink String?
+  content   String?
+  course_id Int?
+  Course    Course? @relation(fields: [course_id], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                       Int      @id @default(autoincrement())
+  username                 String   @unique
+  email                    String   @unique
+  password                 String
+  role                     Roles    @default(USER)
+  isVerified               Boolean  @default(false)
+  emailVerificationToken   String?  @unique
+  emailVerificationExpires DateTime?
+  googleId                 String? @unique
+  facebookId             String? @unique
+  yandexId                 String? @unique
+  dribbbleId               String? @unique
+  Enrollment               Enrollment[]
+  Profile                  Profile?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  supportMessages          SupportMessage[]
+  avatar                   String?
+  lastDevice               String?
+  lastOS                   String?
+  lastIP                   String?
+  lastCountry              String?
+  lastBrowser              String?
+  lastActivityTime         DateTime?
+  messages                 Message[]
+  reactions                Reaction[]
+  favorites                FavoriteCourse[]
+}
+
+model Profile {
+  id              Int      @id @default(autoincrement())
+  userId          Int      @unique
+  bio             String?
+  githubusername  String?
+  city            String?
+  country         String?
+  position        String?
+  company         String?
+  status          String?
+  skills          String[]
+  date            DateTime @default(now())
+  name            String?
+  surname         String?
+  additionalName  String?
+  jobTitle        String?
+  goal            String?
+  aboutMe         String? @db.Text
+  avatar          String?
+  language        String?  // ISO code like 'en', 'ru'
+
+  user            User     @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id       Int      @id @default(autoincrement())
+  courseId Int?
+  content  String
+  date     DateTime @default(now())
+  course   Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+}
+
+model SupportMessage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  email     String
+  message   String
+  status    String   // pending, sent, error
+  error     String?  // текст ошибки, если не отправлено
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Chat {
+  id        String    @id
+  name      String
+  createdAt DateTime  @default(now())
+  messages  Message[]
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  chatId    String
+  userId    Int?
+  text      String
+  fileUrl   String?
+  fileType  String?
+  preview   String?
+  caption   String?
+  sentAt    DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions Reaction[]
+}
+
+model Reaction {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  userId    Int
+  emoji     String
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+enum Roles {
+  ADMIN
+  USER
+}
