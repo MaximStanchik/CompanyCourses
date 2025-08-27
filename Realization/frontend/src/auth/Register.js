@@ -6,8 +6,7 @@ import NavBar from "../components/NavBar";
 import { Link, useHistory } from "react-router-dom";
 import { connect } from "react-redux";
 import { registerUser } from "../actions/authActions";
-import SocialButtons from '../components/SocialButtons';
-import ConsentModal from '../components/ConsentModal';
+
 import axios from 'axios';
 import { Spinner } from 'reactstrap';
 // import { useTranslation } from 'react-i18next';
@@ -21,8 +20,7 @@ const Register = (props) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errors, setErrors] = useState({});
   const [passwordStrength, setPasswordStrength] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedSocialProvider, setSelectedSocialProvider] = useState(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPasswordPopup, setShowPasswordPopup] = useState(false);
   const passwordInputRef = useRef(null);
@@ -125,43 +123,7 @@ const Register = (props) => {
     setIsSubmitting(false);
   };
 
-  // Обработчик для клика по кнопкам социальных сетей
-  const handleSocialButtonClick = (provider) => {
-    setSelectedSocialProvider(provider);
-    setIsModalOpen(true);
-  };
 
-  // Логика регистрации/входа через соцсеть после согласия
-  const handleSocialLogin = async () => {
-    setIsModalOpen(false); // Закрыть модальное окно
-    setErrors({}); // Очистить предыдущие ошибки
-
-    try {
-      // Здесь будет логика для вашего бэкенда для социальной аутентификации
-      // Предполагаем, что ваш бэкенд имеет эндпоинт для каждого провайдера
-      let response;
-      switch (selectedSocialProvider) {
-        case 'google':
-          response = await axios.get('/auth/social/google'); // Пример
-          break;
-        case 'github':
-          response = await axios.get('/auth/social/github'); // Пример
-          break;
-        // Добавьте другие провайдеры по необходимости
-        default:
-          setErrors({ social: 'Неизвестный провайдер социальной сети' });
-          return;
-      }
-      
-      // Обработка успешного ответа от бэкенда
-      console.log('Успешный вход через социальную сеть:', response.data);
-      history.push('/dashboard'); // Перенаправить на dashboard
-
-    } catch (err) {
-      setErrors({ social: 'Ошибка входа через социальную сеть: ' + (err.response?.data?.message || err.message) });
-      console.error('Ошибка входа через социальную сеть:', err.response?.data || err.message);
-    }
-  };
 
   const handlePasswordFocus = () => {
     clearTimeout(popupTimeout.current);
@@ -316,14 +278,7 @@ const Register = (props) => {
                     </div>
                   </form>
                   
-                  <div className="divider-with-text my-4">
-                    <span>Other methods of authorization</span>
-                  </div>
 
-                  {/* Social buttons */}
-                  <div className="social-buttons">
-                    <SocialButtons onSocialClick={handleSocialButtonClick} />
-                  </div>
                   
                   <p className="mt-3 text-muted text-center small">
                     By registering, you accept the{' '}
@@ -341,11 +296,7 @@ const Register = (props) => {
         </div>
       </div>
 
-      <ConsentModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onRegister={handleSocialLogin}
-      />
+
 
       {isSubmitting && (
         <div style={{position:'absolute',top:0,left:0,right:0,bottom:0,background:'rgba(255,255,255,0.7)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:1000}}>

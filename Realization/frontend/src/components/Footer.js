@@ -61,7 +61,7 @@ const Footer = () => {
             <h6 style={{ fontWeight: 600, marginBottom: 8, color: 'var(--footer-fg)' }}>{t('community.title')}</h6>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
               <li><Link to="/users" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('community.users')}</Link></li>
-              <li><Link to="/articles" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('community.articles')}</Link></li>
+
               <li><Link to="/chat" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('community.chat')}</Link></li>
               {/* success stories and activities removed */}
             </ul>

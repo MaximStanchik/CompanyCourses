@@ -37,7 +37,30 @@ const Todo = (props) => {
   return (
     <div style={divStyle}>
       <tr>
-        <td>{props.todo.name || props.todo.username || props.todo.firstName || '-'}</td>
+        <td>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: 40,
+              height: 40,
+              borderRadius: '50%',
+              border: '2px solid #ddd',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
+              fontWeight: 700,
+              color: '#666',
+              background: props.todo.avatar ? `url(${props.todo.avatar})` : '#f8f9fa',
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              flexShrink: 0
+            }}>
+              {!props.todo.avatar && ((props.todo.name || props.todo.username || props.todo.firstName)?.[0] || '?')}
+            </div>
+            <span>{props.todo.name || props.todo.username || props.todo.firstName || '-'}</span>
+          </div>
+        </td>
         <td>{props.todo.email}</td>
         <td>{props.todo.role}</td>
         <td style={{padding:'4px 0'}}>

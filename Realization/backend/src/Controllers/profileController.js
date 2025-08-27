@@ -6,6 +6,7 @@ const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
 const bcrypt = require('bcryptjs');
+const NotificationService = require('../utils/notificationService');
 
 // Ensure static directory exists
 const avatarStoragePath = path.join(__dirname, "../../static/avatar");
@@ -97,12 +98,14 @@ class ProfileController {
           where: { userId: user.id },
           data: profileFields,
         });
-        return res.json(updatedProfile);
+        const freshUser = await DbClient.user.findUnique({ where: { id: user.id }, select: { id: true, username: true, email: true, avatar: true } });
+        return res.json({ ...updatedProfile, user: freshUser });
       } else {
         const createdProfile = await DbClient.profile.create({
           data: profileFields,
         });
-        return res.json(createdProfile);
+        const freshUser = await DbClient.user.findUnique({ where: { id: user.id }, select: { id: true, username: true, email: true, avatar: true } });
+        return res.json({ ...createdProfile, user: freshUser });
       }
     } catch (err) {
       console.error(err);
@@ -187,6 +190,86 @@ class ProfileController {
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Server error" });
+    }
+  }
+
+  async adminUpdateProfile(req, res) {
+    try {
+      const token = req.headers.authorization?.split(" ")[1];
+      const decodedToken = jwt.verify(token, process.env.SECRET);
+      if (!decodedToken.roles || !decodedToken.roles.includes('ADMIN')) {
+        return res.status(403).json({ error: "Forbidden" });
+      }
+
+      const targetUserId = parseInt(req.body.userId);
+      if (!targetUserId) return res.status(400).json({ error: 'userId is required' });
+
+      // Обрабатываем загрузку файла аватара, если он есть
+      if (req.file) {
+        const relativePath = `/static/avatar/${req.file.filename}`;
+        await DbClient.user.update({
+          where: { id: targetUserId },
+          data: { avatar: relativePath },
+        });
+      }
+
+      // Update username/email if provided (unique username enforced)
+      if (req.body.username || req.body.email) {
+        const data = {};
+        if (req.body.username) {
+          const existing = await DbClient.user.findFirst({ where: { username: req.body.username, NOT: { id: targetUserId } } });
+          if (existing) return res.status(400).json({ username: 'Username is already taken' });
+          data.username = req.body.username;
+        }
+        if (req.body.email) {
+          data.email = req.body.email;
+        }
+        if (Object.keys(data).length) {
+          await DbClient.user.update({ where: { id: targetUserId }, data });
+        }
+      }
+
+      const profileFields = {
+        userId: targetUserId,
+        bio: req.body.bio ?? undefined,
+        githubusername: req.body.githubusername ?? undefined,
+        city: req.body.city ?? undefined,
+        country: req.body.country ?? undefined,
+        position: req.body.position ?? undefined,
+        company: req.body.company ?? undefined,
+        status: req.body.status ?? undefined,
+        skills: typeof req.body.skills === 'string' ? req.body.skills.split(',').map(s=>s.trim()).filter(Boolean) : Array.isArray(req.body.skills) ? req.body.skills : undefined,
+        date: req.body.date ?? undefined,
+        name: req.body.name ?? undefined,
+        surname: req.body.surname ?? undefined,
+        additionalName: req.body.additionalName ?? undefined,
+        jobTitle: req.body.jobTitle ?? undefined,
+        goal: req.body.goal ?? undefined,
+        aboutMe: req.body.aboutMe ?? undefined,
+      };
+
+      const existingProfile = await DbClient.profile.findUnique({ where: { userId: targetUserId } });
+      let out;
+      if (existingProfile) {
+        out = await DbClient.profile.update({ where: { userId: targetUserId }, data: profileFields });
+      } else {
+        out = await DbClient.profile.create({ data: { ...profileFields, userId: targetUserId } });
+      }
+      
+      // Отправляем уведомление пользователю
+      try {
+        const adminUser = await DbClient.user.findUnique({ where: { id: decodedToken.id } });
+        await NotificationService.notifyProfileUpdated(targetUserId, adminUser.username || 'Администратор');
+      } catch (notificationError) {
+        console.error('Ошибка при отправке уведомления:', notificationError);
+        // Не прерываем выполнение, если уведомление не отправилось
+      }
+      
+      const freshUser = await DbClient.user.findUnique({ where: { id: targetUserId }, select: { id: true, username: true, email: true, avatar: true, role: true } });
+      return res.json({ profile: out, user: freshUser });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: 'Server error' });
     }
   }
 
@@ -410,4 +493,5 @@ module.exports = {
   uploadAvatarMulter,
   updateUserIp: controller.updateUserIp.bind(controller),
   changePassword: controller.changePassword.bind(controller),
+  adminUpdateProfile: controller.adminUpdateProfile.bind(controller),
 };

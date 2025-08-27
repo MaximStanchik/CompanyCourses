@@ -1,4 +1,4 @@
-import React, { Component, Suspense, useState, useEffect } from "react";
+import React, { Component, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.scss";
 import store from "./store";
@@ -10,21 +10,23 @@ import Register from "./auth/Register";
 import UserList from "./admin/showallusers";
 import EditUser from "./admin/edituser";
 import ShowCategoryList from "./admin/ShowCategoryAdmin";
-import ShowCourseList from "./admin/showCourseAdmin";
 import EditCourseList from "./admin/editCourseAdmin";
+import EditCourse from "./admin/editCourseAdmin";
 import CreateCategoryAdmin from "./admin/createCategoryAdmin";
 import EditCategoryList from "./admin/editCategoryAdmin";
 import EnrollmentList from "./admin/ShowEnrollmentAdmin";
 import CreateEnrollAdmin from "./admin/CreateEnrollmentAdmin";
 import Services from "./listOfCourses/Courses";
 import Servicesforstudent from "./listOfCourses/CoursesForStudent";
+import MyTraining from "./pages/MyTraining";
+import CourseCatalog from "./pages/CourseCatalog";
 import AddCourseAdmin from "./admin/AddCourseAdmin";
 import AddLecture from "./blog/AddLecture";
-import Notification from "./blog/Notification";
+
 import BlogDetailsLeftSidebar from "./blog/BlogDetailsLeftSidebar";
 import PageNotFound from "./pages/404";
 import NoMatch from "./pages/404";
-import { BrowserRouter, Switch, Route, Redirect, withRouter } from "react-router-dom";
+import { BrowserRouter, Switch, Route } from "react-router-dom";
 import PrivateRoute from "./components/common/PrivateRoute";
 import { setCurrentUser, logoutUser } from "./actions/authActions";
 import CreateProfile from "./components/create-profile/CreateProfile";
@@ -46,19 +48,21 @@ import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import Reviews from "./components/Reviews";
 import Support from "./pages/Support";
-import Articles from './pages/Articles';
-import NewPost from './pages/NewPost';
-import ArticleView from './pages/ArticleView';
 import CoursePromo from './pages/CoursePromo';
+import Course from './pages/Course';
 import Users from './pages/Users';
 import Chat from './pages/Chat';
-import ShowAllCoursesAdmin from './admin/ShowAllCoursesAdmin';
-import ShowAllLessonsAdmin from './admin/ShowAllLessonsAdmin';
+import ProfilePage from './pages/Profile';
+
 import SyllabusEditor from './admin/SyllabusEditor';
-import MailingAdmin from './admin/MailingAdmin';
+
 import NotificationsAdmin from './admin/NotificationsAdmin';
+import Notifications from './pages/Notifications';
 import MyClasses from './pages/MyClasses';
 import MyStudents from './pages/MyStudents';
+import LessonsList from './admin/LessonsList';
+import LessonContentEditor from './admin/LessonContentEditor';
+import Teaching from './pages/Teaching';
 
 if (localStorage.jwtToken) {
   setAuthToken(localStorage.jwtToken);
@@ -90,12 +94,10 @@ class Root extends Component {
 
   render() {
     const isAuthenticated = !!localStorage.jwtToken;
-    const userRole = isAuthenticated ? jwt_decode(localStorage.jwtToken).roles[0] : null;
-    const { i18nInitialized } = this.state;
 
     return (
       <Provider store={store}>
-        <Suspense fallback={<div>Загрузка переводов...</div>}>
+        <Suspense fallback={<div>Loading translations...</div>}>
           <I18nextProvider i18n={i18n}>
             <BrowserRouter basename={"/"}>
               <Route render={({ location }) => (
@@ -110,6 +112,10 @@ class Root extends Component {
                       <Route exact path="/license-agreement" component={LicenseAgreement} />
                       <Route exact path="/email-verification-pending" component={EmailVerificationPending} />
                       <PrivateRoute exact path="/servicesforstudent/:id" component={Servicesforstudent} roles={["USER"]} />
+                      <Route exact path="/my-training" component={MyTraining} />
+                      <Route exact path="/course-catalog" component={CourseCatalog} />
+                      <Route exact path="/user-notifications" component={Notifications} />
+                      <Route exact path="/edit-profile" component={EditProfile} />
                       <PrivateRoute exact path="/services" component={Services} roles={["USER", "ADMIN"]} />
                       <PrivateRoute exact path="/addcourse/:id" component={AddCourseAdmin} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/blog-details-left-sidebar/:id" component={BlogDetailsLeftSidebar} roles={["USER", "ADMIN"]} />
@@ -117,40 +123,39 @@ class Root extends Component {
                       <PrivateRoute exact path="/allusers/edit/:id" component={EditUser} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/createEnrollAdmin" component={CreateEnrollAdmin} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/EnrollmentList" component={EnrollmentList} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/ShowCourseList" component={ShowCourseList} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/ShowCategoryList" component={ShowCategoryList} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/ShowCourseList/edit/:id" component={EditCourseList} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/editcourse/:id" component={EditCourseList} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/ShowCategoryList/edit/:id" component={EditCategoryList} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/CreateCategoryAdmin" component={CreateCategoryAdmin} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/add-lecture/:id" component={AddLecture} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/Notifications" component={NotificationsAdmin} roles={["ADMIN"]} />
                       <Route exact path="/404" component={PageNotFound} />
                       <PrivateRoute exact path="/create-profile" component={CreateProfile} roles={["USER"]} />
-                      <PrivateRoute exact path="/edit-profile" component={EditProfile} roles={["USER"]} />
                       <PrivateRoute exact path="/finalprofiles" component={FinalProfiles} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/profile/:handle" component={Profile} roles={["USER", "ADMIN"]} />
+                      <PrivateRoute exact path="/profile/:handle" component={ProfilePage} roles={["USER", "ADMIN"]} />
                       <Route exact path="/social-auth" component={SocialAuthHandler} />
                       <Route exact path="/about" component={About} />
                       <Route exact path="/contacts" component={Contacts} />
                       <Route exact path="/faq" component={FAQ} />
                       <Route exact path="/reviews" component={Reviews} />
                       <Route exact path="/support" component={Support} />
-                      <Route exact path="/articles" component={Articles} />
-                      <Route exact path="/articles/newPost" component={NewPost} />
-                      <Route exact path="/articles/:id" component={ArticleView} />
+
                       <Route exact path="/course-promo/:id" component={CoursePromo} />
+                      <PrivateRoute exact path="/course/:id" component={Course} roles={["USER", "ADMIN"]} />
                       <Route exact path="/users" component={Users} />
                       <Route exact path="/chat" component={Chat} />
-                      <PrivateRoute exact path="/teach/courses" component={ShowAllCoursesAdmin} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/teach/lessons" component={ShowAllLessonsAdmin} roles={["ADMIN"]} />
+                      <PrivateRoute exact path="/teach/courses" component={Teaching} roles={["USER", "ADMIN"]} />
+                      <PrivateRoute exact path="/teach" component={Teaching} roles={["ADMIN"]} />
+                      <PrivateRoute exact path="/teach/lessons" component={LessonsList} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/teach/lessons/new" component={require('./admin/NewLessonAdmin').default} roles={["ADMIN"]} />
+                      <PrivateRoute exact path="/teach/lessons/:id/content" component={LessonContentEditor} roles={["ADMIN"]} />
+                      <PrivateRoute exact path="/teach/lessons/:id/edit" component={require('./admin/EditLessonAdmin').default} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/teach/classes" component={MyClasses} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/teach/students" component={MyStudents} roles={["ADMIN"]} />
+                      <PrivateRoute exact path="/editcourse/:id" component={EditCourse} roles={["ADMIN"]} />
                       <PrivateRoute exact path="/editcourse/:id/syllabus-editor" component={SyllabusEditor} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/editcourse/:id/search" component={require('./admin/CourseSearchAdmin').default} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/teach/mailing" component={MailingAdmin} roles={["ADMIN"]} />
-                      <PrivateRoute exact path="/notifications" component={NotificationsAdmin} roles={["ADMIN"]} />
+                      
+
+                      <PrivateRoute exact path="/admin/notifications" component={NotificationsAdmin} roles={["ADMIN"]} />
                       <Route component={NoMatch} />
                     </Switch>
                   </CSSTransition>

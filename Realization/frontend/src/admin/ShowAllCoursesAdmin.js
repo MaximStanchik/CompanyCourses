@@ -8,6 +8,8 @@ import { faEllipsisV, faPen, faCopy, faTrash, faThumbtack, faQuestion } from '@f
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import './admin.css';
 
 const ShowAllCoursesAdmin = ({ match }) => {
@@ -26,10 +28,23 @@ const ShowAllCoursesAdmin = ({ match }) => {
   const [showDelModal, setShowDelModal] = useState(false);
   const [delId, setDelId] = useState(null);
   const [delInput, setDelInput] = useState('');
+  
+  // Проверяем роль пользователя
+  const isAdmin = () => {
+    try {
+      const token = localStorage.getItem('jwtToken');
+      if (!token) return false;
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      return decoded.roles && decoded.roles.some(r => String(r).toUpperCase().includes('ADMIN'));
+    } catch (e) {
+      return false;
+    }
+  };
+  
   const filterOptions = [
     { value: 'all', label: t('courses.all') },
     { value: 'draft', label: t('courses.draft') },
-    { value: 'open', label: t('courses.open') },
+    { value: 'open', label: t('courses.active') },
     { value: 'inactive', label: t('courses.inactive') },
   ];
   const filterRef = useRef();
@@ -86,10 +101,61 @@ const ShowAllCoursesAdmin = ({ match }) => {
     try {
       const course = courses.find(c=>c.id===id);
       if(!course) return;
-      const newName = `${course.name} (копия)`;
-      await axios.post('/course/add', { name:newName }, { headers });
+      
+      // Создаем новый курс с копированием всех полей
+      const courseData = {
+        name: `${course.name} (копия)`,
+        description: course.description,
+        shortDescription: course.shortDescription,
+        workload: course.workload,
+        learningOutcomes: course.learningOutcomes,
+        requirements: course.requirements,
+        learningFormat: course.learningFormat,
+        language: course.language,
+        level: course.level,
+        acquiredAssets: course.acquiredAssets,
+        status: 'draft', // Копия всегда в статусе черновика
+        category: course.category
+      };
+
+      await axios.post('/course/add', courseData, { headers });
       refreshCourses();
-    }catch(e){console.error('dup fail')}
+    }catch(e){
+      console.error('Duplicate failed:', e);
+      alert('Ошибка при копировании курса');
+    }
+  };
+
+  // Функция для изменения статуса курса
+  const changeCourseStatus = async (courseId, newStatus) => {
+    try {
+      await axios.patch(`/course/update/${courseId}`, { status: newStatus }, { headers });
+      refreshCourses();
+      toast.success(`${t('course.status_changed_to')} ${newStatus === 'draft' ? t('courses.draft') : newStatus === 'published' ? t('courses.active') : t('courses.inactive')}`);
+    } catch (error) {
+      console.error('Failed to change status:', error);
+      toast.error(t('course.status_change_error'));
+    }
+  };
+
+  // Функция для получения цвета статуса
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'draft': return '#ffc107'; // Желтый для черновика
+      case 'open': return '#28a745'; // Зеленый для активного
+      case 'inactive': return '#dc3545'; // Красный для неактивного
+      default: return '#6c757d'; // Серый по умолчанию
+    }
+  };
+
+  // Функция для получения текста статуса
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'draft': return t('courses.draft');
+      case 'open': return t('courses.active');
+      case 'inactive': return t('courses.inactive');
+      default: return t('common.unknown');
+    }
   };
 
   useEffect(() => {
@@ -160,7 +226,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
                   border: '1px solid #eaeaea',
                   borderRadius: 8,
                   boxShadow: filterOpen ? '0 8px 32px rgba(68,133,237,0.13)' : 'none',
-                  zIndex: 10,
+                  zIndex: 1000,
                   opacity: filterOpen ? 1 : 0,
                   pointerEvents: filterOpen ? 'auto' : 'none',
                   transform: filterOpen ? 'translateY(0)' : 'translateY(10px)',
@@ -183,7 +249,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
                       padding: '10px 18px',
                       textAlign: 'left',
                       fontWeight: courseFilter === opt.value ? 700 : 400,
-                      color: courseFilter === opt.value ? '#4485ed' : (darkTheme ? '#eaf4fd' : '#222'),
+                      color: courseFilter === opt.value ? '#4485ed' : (darkTheme ? '#eaf4fd' : '#000'),
                       cursor: 'pointer',
                       fontSize: 15,
                       transition: 'background 0.15s',
@@ -219,7 +285,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
             </button>
           </div>
           {loading ? (
-            <div>{t('common.loading', 'Загрузка...')}</div>
+            <div>{t('common.loading')}</div>
           ) : (
             <div className="course-grid" style={{
               display: 'grid',
@@ -232,12 +298,15 @@ const ShowAllCoursesAdmin = ({ match }) => {
                   if (courseFilter === 'draft') return course.status === 'draft';
                   if (courseFilter === 'open') return course.status === 'open';
                   if (courseFilter === 'inactive') return course.status === 'inactive';
+                  if (courseFilter === 'published') return course.status === 'published';
                   return true;
                 })
                 .filter(course => {
                   if (!search.trim()) return true;
                   const s = search.trim().toLowerCase();
-                  return (course.name && course.name.toLowerCase().includes(s)) || (course.id && String(course.id).includes(s));
+                  return (course.name && course.name.toLowerCase().includes(s)) || 
+                         (course.id && String(course.id).includes(s)) ||
+                         (course.description && course.description.toLowerCase().includes(s));
                 })
                 .map(course => (
                   <div key={course.id} className="item-tile" style={{
@@ -267,7 +336,40 @@ const ShowAllCoursesAdmin = ({ match }) => {
                     <h3 style={{ gridArea: 'title', margin: 0, fontSize: 18, fontWeight: 600, alignSelf: 'center', color: 'var(--text-color)' }}>{course.name}</h3>
 
                     {/* Description */}
-                    <p style={{ gridArea: 'desc', margin: 0, color: '#666', fontSize: 14 }}>{course.description || '-'}</p>
+                    <p style={{ 
+                      gridArea: 'desc', 
+                      margin: 0, 
+                      color: '#666', 
+                      fontSize: 14,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      lineHeight: '1.4'
+                    }}>{course.description || '-'}</p>
+
+                    {/* Status badge */}
+                    <div style={{ 
+                      gridArea: 'link', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 8,
+                      marginTop: 8
+                    }}>
+                      <span style={{
+                        padding: '2px 6px',
+                        borderRadius: 8,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        backgroundColor: getStatusColor(course.status || 'draft'),
+                        color: '#fff',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.3px'
+                      }}>
+                        {getStatusText(course.status || 'draft')}
+                      </span>
+                    </div>
 
                     {/* Pin icon and menu */}
                     <div className="item-tile__tools" style={{ gridArea: 'tools', position: 'relative', zIndex: 1, display:'flex', alignItems:'center', gap:8 }}>
@@ -278,17 +380,19 @@ const ShowAllCoursesAdmin = ({ match }) => {
                       >
                           <FontAwesomeIcon icon={faThumbtack} />
                         </span>
-                      <span
-                        className={`svg-icon menu-more_icon svg-icon_inline${clickedMenuId === course.id ? ' clicked' : ''}`}
-                        style={{ color: '#888', cursor: 'pointer' }}
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleMenu(course.id); }}
-                      >
-                          <FontAwesomeIcon icon={faEllipsisV} />
-                        </span>
+                      {isAdmin() && (
+                        <span
+                          className={`svg-icon menu-more_icon svg-icon_inline${clickedMenuId === course.id ? ' clicked' : ''}`}
+                          style={{ color: '#888', cursor: 'pointer' }}
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggleMenu(course.id); }}
+                        >
+                            <FontAwesomeIcon icon={faEllipsisV} />
+                          </span>
+                      )}
                     </div>
 
                     {/* Tools menu button */}
-                    {activeMenuId === course.id && (
+                    {activeMenuId === course.id && isAdmin() && (
                       <div className="item-tile__dropdown" style={{
                         position: 'absolute',
                         top: 24,
@@ -304,17 +408,49 @@ const ShowAllCoursesAdmin = ({ match }) => {
                         <button className="dropdown-item" style={{
                           display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer'
                         }} onClick={(e) => { e.stopPropagation(); handleEdit(course.id); }}>
-                          <FontAwesomeIcon icon={faPen} style={{ marginRight: 8 }} /> {t('common.edit', 'Редактировать')}
+                          <FontAwesomeIcon icon={faPen} style={{ marginRight: 8 }} /> {t('common.edit')}
                         </button>
                         <button className="dropdown-item" style={{
                           display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer'
                         }} onClick={(e) => { e.stopPropagation(); handleDuplicate(course.id); }}>
-                          <FontAwesomeIcon icon={faCopy} style={{ marginRight: 8 }} /> {t('courses.duplicate', 'Создать копию')}
+                          <FontAwesomeIcon icon={faCopy} style={{ marginRight: 8 }} /> {t('courses.duplicate')}
                         </button>
+                        {/* Кнопки изменения статуса */}
+                        {course.status !== 'draft' && (
+                          <button className="dropdown-item" style={{
+                            display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer', color: '#ffc107'
+                          }} onClick={(e) => { e.stopPropagation(); changeCourseStatus(course.id, 'draft'); }}>
+                            📝 Черновик
+                          </button>
+                        )}
+                        {course.status !== 'published' && (
+                          <button className="dropdown-item" style={{
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 8, 
+                            padding: '8px 12px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: 'var(--text-color)',
+                            cursor: 'pointer',
+                            fontSize: 14,
+                            width: '100%',
+                            textAlign: 'left'
+                          }} onClick={(e) => { e.stopPropagation(); changeCourseStatus(course.id, 'published'); }}>
+                            ✅ Опубликовать
+                          </button>
+                        )}
+                        {course.status !== 'inactive' && (
+                          <button className="dropdown-item" style={{
+                            display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer', color: '#dc3545'
+                          }} onClick={(e) => { e.stopPropagation(); changeCourseStatus(course.id, 'inactive'); }}>
+                            🚫 Деактивировать
+                          </button>
+                        )}
                         <button className="dropdown-item" style={{
                           display: 'flex', alignItems: 'center', width: '100%', background: 'none', border: 'none', padding: '8px 12px', cursor: 'pointer', color: '#d9534f'
                         }} onClick={(e) => { e.stopPropagation(); handleDelete(course.id); }}>
-                          <FontAwesomeIcon icon={faTrash} style={{ marginRight: 8 }} /> {t('common.delete', 'Удалить')}
+                          <FontAwesomeIcon icon={faTrash} style={{ marginRight: 8 }} /> {t('common.delete')}
                         </button>
                       </div>
                     )}
@@ -328,9 +464,9 @@ const ShowAllCoursesAdmin = ({ match }) => {
                       marginTop: 12,
                       zIndex: 1
                     }}>
-                      <a href={`/course/${course.id}#description`} style={{ color: 'var(--link-color)' }}>{t('courses.description', 'Описание')}</a>
-                      <a href={`/course/${course.id}#contents`} style={{ color: 'var(--link-color)' }}>{t('courses.contents', 'Содержание')}</a>
-                      <a href={`/course/${course.id}/access`} style={{ color: 'var(--link-color)' }}>{t('courses.access_rights', 'Права доступа')}</a>
+                      <a href={`/course/${course.id}#description`} style={{ color: 'var(--link-color)' }}>{t('courses.description')}</a>
+                      <a href={`/course/${course.id}#contents`} style={{ color: 'var(--link-color)' }}>{t('courses.contents')}</a>
+                      <a href={`/course/${course.id}/access`} style={{ color: 'var(--link-color)' }}>{t('courses.access_rights')}</a>
                     </div>
                   </div>
                 ))}
@@ -339,7 +475,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
         </main>
       </div>
       <Footer />
-      {showDelModal && (
+      {showDelModal && isAdmin() && (
         <div style={{ position:'fixed', top:0,left:0,right:0,bottom:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:1000 }} onClick={()=>setShowDelModal(false)}>
           <div style={{ background:'#fff', padding:32, borderRadius:8, width:320 }} onClick={e=>e.stopPropagation()}>
             <h3 style={{marginTop:0}}>Подтвердите удаление</h3>
@@ -352,8 +488,11 @@ const ShowAllCoursesAdmin = ({ match }) => {
           </div>
         </div>
       )}
+      <ToastContainer />
     </div>
   );
 };
 
-export default ShowAllCoursesAdmin; 
+export default ShowAllCoursesAdmin; //      "Подтвердите удаление"
+//"Введите"
+//"для подтверждения операции."

@@ -13,9 +13,9 @@ async function sendVerificationEmail(email, token) {
     console.log(`Sending verification email to ${email} with token: ${token}`);
 
     let transporter = nodemailer.createTransport({
-        host: process.env.EMAIL_HOST,
-        port: process.env.EMAIL_PORT,
-        secure: process.env.EMAIL_PORT == 465, // true for 465, false for other ports
+        host: process.env.EMAIL_HOST || 'smtp.mail.yahoo.com',
+        port: parseInt(process.env.EMAIL_PORT) || 587,
+        secure: false,
         auth: {
             user: process.env.EMAIL_USER,
             pass: process.env.EMAIL_PASS,

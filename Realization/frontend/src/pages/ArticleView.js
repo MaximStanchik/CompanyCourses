@@ -72,15 +72,15 @@ export default function ArticleView(){
   // current user info
   const [currentUser,setCurrentUser]=useState(()=>{
     const token=localStorage.getItem('jwtToken');
-    if(!token) return {id:null,username:t('chat.you')||'You',avatar:null};
+    if(!token) return {id:null,username:t('chat.you'),avatar:null};  
     try{
       const payload = JSON.parse(atob(token.split('.')[1]));
       return {
         id: payload.id || payload.userId || null,
-        username: payload.username || payload.name || (t('chat.you')||'You'),
+        username: payload.username || payload.name || (t('chat.you')),
         avatar: payload.avatar || null
       };
-    }catch{return {id:null,username:t('chat.you')||'You',avatar:null};}
+    }catch{return {id:null,username:t('chat.you'),avatar:null};}
   });
 
   // fetch avatar if missing
@@ -149,8 +149,8 @@ export default function ArticleView(){
           </button>
         </div>
         <div style={{marginTop:40}}>
-          <h3 style={{marginBottom:16,color:dark?'#eaf4fd':'#23272f'}}>{t('articles.comments')||'Comments'} ({comments.length})</h3>
-          {comments.length===0&&<p style={{color:dark?'#999':'#666'}}>{t('articles.noComments')||'No comments yet'}</p>}
+          <h3 style={{marginBottom:16,color:dark?'#eaf4fd':'#23272f'}}>{t('articles.comments')} ({comments.length})</h3>
+          {comments.length===0&&<p style={{color:dark?'#999':'#666'}}>{t('articles.noComments')}</p>}
           <ul style={{listStyle:'none',padding:0,margin:0}}>
             {comments.map(c=>(
               <li key={c.id} style={{display:'flex',gap:12,marginBottom:18}}>
@@ -168,7 +168,7 @@ export default function ArticleView(){
             ))}
           </ul>
           <div style={{display:'flex',gap:12,marginTop:12}}>
-            <input value={commentText} onChange={e=>setCommentText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addComment();}}} placeholder={t('articles.addComment')||'Add a comment'} style={{flex:1,padding:'10px 14px',fontSize:14,borderRadius:8,border:`1px solid ${borderColor}`,background:fieldBg,color:dark?'#eaf4fd':'#23272f'}}/>
+            <input value={commentText} onChange={e=>setCommentText(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();addComment();}}} placeholder={t('articles.addComment')} style={{flex:1,padding:'10px 14px',fontSize:14,borderRadius:8,border:`1px solid ${borderColor}`,background:fieldBg,color:dark?'#eaf4fd':'#23272f'}}/>
             <button onClick={addComment} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'10px 18px',fontWeight:600,cursor:'pointer'}}>{t('chat.send')}</button>
           </div>
         </div>

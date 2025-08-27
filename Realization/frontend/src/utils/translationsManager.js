@@ -6,7 +6,6 @@ class TranslationsManager {
     this.translationsPath = path.join(process.cwd(), 'src', 'i18n', 'translations.json');
   }
 
-  // Чтение файла переводов
   readTranslations() {
     try {
       const data = fs.readFileSync(this.translationsPath, 'utf8');
@@ -17,7 +16,6 @@ class TranslationsManager {
     }
   }
 
-  // Запись в файл переводов
   writeTranslations(translations) {
     try {
       fs.writeFileSync(this.translationsPath, JSON.stringify(translations, null, 2), 'utf8');
@@ -28,15 +26,12 @@ class TranslationsManager {
     }
   }
 
-  // Добавление новой категории в переводы
   addCategoryTranslation(categoryName, categoryId) {
     const translations = this.readTranslations();
     if (!translations) return false;
 
-    // Создаем ключ для категории
     const categoryKey = `category_${categoryId}`;
     
-    // Добавляем переводы для всех языков
     Object.keys(translations).forEach(lang => {
       if (!translations[lang].common) {
         translations[lang].common = {};
@@ -47,7 +42,6 @@ class TranslationsManager {
     return this.writeTranslations(translations);
   }
 
-  // Обновление названия категории в переводах
   updateCategoryTranslation(categoryName, categoryId) {
     const translations = this.readTranslations();
     if (!translations) return false;
@@ -63,7 +57,6 @@ class TranslationsManager {
     return this.writeTranslations(translations);
   }
 
-  // Удаление категории из переводов
   removeCategoryTranslation(categoryId) {
     const translations = this.readTranslations();
     if (!translations) return false;
@@ -79,7 +72,6 @@ class TranslationsManager {
     return this.writeTranslations(translations);
   }
 
-  // Получение перевода категории
   getCategoryTranslation(categoryId, language = 'en') {
     const translations = this.readTranslations();
     if (!translations || !translations[language] || !translations[language].common) {

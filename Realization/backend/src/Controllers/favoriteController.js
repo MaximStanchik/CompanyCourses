@@ -3,11 +3,19 @@ const DbClient = new PrismaClient();
 const jwt = require("jsonwebtoken");
 
 class favoriteController {
+  constructor() {
+    // Bind methods to preserve 'this' context when used as route handlers
+    this.getFavorites = this.getFavorites.bind(this);
+    this.addFavorite = this.addFavorite.bind(this);
+    this.removeFavorite = this.removeFavorite.bind(this);
+  }
+
   // Получить избранные курсы текущего пользователя (только USER)
   async getFavorites(req, res) {
     try {
-      const { id: userId, roles } = this._getUser(req, res);
-      if (!userId) return;
+      const user = this._getUser(req, res);
+      if (!user) return;
+      const { id: userId, roles } = user;
       if (roles && roles.includes("ADMIN")) {
         return res.status(403).json("Admins cannot manage favorites");
       }
@@ -35,8 +43,9 @@ class favoriteController {
   // Добавить курс в избранное
   async addFavorite(req, res) {
     try {
-      const { id: userId, roles } = this._getUser(req, res);
-      if (!userId) return;
+      const user = this._getUser(req, res);
+      if (!user) return;
+      const { id: userId, roles } = user;
       if (roles && roles.includes("ADMIN")) {
         return res.status(403).json("Admins cannot manage favorites");
       }
@@ -63,8 +72,9 @@ class favoriteController {
   // Удалить курс из избранного
   async removeFavorite(req, res) {
     try {
-      const { id: userId, roles } = this._getUser(req, res);
-      if (!userId) return;
+      const user = this._getUser(req, res);
+      if (!user) return;
+      const { id: userId, roles } = user;
       if (roles && roles.includes("ADMIN")) {
         return res.status(403).json("Admins cannot manage favorites");
       }

@@ -19,7 +19,7 @@ const Support = () => {
   const t = i18n.t.bind(i18n);
   const textareaRef = useRef(null);
 
-  const [lang, setLang] = useState(i18n.language || localStorage.getItem('appLang') || 'en');
+  const [lang, setLang] = useState(i18n.language || localStorage.getItem('language') || 'en');
   const [message, setMessage] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -55,7 +55,7 @@ const Support = () => {
 
   const handleLangChange = (code) => {
     i18n.changeLanguage(code);
-    localStorage.setItem('appLang', code);
+    localStorage.setItem('language', code);
     // Не надо setLang здесь — обновится через событие languageChanged
   };
 

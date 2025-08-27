@@ -28,7 +28,7 @@ function usePrefersDark() {
 
 export default function Support() {
   const [lang, setLang] = useState(() => localStorage.getItem('language') || 'ru');
-  const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
+  const [theme, setTheme] = useState(null);
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
   const [message, setMessage] = useState('');
@@ -67,7 +67,7 @@ export default function Support() {
       setEmojiAnim('in');
     } else if (emojiAnim === 'in') {
       setEmojiAnim('out');
-      setTimeout(() => setEmojiAnim('in'), 200); // сбросить после анимации
+      setTimeout(() => setEmojiAnim('in'), 200); 
     }
   }, [emojiPicker.visible]);
 
@@ -78,7 +78,6 @@ export default function Support() {
     const end = textarea.selectionEnd;
     const newValue = message.slice(0, start) + emojiObj.native + message.slice(end);
     setMessage(newValue);
-    // Не закрываем меню! Просто фокусируем textarea
     setTimeout(() => {
       textarea.focus();
       textarea.setSelectionRange(start + emojiObj.native.length, start + emojiObj.native.length);
@@ -91,7 +90,6 @@ export default function Support() {
   const fieldColor = dark ? '#ddd' : '#222';
   const borderColor = dark ? '#36607e' : '#e0e0e0';
 
-  // sync language globally without reload
   useEffect(() => {
     i18n.changeLanguage(lang);
     localStorage.setItem('language', lang);
@@ -116,13 +114,13 @@ export default function Support() {
         }),
       });
       if (res.ok) {
-        setSuccess(t('support.messageSentSuccess') || 'Сообщение успешно отправлено!');
+        setSuccess(t('support.messageSentSuccess'));
         setMessage('');
       } else {
-        setError(t('support.messageSendFailed') || 'Ошибка отправки сообщения.');
+        setError(t('support.messageSendFailed'));
       }
     } catch (err) {
-      setError(t('support.messageSendFailed') || 'Ошибка отправки сообщения.');
+      setError(t('support.messageSendFailed'));
     } finally {
       setLoading(false);
     }
@@ -146,7 +144,7 @@ export default function Support() {
             style={{ padding: '0.5rem 1.5rem', backgroundColor: '#3976a8', color: '#fff', border: 'none', borderRadius: 20, cursor: 'pointer', fontSize: '1rem', transition: 'background 0.2s', fontWeight: 600 }}
             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
           >
-            {dark ? (t('navbar.light_mode') || 'Светлая тема') : (t('navbar.dark_mode') || 'Тёмная тема')}
+            {dark ? (t('navbar.light_mode') ) : (t('navbar.dark_mode'))}
           </button>
           <button
             style={{ padding: '0.5rem 1.5rem', backgroundColor: '#3976a8', color: '#fff', border: 'none', borderRadius: 20, cursor: 'pointer', fontSize: '1rem', transition: '0.3s', transform: 'translateY(0px)', boxShadow: 'none' }}
@@ -156,14 +154,14 @@ export default function Support() {
           </button>
         </div>
         <div style={{ background: formBg, borderRadius: 16, boxShadow: dark ? '0 2px 8px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.04)', padding: 32, margin: '0 auto', maxWidth: 520 }}>
-          <h2 style={{ fontWeight: 700, fontSize: 24, marginBottom: 18, color: dark ? '#eaf4fd' : '#3976a8' }}>{t('support.title') || 'Поддержка'}</h2>
+          <h2 style={{ fontWeight: 700, fontSize: 24, marginBottom: 18, color: dark ? '#eaf4fd' : '#3976a8' }}>{t('support.title')}</h2>
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: 18, position: 'relative' }}>
               <textarea
                 ref={textareaRef}
                 value={message}
                 onChange={e => setMessage(e.target.value)}
-                placeholder={t('support.placeholder') || 'Опишите вашу проблему или вопрос...'}
+                placeholder={t('support.placeholder') }
                 style={{ width: '100%', minHeight: 120, borderRadius: 12, border: `1.5px solid ${borderColor}`, background: fieldBg, color: fieldColor, fontSize: 17, padding: 16, resize: 'vertical', outline: 'none', boxShadow: 'none' }}
                 maxLength={2000}
                 disabled={loading}
@@ -187,7 +185,7 @@ export default function Support() {
                 style={{ minWidth: 160, height: 48, borderRadius: 24, fontSize: 17, fontWeight: 600, background: '#3976a8', color: '#fff', border: 'none', boxShadow: 'none', transition: 'background 0.18s' }}
                 disabled={loading || !message.trim()}
               >
-                {loading ? (t('support.sending') || 'Отправка...') : (t('support.send') || 'Отправить')}
+                {loading ? (t('support.sending') ) : (t('support.send'))}
               </button>
             </div>
           </form>

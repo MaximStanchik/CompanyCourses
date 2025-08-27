@@ -30,7 +30,7 @@ const PrivacyPolicy = () => {
   const t = i18n.t.bind(i18n);
 
   const [lang, setLang] = useState(localStorage.getItem('language') || 'en');
-  const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
+  const [theme, setTheme] = useState(null); 
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
 

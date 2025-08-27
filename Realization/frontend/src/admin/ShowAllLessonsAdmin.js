@@ -44,7 +44,7 @@ const ShowAllLessonsAdmin = ({ match }) => {
   const headers = { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` };
 
   const handleEdit = (id) => {
-    history.push(`/editlesson/${id}`);
+    history.push(`/teach/lessons/${id}/content`);
   };
 
   const handleDuplicate = async (id) => {
@@ -243,23 +243,23 @@ const ShowAllLessonsAdmin = ({ match }) => {
                   {activeMenuId === lesson.id && (
                     <div className="item-tile__dropdown" style={{ position:'absolute', top:24, right:0, background:'#fff', border:'1px solid #eaeaea', borderRadius:6, boxShadow:'0 4px 8px rgba(0,0,0,0.1)', zIndex:2, minWidth:140 }}>
                       <button className="dropdown-item" style={{ display:'flex', alignItems:'center', width:'100%', background:'none', border:'none', padding:'8px 12px', cursor:'pointer' }} onClick={(e)=>{e.stopPropagation(); handleEdit(lesson.id); }}>
-                        <FontAwesomeIcon icon={faPen} style={{ marginRight:8 }}/> {t('common.edit','Редактировать')}
+                        <FontAwesomeIcon icon={faPen} style={{ marginRight:8 }}/> {t('common.edit')}
                       </button>
                       <button className="dropdown-item" style={{ display:'flex', alignItems:'center', width:'100%', background:'none', border:'none', padding:'8px 12px', cursor:'pointer' }} onClick={(e)=>{e.stopPropagation(); handleDuplicate(lesson.id); }}>
-                        <FontAwesomeIcon icon={faCopy} style={{ marginRight:8 }}/> {t('lessons.duplicate','Создать копию')}
+                        <FontAwesomeIcon icon={faCopy} style={{ marginRight:8 }}/> {t('lessons.duplicate')}
                       </button>
                       <button className="dropdown-item" style={{ display:'flex', alignItems:'center', width:'100%', background:'none', border:'none', padding:'8px 12px', cursor:'pointer', color:'#d9534f' }} onClick={(e)=>{e.stopPropagation(); handleDelete(lesson.id); }}>
-                        <FontAwesomeIcon icon={faTrash} style={{ marginRight:8 }}/> {t('common.delete','Удалить')}
+                        <FontAwesomeIcon icon={faTrash} style={{ marginRight:8 }}/> {t('common.delete')}
                       </button>
                     </div>
                   )}
 
                   <div className="item-tile__footer-links" style={{ gridArea:'footer', display:'none', gap:12, fontSize:14, marginTop:12 }}>
-                    <a href={`/lesson/${lesson.id}#description`} style={{ color:'var(--link-color)' }}>{t('lessons.description','Описание')}</a>
-                    <a href={`/lesson/${lesson.id}#contents`} style={{ color:'var(--link-color)' }}>{t('lessons.contents','Содержание')}</a>
-                    <a href={`/lesson/${lesson.id}/access`} style={{ color:'var(--link-color)' }}>{t('lessons.access_rights','Права доступа')}</a>
-                  </div>
-                </div>
+                    <a href={`/lesson/${lesson.id}#description`} style={{ color:'var(--link-color)' }}>{t('lessons')}</a>
+                    <a href={`/lesson/${lesson.id}#contents`} style={{ color:'var(--link-color)' }}>{t('lessons')}</a>
+                    <a href={`/lesson/${lesson.id}/access`} style={{ color:'var(--link-color)' }}>{t('lessons')}</a>
+                  </div> 
+                </div> 
               ))}
             </div>
           )}

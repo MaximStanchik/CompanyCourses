@@ -227,7 +227,7 @@ export default function Chat() {
     });
   };
 
-  const commonChats = [chatObj('global', t('chat.global') || 'Общий чат', <FaGlobe />), ...randomChats.map(name => chatObj(name, name, <FaGlobe />))];
+  const commonChats = [chatObj('global', t('chat.global'), <FaGlobe />), ...randomChats.map(name => chatObj(name, name, <FaGlobe />))];
 
   const allChatsArray = [...commonChats]; // will expand later after tech/company/spec defined
   // --- Left chats (localStorage) ---
@@ -470,11 +470,11 @@ export default function Chat() {
     borderBottom: `1.5px solid ${borderColor}`,
     position: 'fixed',
     top: 0,
-    left: sidebarOpen ? sidebarWidth : 0,
+    left: sidebarOpen ? sidebarWidth : 50,
     right: 0,
     zIndex: 100,
     boxShadow: dark ? '0 2px 8px rgba(0,0,0,0.18)' : '0 2px 8px rgba(0,0,0,0.06)',
-    width: sidebarOpen ? `calc(100% - ${sidebarWidth}px)` : '100%',
+    width: sidebarOpen ? `calc(100% - ${sidebarWidth}px)` : 'calc(100% - 50px)',
   };
 
   // Новый стиль для панели управления справа
@@ -503,28 +503,54 @@ export default function Chat() {
     transition: 'background 0.2s',
   });
 
-  // Новый стиль для аватара
-  const avatarStyle = (isMe) => ({
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    background: isMe ? (dark ? '#3976a8' : '#b6d4fe') : '#d3dbe6',
-    color: isMe ? '#fff' : '#888',
-    fontWeight: 700,
-    fontSize: 16,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: isMe ? 0 : 10,
-    marginLeft: isMe ? 10 : 0,
-    flexShrink: 0,
-    boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-  });
+  // Компонент аватарки с обработкой ошибок
+  const Avatar = ({ user, isMe, size = 32, onClick, primaryColor }) => {
+    const [imageError, setImageError] = useState(false);
+    
+    const avatarStyle = {
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: (user.avatar && !imageError) ? 'transparent' : (isMe ? (dark ? '#3976a8' : '#b6d4fe') : '#d3dbe6'),
+      color: (user.avatar && !imageError) ? 'transparent' : (isMe ? '#fff' : '#888'),
+      fontWeight: 700,
+      fontSize: size * 0.5,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: isMe ? 0 : (size > 50 ? 0 : 10),
+      marginLeft: isMe ? (size > 50 ? 0 : 10) : 0,
+      marginBottom: size > 50 ? 24 : 0,
+      flexShrink: 0,
+      boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+      backgroundImage: (user.avatar && !imageError) ? `url(${user.avatar})` : 'none',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      cursor: onClick ? 'pointer' : 'default',
+      border: size > 50 ? `3px solid ${primaryColor || '#3976a8'}` : 'none',
+      textTransform: size > 50 ? 'uppercase' : 'none',
+    };
+
+    return (
+      <div style={avatarStyle} onClick={onClick}>
+        {user.avatar && (
+          <img
+            src={user.avatar}
+            alt=""
+            style={{ display: 'none' }}
+            onError={() => setImageError(true)}
+          />
+        )}
+        {(!user.avatar || imageError) && (user.username?.[0]?.toUpperCase() || '?')}
+      </div>
+    );
+  };
 
   // Новый стиль для панели ввода
   const inputBarStyle = {
     position: 'fixed',
-    left: sidebarOpen ? sidebarWidth : 0,
+    left: sidebarOpen ? sidebarWidth + (sidebarOpen && !showRightPanel ? 20 : 0) : 50,
     right: showRightPanel ? 320 : 0,
     bottom: 0,
     background: dark ? '#23272f' : '#fff',
@@ -743,8 +769,8 @@ export default function Chat() {
     if (diff === 0) return t('chat.today');
     if (diff === 1) return t('chat.yesterday');
     return date.toLocaleDateString();
-  }
-
+  }  
+  
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
   useEffect(()=>{
@@ -767,7 +793,11 @@ export default function Chat() {
       const username = typeof u === 'object' ? (u.username || u.name) : u;
       if (!username) return;
       if (!map[username]) {
-        map[username] = { id: (typeof u === 'object' ? u.id : username), username };
+        map[username] = { 
+          id: (typeof u === 'object' ? u.id : username), 
+          username,
+          avatar: typeof u === 'object' ? u.avatar : null
+        };
       }
     });
     return Object.values(map);
@@ -800,6 +830,26 @@ export default function Chat() {
     const filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
     const encoded = encodeURIComponent(cleanedName);
     return `${SERVER_URL}/api/files/download/${filename}?name=${encoded}`;
+  };
+
+  const getFileDisplayUrl = (msg) => {
+    try {
+      const filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
+      return `${SERVER_URL}/api/files/download/${filename}`;
+    } catch (error) {
+      console.error('Error getting file display URL:', error);
+      return '';
+    }
+  };
+
+  const getMediaDisplayUrl = (m) => {
+    try {
+      const filename = m.fileUrl.startsWith('/') ? m.fileUrl.split('/').pop() : m.fileUrl.split('/').pop();
+      return `${SERVER_URL}/api/files/download/${filename}`;
+    } catch (error) {
+      console.error('Error getting media display URL:', error);
+      return '';
+    }
   };
 
   const [modalTab, setModalTab] = useState(null); // potential future use
@@ -895,48 +945,68 @@ export default function Chat() {
       background: dark ? 'linear-gradient(135deg,#232526 0%,#414345 100%)' : lightGradient,
       borderRadius:24,
       boxShadow: dark? '0 8px 32px rgba(0,0,0,0.38)' : '0 8px 32px rgba(0,0,0,0.14)',
-      padding:44,minWidth:340,maxWidth:440,width:'92vw',zIndex:1001,
+      padding:44,minWidth:340,maxWidth:440,width:'92vw',zIndex:10001,
       display:'flex',flexDirection:'column',alignItems:'center',
       border:`1.5px solid ${dark? borderColor : '#b6d4fe'}`,
       color: dark? '#eaf4fd':'#1a2a3a',
       animation:'fadeInModal .25s ease'
     };
     return (
-      <div style={modalStyle}>
-        {/* close x */}
-        <FaTimes onClick={()=>setSelectedUser(null)} style={{position:'absolute',top:18,right:22,cursor:'pointer',fontSize:18,color:dark?'#eaf4fd':'#666'}}/>
-        {/* avatar */}
-        <div style={{width:120,height:120,borderRadius:'50%',border:`3px solid ${primaryColor}`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:48,fontWeight:700,color:primaryColor.toString(),marginBottom:24,textTransform:'uppercase'}}>
-          {selectedUser.username?.[0]||'?'}
-        </div>
-        {/* name */}
-        <h2 style={{margin:0,fontSize:24,fontWeight:800,textAlign:'center',color:dark?'#eaf4fd':'#1d1d25'}}>{selectedUser.username}</h2>
-        {/* email */}
-        { (prof.email || selectedUser.email) && (
-          <div style={{marginTop:6,display:'flex',alignItems:'center',gap:6,fontSize:15,color:primaryColor}}>
-            <FaEnvelope/> {(prof.email || selectedUser.email)}
-          </div>
-        ) }
-        {/* bio */}
-        {prof.bio && <div style={{marginTop:18,background:dark?'#102027':'#0d47a1',color:'#eaf4fd',borderRadius:10,padding:'10px 14px',maxWidth:'100%',fontStyle:'italic',fontSize:15,display:'flex',alignItems:'center',gap:6}}><FaQuoteLeft/> {prof.bio}</div>}
-        {/* skills */}
-        {Array.isArray(skills)&&skills.length>0 && (
-          <div style={{marginTop:18,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
-            {skills.map((s,i)=>(<span key={i} style={{background:primaryColor,color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:13,fontWeight:700,whiteSpace:'nowrap'}}>{s}</span>))}
-          </div>
-        )}
-        {/* info rows */}
-        <div style={{marginTop:24,width:'100%'}}>
-          {rows.map(r=> (
-            <div key={r.key} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,fontSize:15}}>
-              <span style={{fontSize:18,color:iconColors[r.key]||primaryColor}}>{iconMap[r.key]}</span>
-              <span style={{fontWeight:700,minWidth:90}}>{r.label}</span>
-              <span style={{flex:1}}>{r.value}</span>
+      <>
+        {/* Backdrop */}
+        <div 
+          onClick={() => setSelectedUser(null)} 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: '#0008',
+            zIndex: 10000
+          }}
+        />
+        {/* Modal */}
+        <div style={modalStyle}>
+          {/* close x */}
+          <FaTimes onClick={()=>setSelectedUser(null)} style={{position:'absolute',top:18,right:22,cursor:'pointer',fontSize:18,color:dark?'#eaf4fd':'#666'}}/>
+          {/* avatar */}
+          <Avatar 
+            user={selectedUser}
+            isMe={false}
+            size={120}
+            onClick={null}
+            primaryColor={primaryColor}
+          />
+          {/* name */}
+          <h2 style={{margin:0,fontSize:24,fontWeight:800,textAlign:'center',color:dark?'#eaf4fd':'#1d1d25'}}>{selectedUser.username}</h2>
+          {/* email */}
+          { (prof.email || selectedUser.email) && (
+            <div style={{marginTop:6,display:'flex',alignItems:'center',gap:6,fontSize:15,color:primaryColor}}>
+              <FaEnvelope/> {(prof.email || selectedUser.email)}
             </div>
-          ))}
+          ) }
+          {/* bio */}
+          {prof.bio && <div style={{marginTop:18,background:dark?'#102027':'#0d47a1',color:'#eaf4fd',borderRadius:10,padding:'10px 14px',maxWidth:'100%',fontStyle:'italic',fontSize:15,display:'flex',alignItems:'center',gap:6}}><FaQuoteLeft/> {prof.bio}</div>}
+          {/* skills */}
+          {Array.isArray(skills)&&skills.length>0 && (
+            <div style={{marginTop:18,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
+              {skills.map((s,i)=>(<span key={i} style={{background:primaryColor,color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:13,fontWeight:700,whiteSpace:'nowrap'}}>{s}</span>))}
+            </div>
+          )}
+          {/* info rows */}
+          <div style={{marginTop:24,width:'100%'}}>
+            {rows.map(r=> (
+              <div key={r.key} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,fontSize:15}}>
+                <span style={{fontSize:18,color:iconColors[r.key]||primaryColor}}>{iconMap[r.key]}</span>
+                <span style={{fontWeight:700,minWidth:90}}>{r.label}</span>
+                <span style={{flex:1}}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+          <button onClick={()=>setSelectedUser(null)} style={{background: dark? 'linear-gradient(90deg,#3976a8 0%, #36607e 100%)':'linear-gradient(90deg,#3976a8 0%, #b6d4fe 100%)',color:'#fff',border:'none',borderRadius:14,padding:'12px 38px',fontWeight:700,fontSize:17,marginTop:8,alignSelf:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.1)',cursor:'pointer',letterSpacing:1,transition:'background 0.2s'}}>Back</button>
         </div>
-        <button onClick={()=>setSelectedUser(null)} style={{background: dark? 'linear-gradient(90deg,#3976a8 0%, #36607e 100%)':'linear-gradient(90deg,#3976a8 0%, #b6d4fe 100%)',color:'#fff',border:'none',borderRadius:14,padding:'12px 38px',fontWeight:700,fontSize:17,marginTop:8,alignSelf:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.1)',cursor:'pointer',letterSpacing:1,transition:'background 0.2s'}}>Back</button>
-      </div>
+      </>
     );
   }
 
@@ -1086,11 +1156,11 @@ export default function Chat() {
       <div style={headerStyle}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
           <div style={{ fontWeight: 800, fontSize: 22, color: dark ? '#eaf4fd' : '#3976a8', marginLeft: 8 }}>
-            {selectedChat ? selectedChat.label : (t('chat.chooseChat') || 'Выберите чат')}
+            {selectedChat ? selectedChat.label : (t('chat.chooseChat'))} 
           </div>
           {selectedChat && (
             <div style={{ fontSize: 15, color: '#888', marginLeft: 8, marginTop: 2 }}>
-              {chatMessages.length} {t('chat.messages')}
+              {chatMessages.length} {t('chat.messages')} 
             </div>
           )}
         </div>
@@ -1121,7 +1191,14 @@ export default function Chat() {
         </div>
       </div>
       {/* Сообщения */}
-      <div className="container" style={{ maxWidth: 600, margin: '0 auto', padding: 0, marginLeft: sidebarOpen ? sidebarWidth + (showRightPanel ? 320 : 0) : (showRightPanel ? 320 : 0), transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1)' }}>
+      <div className="container" style={{ 
+        maxWidth: 600, 
+        margin: '0 auto', 
+        padding: 0, 
+        marginLeft: sidebarOpen ? sidebarWidth + (showRightPanel ? 320 : 0) : (showRightPanel ? 320 : 0), 
+        paddingLeft: !sidebarOpen ? '50px' : (sidebarOpen && !showRightPanel ? '20px' : '0'),
+        transition: 'margin-left 0.22s cubic-bezier(0.4,0,0.2,1), padding-left 0.22s cubic-bezier(0.4,0,0.2,1)' 
+      }}>
         <div style={messagesContainerStyle}>
           {loadingMessages ? (
             <div style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>Загрузка сообщений...</div>
@@ -1129,7 +1206,7 @@ export default function Chat() {
             <div style={{
               ...emptyStyle,
               position: 'absolute',
-              left: sidebarOpen ? sidebarWidth : 0,
+              left: sidebarOpen ? sidebarWidth + (sidebarOpen && !showRightPanel ? 20 : 0) : 50,
               right: showRightPanel ? 320 : 0,
               top: 0,
               bottom: 0,
@@ -1142,17 +1219,34 @@ export default function Chat() {
               pointerEvents: 'none',
               zIndex: 2,
             }}>
-              {selectedChat ? (t('chat.noMessages') || 'Нет сообщений') : (t('chat.chooseChat') || 'Выберите чат')}
+              {selectedChat ? (t('chat.noMessages')) : (t('chat.chooseChat'))}
             </div>
           ) : chatMessages.map((msg, i) => {
             const isMe = (msg.user && (msg.user.username || msg.user) === username) || (typeof msg.user === 'string' && msg.user === username);
             const displayName = msg.user && typeof msg.user === 'object' ? (msg.user.username || msg.user.name || 'Anonymous') : (msg.user || 'Anonymous');
+            const userAvatar = msg.user && typeof msg.user === 'object' ? msg.user.avatar : null;
             const displayTime = msg.sentAt ? new Date(msg.sentAt) : (msg.time ? new Date(msg.time) : null);
             return (
               <div key={msg.id || i} style={{ display: 'flex', flexDirection: 'row', alignItems: 'flex-end', marginBottom: 10, justifyContent: 'flex-start', width: '100%' }}>
-                <div style={avatarStyle(isMe)} onClick={()=> setSelectedUser(typeof msg.user==='object'? msg.user : {id:msg.user, username:msg.user})}>{displayName[0] ? displayName[0].toUpperCase() : '?'}</div>
+                <Avatar 
+                  user={(() => {
+                    const username = typeof msg.user==='object'? (msg.user.username || msg.user.name) : msg.user;
+                    const participant = participants.find(p => p.username === username);
+                    return participant || (typeof msg.user==='object'? msg.user : {id:msg.user, username:msg.user});
+                  })()}
+                  isMe={isMe}
+                  onClick={()=> {
+                    const username = typeof msg.user==='object'? (msg.user.username || msg.user.name) : msg.user;
+                    const participant = participants.find(p => p.username === username);
+                    setSelectedUser(participant || (typeof msg.user==='object'? msg.user : {id:msg.user, username:msg.user}));
+                  }}
+                />
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', flex: 1 }}>
-                  <span style={nameStyle(isMe)} onClick={()=> setSelectedUser(typeof msg.user==='object'? msg.user : {id:msg.user, username:msg.user})}>{isMe ? (t('chat.you')) : displayName}</span>
+                  <span style={nameStyle(isMe)} onClick={()=> {
+                    const username = typeof msg.user==='object'? (msg.user.username || msg.user.name) : msg.user;
+                    const participant = participants.find(p => p.username === username);
+                    setSelectedUser(participant || (typeof msg.user==='object'? msg.user : {id:msg.user, username:msg.user}));
+                  }}>{isMe ? (t('chat.you')) : displayName}</span>
                   <span
                     style={{ ...bubbleStyle(isMe), marginLeft: 0, marginRight: 16, cursor: 'context-menu', alignSelf: 'flex-start' }}
                     onContextMenu={e => handleContextMenu(e, i)}
@@ -1162,12 +1256,28 @@ export default function Chat() {
                     {/* Медиа/файл */}
                     {msg.fileUrl && (/\.(png|jpe?g|gif|webp|svg)$/i.test(msg.fileUrl) || (msg.fileType && msg.fileType.startsWith('image/'))) && (
                       <div style={{ marginTop: 8 }}>
-                        <img src={msg.fileUrl.startsWith('/') ? SERVER_URL + msg.fileUrl : msg.fileUrl} alt={msg.fileName || ''} style={{ maxWidth: 220, maxHeight: 220, borderRadius: 10 }} />
+                        <img 
+                          src={getFileDisplayUrl(msg)} 
+                          alt={msg.fileName || ''} 
+                          style={{ maxWidth: 220, maxHeight: 220, borderRadius: 10 }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            console.warn('Failed to load image:', msg.fileUrl);
+                          }}
+                        />
                       </div>
                     )}
                     {msg.fileUrl && (/\.(mp4|webm|ogg)$/i.test(msg.fileUrl) || (msg.fileType && msg.fileType.startsWith('video/'))) && (
                       <div style={{ marginTop: 8 }}>
-                        <video src={msg.fileUrl.startsWith('/') ? SERVER_URL + msg.fileUrl : msg.fileUrl} controls style={{ maxWidth: 220, borderRadius: 10 }} />
+                        <video 
+                          src={getFileDisplayUrl(msg)} 
+                          controls 
+                          style={{ maxWidth: 220, borderRadius: 10 }}
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            console.warn('Failed to load video:', msg.fileUrl);
+                          }}
+                        />
                       </div>
                     )}
                     {msg.fileUrl && (!msg.fileType || (!msg.fileType.startsWith('image/') && !msg.fileType.startsWith('video/'))) && (
@@ -1268,7 +1378,7 @@ export default function Chat() {
                   addToMyChats(selectedChat.id);
                 }
               }}
-              placeholder={t('chat.placeholder') || 'Введите сообщение...'}
+              placeholder={t('chat.placeholder')}
               style={{ flex: 1, borderRadius: 14, border: `1.5px solid ${borderColor}`, padding: '14px 20px', fontSize: 17, background: dark ? '#213747' : '#f9fafd', color: fieldColor, boxShadow: 'none', outline: 'none', transition: 'border 0.2s' }}
               autoFocus
               maxLength={500}
@@ -1282,7 +1392,7 @@ export default function Chat() {
             />
             <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ background: '#eaf4fd', color: '#3976a8', border: 'none', borderRadius: 10, padding: '0 14px', fontWeight: 700, fontSize: 22, height: 44, cursor: 'pointer' }}>📎</button>
             <button type="submit" style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 14, padding: '0 32px', fontWeight: 700, fontSize: 17, height: 52, boxShadow: '0 2px 8px rgba(0,0,0,0.10)', transition: 'background 0.2s', letterSpacing: 1 }}>
-              {t('chat.send') || 'Отправить'}
+              {t('chat.send')}
             </button>
           </form>
           {/* Предпросмотр файла */}
@@ -1292,9 +1402,9 @@ export default function Chat() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{file.name}</div>
                 <div style={{ fontSize: 13, color: '#888' }}>{(file.size/1024).toFixed(1)} KB</div>
-                <input type="text" value={caption} onChange={e => setCaption(e.target.value)} placeholder={t('chat.caption') || 'Подпись к файлу (необязательно)'} style={{ marginTop: 6, borderRadius: 8, border: `1px solid ${borderColor}`, padding: '6px 10px', fontSize: 15, width: '100%' }} />
+                <input type="text" value={caption} onChange={e => setCaption(e.target.value)} placeholder={t('chat.caption')} style={{ marginTop: 6, borderRadius: 8, border: `1px solid ${borderColor}`, padding: '6px 10px', fontSize: 15, width: '100%' }} />
               </div>
-              <button type="button" onClick={resetFile} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '6px 14px', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{t('common.reset') || 'Сбросить'}</button>
+              <button type="button" onClick={resetFile} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '6px 14px', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{t('common.reset')}</button>
             </div>
           )}
         </div>
@@ -1389,8 +1499,8 @@ export default function Chat() {
               <button onClick={() => setLinksModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaLink />{t('chat.sharedLinks')} ({sharedLinks.length})</button>
               <button onClick={() => setFilesModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaFileAlt />{t('chat.sharedFiles')} ({sharedFiles.length})</button>
               <button onClick={() => setPhotosModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaImage />{t('chat.sharedPhotos')} ({sharedPhotos.length})</button>
-              <button onClick={() => setVideosModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaVideo />{t('chat.sharedVideos')||'Видео'} ({sharedVideos.length})</button>
-              <button onClick={() => setAudiosModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaMusic />{t('chat.sharedAudios')||'Аудио'} ({sharedAudios.length})</button>
+              <button onClick={() => setVideosModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaVideo />{t('chat.sharedVideos')} ({sharedVideos.length})</button>
+              <button onClick={() => setAudiosModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaMusic />{t('chat.sharedAudios')} ({sharedAudios.length})</button>
               <button onClick={() => setGifsModalOpen(true)} style={{background: 'none', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 700, fontSize: 16, cursor: 'pointer', whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'left', width: '100%', display: 'flex', alignItems: 'center', gap: 8}}><FaFileImage />GIF ({sharedGifs.length})</button>
             </div>
           </div>
@@ -1403,7 +1513,12 @@ export default function Chat() {
             <ul style={{listStyle: 'none', padding: 0, margin: 0}}>
               {participants.sort((a,b)=> (b.online?1:0)-(a.online?1:0)).map(user => (
                 <li key={user.id} style={{display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, cursor: 'pointer', borderRadius: 8, padding: '4px 6px', transition: 'background 0.13s'}} onClick={() => setSelectedUser(user)}>
-                  <div style={{width: 32, height: 32, borderRadius: '50%', background: '#b6d4fe', color: '#3976a8', fontWeight: 700, fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{user.username[0]?.toUpperCase() || '?'}</div>
+                  <Avatar 
+                    user={user}
+                    isMe={false}
+                    size={32}
+                    onClick={() => setSelectedUser(user)}
+                  />
                   <div style={{flex: 1, minWidth: 0, wordBreak: 'break-all', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'normal', fontSize: 15}}>{user.username}</div>
                   {user.online && <span style={{width:8,height:8,borderRadius:'50%',background:'#4caf50'}}/>}
                 </li>
@@ -1411,11 +1526,10 @@ export default function Chat() {
             </ul>
             </div>
           </div>
-          {/* Модальное окно/блок с инфой о пользователе */}
-          {selectedUser && <UserProfileModal/>}
+          {/* Модальное окно/блок с инфой о пользователе - перемещено в конец компонента */}
           {panelTab === 'links' && !linksModalOpen && (
             <div style={{padding:'0 24px', marginTop:12, overflowY:'auto', maxHeight:200}}>
-              {sharedLinks.length === 0 && <div style={{color:'#888'}}>{t('chat.noLinks')||'Нет ссылок'}</div>}
+              {sharedLinks.length === 0 && <div style={{color:'#888'}}>{t('chat.noLinks')}</div>}
               <ul style={{padding:0, margin:0, listStyle:'none'}}>
                 {sharedLinks.map((l,i)=>(<li key={i} style={{marginBottom:6}}><a href={l} target="_blank" rel="noopener noreferrer" style={{color: dark ? '#7ecbff' : '#3976a8'}}>{l}</a></li>))}
               </ul>
@@ -1423,7 +1537,7 @@ export default function Chat() {
           )}
           {panelTab === 'files' && !filesModalOpen && (
             <div style={{padding:'0 24px', marginTop:12, overflowY:'auto', maxHeight:200}}>
-              {sharedFiles.length === 0 && <div style={{color:'#888'}}>{t('chat.noFiles')||'Нет файлов'}</div>}
+              {sharedFiles.length === 0 && <div style={{color:'#888'}}>{t('chat.noFiles')}</div>}
               <ul style={{padding:0, margin:0, listStyle:'none'}}>
                 {sharedFiles.map((m,i)=>(<li key={i} style={{marginBottom:6}}><a href={getDownloadUrl(m, m.fileName || decodeURIComponent(m.fileUrl.split('/').pop()))} target="_blank" rel="noopener noreferrer" style={{color: dark ? '#7ecbff' : '#3976a8'}}>{m.fileName || decodeURIComponent(m.fileUrl.split('/').pop())}</a></li>))}
               </ul>
@@ -1431,8 +1545,19 @@ export default function Chat() {
           )}
           {panelTab === 'photos' && !photosModalOpen && (
             <div style={{padding:'0 24px', marginTop:12, overflowY:'auto', maxHeight:200, display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(90px,1fr))', gap:8, alignContent:'flex-start'}}>
-              {sharedPhotos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noPhotos')||'Нет изображений'}</div>}
-              {sharedPhotos.map((m,i)=>(<img key={i} src={m.fileUrl.startsWith('/')?SERVER_URL+m.fileUrl:m.fileUrl} alt='' style={{width:'100%',height:120,objectFit:'cover',borderRadius:6}}/>))}
+              {sharedPhotos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noPhotos')}</div>}
+              {sharedPhotos.map((m,i)=>(
+                <img 
+                  key={i} 
+                  src={getMediaDisplayUrl(m)} 
+                  alt='' 
+                  style={{width:'100%',height:120,objectFit:'cover',borderRadius:6}}
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    console.warn('Failed to load shared photo:', m.fileUrl);
+                  }}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -1477,8 +1602,8 @@ export default function Chat() {
               <button onClick={() => setPhotosModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:12,gridAutoRows:'120px',alignContent:'flex-start'}}>
-              {sharedPhotos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noPhotos')||'Нет изображений'}</div>}
-              {sharedPhotos.map((m,i)=>(<img key={i} src={m.fileUrl.startsWith('/')?SERVER_URL+m.fileUrl:m.fileUrl} alt='' style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:6}}/>))}
+              {sharedPhotos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noPhotos')}</div>}
+              {sharedPhotos.map((m,i)=>(<img key={i} src={getMediaDisplayUrl(m)} alt='' style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:6}}/>))}
             </div>
           </div>
         </>
@@ -1493,7 +1618,7 @@ export default function Chat() {
               <button onClick={() => setLinksModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1}}>
-              {sharedLinks.length === 0 && <div style={{color:'#888'}}>{t('chat.noLinks')||'Нет ссылок'}</div>}
+              {sharedLinks.length === 0 && <div style={{color:'#888'}}>{t('chat.noLinks')}</div>}
               <ul style={{padding:0,margin:0,listStyle:'none'}}>
                 {sharedLinks.map((l,i)=>(
                   <li key={i} style={{marginBottom:8}}>
@@ -1515,7 +1640,7 @@ export default function Chat() {
               <button onClick={() => setFilesModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1}}>
-              {sharedFiles.length === 0 && <div style={{color:'#888'}}>{t('chat.noFiles')||'Нет файлов'}</div>}
+              {sharedFiles.length === 0 && <div style={{color:'#888'}}>{t('chat.noFiles')}</div>}
               <ul style={{padding:0,margin:0,listStyle:'none'}}>
                 {sharedFiles.map((m,i)=>(
                   <li key={i} style={{marginBottom:8,display:'flex',alignItems:'center',gap:14,padding:'8px 10px',borderRadius:8,transition:'background 0.15s',cursor:'pointer',background: 'none'}}
@@ -1543,8 +1668,8 @@ export default function Chat() {
               <button onClick={() => setVideosModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))',gap:8,gridAutoRows:'120px',alignContent:'flex-start'}}>
-              {sharedVideos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noVideos')||'Нет видео'}</div>}
-              {sharedVideos.map((m,i)=>(<video key={i} src={m.fileUrl.startsWith('/')?SERVER_URL+m.fileUrl:m.fileUrl} controls style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:6}}/>))}
+              {sharedVideos.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noVideos')}</div>}
+              {sharedVideos.map((m,i)=>(<video key={i} src={getMediaDisplayUrl(m)} controls style={{width:'100%',height:'100%',objectFit:'cover',borderRadius:6}}/>))}
             </div>
           </div>
         </>
@@ -1556,13 +1681,13 @@ export default function Chat() {
           <div onClick={() => setAudiosModalOpen(false)} style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'#0008',zIndex:9998}}/>
           <div style={{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'60vw',maxWidth:600,height:'60vh',background:dark?'#23272f':'#fff',border:`1.5px solid ${borderColor}`,borderRadius:12,zIndex:9999,display:'flex',flexDirection:'column',padding:24,boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <h3 style={{margin:0,fontSize:22,fontWeight:800,color:dark ? '#eaf4fd' : '#3976a8'}}>{t('chat.sharedAudios')||'Аудио'} ({sharedAudios.length})</h3>
+              <h3 style={{margin:0,fontSize:22,fontWeight:800,color:dark ? '#eaf4fd' : '#3976a8'}}>{t('chat.sharedAudios')} ({sharedAudios.length})</h3>
               <button onClick={() => setAudiosModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1}}>
-              {sharedAudios.length === 0 && <div style={{color:'#888'}}>{t('chat.noAudios')||'Нет аудио'}</div>}
+              {sharedAudios.length === 0 && <div style={{color:'#888'}}>{t('chat.noAudios')}</div>}
               <ul style={{padding:0,margin:0,listStyle:'none'}}>
-                {sharedAudios.map((m,i)=>(<li key={i} style={{marginBottom:12}}><audio src={m.fileUrl.startsWith('/')?SERVER_URL+m.fileUrl:m.fileUrl} controls style={{width:'100%'}}/></li>))}
+                {sharedAudios.map((m,i)=>(<li key={i} style={{marginBottom:12}}><audio src={getMediaDisplayUrl(m)} controls style={{width:'100%'}}/></li>))}
               </ul>
             </div>
           </div>
@@ -1575,12 +1700,12 @@ export default function Chat() {
           <div onClick={() => setGifsModalOpen(false)} style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'#0008',zIndex:9998}}/>
           <div style={{position:'fixed',top:'50%',left:'50%',transform:'translate(-50%,-50%)',width:'60vw',maxWidth:600,height:'60vh',background:dark?'#23272f':'#fff',border:`1.5px solid ${borderColor}`,borderRadius:12,zIndex:9999,display:'flex',flexDirection:'column',padding:24,boxShadow:'0 4px 16px rgba(0,0,0,0.25)'}}>
             <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-              <h3 style={{margin:0,fontSize:22,fontWeight:800,color:dark ? '#eaf4fd' : '#3976a8'}}>{t('chat.sharedGifs')||'GIF'} ({sharedGifs.length})</h3>
+              <h3 style={{margin:0,fontSize:22,fontWeight:800,color:dark ? '#eaf4fd' : '#3976a8'}}>{t('chat.sharedGifs')} ({sharedGifs.length})</h3>
               <button onClick={() => setGifsModalOpen(false)} style={{background:'#3976a8',color:'#fff',border:'none',borderRadius:8,padding:'6px 14px',fontWeight:700,fontSize:15,cursor:'pointer'}}>{t('common.close')}</button>
             </div>
             <div style={{overflowY:'auto',flex:1,display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:8,alignContent:'flex-start'}}>
-              {sharedGifs.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noGifs')||'Нет GIF'}</div>}
-              {sharedGifs.map((m,i)=>(<img key={i} src={m.fileUrl.startsWith('/')?SERVER_URL+m.fileUrl:m.fileUrl} alt='' style={{width:'100%',height:120,objectFit:'cover',borderRadius:6}}/>))}
+              {sharedGifs.length === 0 && <div style={{color:'#888', gridColumn:'1 / -1'}}>{t('chat.noGifs')}</div>}
+              {sharedGifs.map((m,i)=>(<img key={i} src={getMediaDisplayUrl(m)} alt='' style={{width:'100%',height:120,objectFit:'cover',borderRadius:6}}/>))}
             </div>
           </div>
         </>
@@ -1591,6 +1716,9 @@ export default function Chat() {
           <div style={{padding:'6px 12px',cursor:'pointer'}} onClick={()=>removeChat(myChatMenu.chatId)}>{t('chat.leaveChat')}</div>
         </div>
       )}
+      
+      {/* Модальное окно с информацией о пользователе - отображается поверх всего интерфейса */}
+      {selectedUser && <UserProfileModal/>}
     </div>
   );
 } 

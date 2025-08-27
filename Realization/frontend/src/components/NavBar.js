@@ -27,6 +27,7 @@ import {
   faChalkboardTeacher,
   faQuestion,
   faLayerGroup,
+  faCog,
 } from "@fortawesome/free-solid-svg-icons";
 import useTheme from "../hooks/useTheme";
 import "../components/NavBarStyle.css";
@@ -66,18 +67,20 @@ const NavBar = () => {
   ];
 
   const changeLang = (code) => {
+    console.log('NavBar: Changing language to:', code);
     i18n.changeLanguage(code);
     localStorage.setItem('language', code);
     setCurrentLangCode(code);
     console.log('Language changed to:', code);
-    setTimeout(() => {
-      window.location.reload();
-    }, 100); // Delay reload to ensure state updates
+    // Dispatch custom event to force component updates
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: code }));
   };
 
   useEffect(() => {
     const storedLang = localStorage.getItem('language');
+    console.log('NavBar: useEffect - storedLang:', storedLang, 'currentLangCode:', currentLangCode);
     if (storedLang && storedLang !== currentLangCode) {
+      console.log('NavBar: Updating currentLangCode from', currentLangCode, 'to', storedLang);
       setCurrentLangCode(storedLang);
     }
   }); // Check localStorage on every render
@@ -135,7 +138,7 @@ const NavBar = () => {
 
   // ThemeToggle
   const ThemeToggle = (
-    <li onClick={toggleTheme} style={{ cursor: "pointer", color: "#ffffff" }}>
+    <li onClick={() => { toggleTheme(); window.location.reload(); }} style={{ cursor: "pointer", color: "#ffffff" }}>
       <div className="menu-item">
         <FontAwesomeIcon icon={theme === "light" ? faMoon : faSun} size="2x" />
         <span>{theme === "light" ? t('navbar.light_mode') : t('navbar.dark_mode')}</span>
@@ -181,7 +184,7 @@ const NavBar = () => {
         top: '100%', 
         left: '50%', 
         transform: 'translateX(-50%) translateY(-10px)', 
-        background: '#fff', 
+        background: '#1f232a', 
         listStyle: 'none', 
         padding: '10px 0', 
         margin: 0, 
@@ -194,7 +197,11 @@ const NavBar = () => {
         transition: 'opacity 0.3s ease, visibility 0.3s ease, transform 0.3s ease'
       }}>
         {languages.map(l => (
-          <li key={l.code} onClick={e => { e.stopPropagation(); changeLang(l.code); setLangMenuOpen(false); }} style={{ cursor: 'pointer', padding: '6px 20px', whiteSpace: 'nowrap', fontSize: 14, transition: 'background 0.2s ease' }} onMouseEnter={e => e.currentTarget.style.background='#f1f5fb'} onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+          <li key={l.code}
+               onClick={e => { e.stopPropagation(); changeLang(l.code); setLangMenuOpen(false); }}
+               style={{ cursor: 'pointer', padding: '6px 20px', whiteSpace: 'nowrap', fontSize: 14, color: '#eaf4fd', transition: 'transform 0.15s ease, color 0.15s ease', listStyle: 'none' }}
+               onMouseEnter={e => { e.currentTarget.style.transform='translateX(6px)'; e.currentTarget.style.color = '#fff'; }}
+               onMouseLeave={e => { e.currentTarget.style.transform='translateX(0)'; e.currentTarget.style.color = '#eaf4fd'; }}>
             {l.label}
           </li>
         ))}
@@ -214,11 +221,11 @@ const NavBar = () => {
         </a>
         <ul className="submenu">
           <li><a href={`/add-lecture/${users.id}`}>ADD LECTURE</a></li>
-          <li><a href={`/services`}>{t('navbar.all_courses')}</a></li>
+          <li><a href="/teach">{t('navbar.all_courses')}</a></li>
         </ul>
       </li>
-      <li><a href="/ShowCourseList"><div className="menu-item"><FontAwesomeIcon icon={faList} size="2x" /><span>{t('navbar.courses')}</span></div></a></li>
       <li><a href="/ShowCategoryList"><div className="menu-item"><FontAwesomeIcon icon={faFileCode} size="2x" /><span>{t('navbar.categories')}</span></div></a></li>
+      <li><a href="/users"><div className="menu-item"><FontAwesomeIcon icon={faUsers} size="2x" /><span>{t('navbar.users')}</span></div></a></li>
       <li><a href="/EnrollmentList"><div className="menu-item"><FontAwesomeIcon icon={faComputer} size="2x" /><span>{t('navbar.enrolled_users')}</span></div></a></li>
       <li className="nav-item">
         <a className="nav-link" href={`/addcourse/${users.id}`} style={{ minWidth: 60, minHeight: 56, padding: '6px 8px', borderRadius: 8, transition: 'background 0.18s', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -244,19 +251,7 @@ const NavBar = () => {
         </div>
       </li>
       <li><a href="/my-training"><div className="menu-item"><FontAwesomeIcon icon={faGraduationCap} size="2x" /><span>{t('navbar.my_training')}</span></div></a></li>
-      <li><a href="/Notifications"><div className="menu-item"><FontAwesomeIcon icon={faComments} size="2x" /><span>{t('navbar.notifications')}</span></div></a></li>
-      <li className="has-children has-children--multilevel-submenu">
-        <a>
-          <div className="menu-item">
-            <FontAwesomeIcon icon={faList} size="2x" />
-            <span>{t('navbar.courses')}</span>
-          </div>
-        </a>
-        <ul className="submenu">
-          <li><a href={`/servicesforstudent/${users.id}`}>{t('navbar.my_courses')}</a></li>
-          <li><a href="/services">{t('navbar.all_courses')}</a></li>
-        </ul>
-      </li>
+      <li><a href="/notifications"><div className="menu-item"><FontAwesomeIcon icon={faComments} size="2x" /><span>{t('navbar.notifications')}</span></div></a></li>
       <li><a href="/edit-profile"><div className="menu-item"><FontAwesomeIcon icon={faUserCircle} size="2x" /><span>{t('navbar.profile')}</span></div></a></li>
       {LanguageSelect}
       {ThemeToggle}
@@ -285,29 +280,58 @@ const NavBar = () => {
                           </div>
                         </a>
                         <ul id="main-nav-ul">
-                          <li style={{marginRight: '18px'}}><a href="/ShowCourseList"><div className="menu-item"><FontAwesomeIcon icon={faList} size="2x" /><span>{t('navbar.courses')}</span></div></a></li>
-                          <li style={{marginRight: '18px'}}><a href="/ShowCategoryList"><div className="menu-item"><FontAwesomeIcon icon={faFileCode} size="2x" /><span>{t('navbar.categories')}</span></div></a></li>
-                          <li style={{marginRight: '18px'}}><a href="/EnrollmentList"><div className="menu-item"><FontAwesomeIcon icon={faComputer} size="2x" /><span>{t('navbar.enrolled_users')}</span></div></a></li>
-                          {/* Для администратора показываем только "Преподавание" и не показываем Моє навчання и Профіль */}
                           {isAuthenticated && isAdmin && (
                             <>
-                              <li style={{marginRight: '18px'}}><a href="/teach/courses"><div className="menu-item"><FontAwesomeIcon icon={faChalkboardTeacher} size="2x" /><span>{t('navbar.teaching')}</span></div></a></li>
+                              <li style={{marginRight: '18px'}}><Link to="/ShowCategoryList"><div className="menu-item"><FontAwesomeIcon icon={faFileCode} size="2x" /><span>{t('navbar.categories')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}><Link to="/EnrollmentList"><div className="menu-item"><FontAwesomeIcon icon={faComputer} size="2x" /><span>{t('navbar.enrolled_users')}</span></div></Link></li>
+                            </>
+                          )}
+                          {isAuthenticated && isAdmin && (
+                            <>
+                              <li style={{marginRight: '18px'}}><Link to="/teach"><div className="menu-item"><FontAwesomeIcon icon={faChalkboardTeacher} size="2x" /><span>{t('navbar.teaching')}</span></div></Link></li>
+                            </>
+                          )}
+                          {isAuthenticated && !isAdmin && (
+                            <>
+                              <li style={{marginRight: '18px'}}><Link to="/my-training"><div className="menu-item"><FontAwesomeIcon icon={faGraduationCap} size="2x" /><span>{t('navbar.my_training')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}><Link to="/course-catalog"><div className="menu-item"><FontAwesomeIcon icon={faBook} size="2x" /><span>{t('navbar.course_catalog')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}><Link to="/edit-profile"><div className="menu-item"><FontAwesomeIcon icon={faUserCircle} size="2x" /><span>{t('navbar.profile')}</span></div></Link></li>
                               <li style={{marginRight: '18px'}}>
-                                <a href="/notifications">
+                                <Link 
+                                  to="/user-notifications"
+                                  style={{
+                                    color: '#ffffff',
+                                    textDecoration: 'none'
+                                  }}
+                                >
                                   <div className="menu-item">
-                                    <FontAwesomeIcon icon={faBell} size="2x" />
-                                    <span>{t('navbar.notifications')}</span>
+                                    <FontAwesomeIcon icon={faBell} size="2x" style={{ color: '#ffffff' }} />
+                                    <span style={{ color: '#ffffff' }}>{t('navbar.notifications')}</span>
                                   </div>
-                                </a>
+                                </Link>
                               </li>
                             </>
                           )}
-                          {/* Для обычного пользователя показываем только "Моє навчання" и "Профіль", не показываем Преподавание */}
-                          {isAuthenticated && !isAdmin && (
+                          {/* Для незарегистрированных пользователей показываем основные страницы */}
+                          {!isAuthenticated && (
                             <>
-                              <li style={{marginRight: '18px'}}><a href="/my-training"><div className="menu-item"><FontAwesomeIcon icon={faGraduationCap} size="2x" /><span>{t('navbar.my_training')}</span></div></a></li>
-                              <li style={{marginRight: '18px'}}><a href="/edit-profile"><div className="menu-item"><FontAwesomeIcon icon={faUserCircle} size="2x" /><span>{t('navbar.profile')}</span></div></a></li>
-                              <li style={{marginRight: '18px'}}><a href="/Notifications"><div className="menu-item"><FontAwesomeIcon icon={faComments} size="2x" /><span>{t('navbar.notifications')}</span></div></a></li>
+                              <li style={{marginRight: '18px'}}><Link to="/my-training"><div className="menu-item"><FontAwesomeIcon icon={faGraduationCap} size="2x" /><span>{t('navbar.my_training')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}><Link to="/course-catalog"><div className="menu-item"><FontAwesomeIcon icon={faBook} size="2x" /><span>{t('navbar.course_catalog')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}><Link to="/edit-profile"><div className="menu-item"><FontAwesomeIcon icon={faUserCircle} size="2x" /><span>{t('navbar.profile')}</span></div></Link></li>
+                              <li style={{marginRight: '18px'}}>
+                                <Link 
+                                  to="/user-notifications"
+                                  style={{
+                                    color: '#ffffff',
+                                    textDecoration: 'none'
+                                  }}
+                                >
+                                  <div className="menu-item">
+                                    <FontAwesomeIcon icon={faBell} size="2x" style={{ color: '#ffffff' }} />
+                                    <span style={{ color: '#ffffff' }}>{t('navbar.notifications')}</span>
+                                  </div>
+                                </Link>
+                              </li>
                             </>
                           )}
                           <li style={{marginRight: '18px'}}>{LanguageSelect}</li>
@@ -319,9 +343,7 @@ const NavBar = () => {
                         </div>
                       </nav>
                       <nav className="Navbar__Items" style={{ display: displayProp }}>
-                        <ul style={{ display: displayProp, flexDirection: flexProp }}>
-                          {/* renderLinks() */}
-                        </ul>
+                        {/* Мобильная навигация будет добавлена позже при необходимости */}
                       </nav>
                     </div>
                   </div>
@@ -340,18 +362,19 @@ const NavBar = () => {
           alignItems: "center", justifyContent: "center", zIndex: 1000
         }}>
           <div style={{
-            backgroundColor: "#fff", padding: "30px", borderRadius: "8px",
-            textAlign: "center", minWidth: "300px", maxWidth: "400px", position: "relative"
+            backgroundColor: theme === 'dark' ? '#23272f' : '#fff', padding: "30px", borderRadius: "12px",
+            textAlign: "center", minWidth: "300px", maxWidth: "400px", position: "relative",
+            color: theme === 'dark' ? '#eaf4fd' : '#000', border: `1px solid ${theme==='dark' ? '#3c4250' : '#e9ecef'}`
           }}>
             <div style={{ fontSize: "40px", marginBottom: "10px" }}>🤔</div>
-            <div style={{ fontSize: "18px", marginBottom: "20px" }}>
+            <div style={{ fontSize: "18px", marginBottom: "20px", color: theme==='dark' ? '#eaf4fd' : '#000' }}>
               {t('navbar.logout_confirm')}
             </div>
             <div style={{ display: "flex", justifyContent: "center", gap: "10px" }}>
-              <button onClick={handleLogoutConfirm} style={{ backgroundColor: "#28a745", color: "white", padding: "8px 16px", border: "none", borderRadius: "4px" }}>
+              <button onClick={handleLogoutConfirm} style={{ backgroundColor: "#28a745", color: "white", padding: "8px 16px", border: "none", borderRadius: "8px" }}>
                 {t('navbar.ok')}
               </button>
-              <button onClick={() => setShowModal(false)} style={{ padding: "8px 16px", border: "1px solid gray", borderRadius: "4px", backgroundColor: "white" }}>
+              <button onClick={() => setShowModal(false)} style={{ padding: "8px 16px", border: `1px solid ${theme==='dark' ? '#3c4250' : '#adb5bd'}`, borderRadius: "8px", backgroundColor: theme==='dark' ? '#2d2f36' : "white", color: theme==='dark' ? '#eaf4fd' : "#000000" }}>
                 {t('navbar.cancel')}
               </button>
             </div>
@@ -384,14 +407,14 @@ function renderSub(node){
   if(!node) return null;
   if(!node.children || node.children.length===0) return null;
   return (
-    <ul style={{listStyle:'none',margin:0,paddingLeft:20}}>
+    <div style={{margin:0,paddingLeft:20}}>
       {node.children.map(child=> (
-        <li key={child.id} style={{margin:'4px 0'}}>
+        <div key={child.id} style={{margin:'4px 0', padding:'4px 8px', cursor:'pointer'}}>
           {child.name}
           {renderSub(child)}
-        </li>
+        </div>
       ))}
-    </ul>
+    </div>
   );
 }
 

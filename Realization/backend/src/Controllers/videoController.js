@@ -35,7 +35,7 @@ const uploadVideo = (req) => {
       }
 
       if (!req.file) {
-        return reject(new Error("No file uploaded"));
+        return resolve(null);
       }
 
       const relativePath = `/static/${req.file.filename}`;

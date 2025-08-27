@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import i18n from '../i18n';
+import { useHistory, useLocation } from 'react-router-dom';
+import { useLanguage } from '../hooks/useLanguage';
 import axios from '../utils/axios';
 import jwt_decode from 'jwt-decode';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const langOptions = [
   { value: 'en', label: 'EN' },
@@ -13,13 +15,6 @@ const langOptions = [
   { value: 'uk', label: 'UK' },
   { value: 'zh', label: 'ZH' },
   { value: 'be', label: 'BE' },
-];
-
-const t = i18n.t.bind(i18n);
-
-const sortOptions = [
-  { value: 'name', label: t('users.sort_by_name', 'По имени') },
-  { value: 'date', label: t('users.sort_by_date', 'По дате регистрации') },
 ];
 
 function usePrefersDark() {
@@ -34,22 +29,35 @@ function usePrefersDark() {
 }
 
 function Users() {
+  const { t } = useLanguage();
+  
+  const sortOptions = [
+    { value: 'name', label: t('users.sort_by_name') },
+    { value: 'role', label: t('users.sort_by_role') },
+  ];
+  
   const [users, setUsers] = useState([]);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('name');
   const [lang, setLang] = useState(localStorage.getItem('language') || 'ru');
-  const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
+  const [theme, setTheme] = useState(null); 
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
   const history = useHistory();
+  const location = useLocation();
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [editProfile, setEditProfile] = useState({});
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
 
   useEffect(() => {
-    // Determine current user role from token
     const token = localStorage.getItem('jwtToken');
     if (token) {
       try {
@@ -71,19 +79,48 @@ function Users() {
           headers: { Authorization: `Bearer ${token}` },
         });
         setUsers(res.data || []);
+        
+        if (location.search) {
+          const urlParams = new URLSearchParams(location.search);
+          const searchQuery = urlParams.get('search');
+          const editUserId = urlParams.get('editUserId');
+          const openEditModal = urlParams.get('openEditModal');
+          
+          if (searchQuery) {
+            setQuery(searchQuery);
+          }
+          
+          if (openEditModal === 'true' && editUserId) {
+            const userToEdit = res.data.find(user => user.id === parseInt(editUserId));
+            if (userToEdit) {
+              setTimeout(() => {
+                openEdit(userToEdit);
+                history.replace(location.pathname, {});
+              }, 100);
+            }
+          }
+        }
+        else if (location.state?.openEditModal && location.state?.editUserId) {
+          const userToEdit = res.data.find(user => user.id === location.state.editUserId);
+          if (userToEdit) {
+            setTimeout(() => {
+              openEdit(userToEdit);
+              history.replace(location.pathname, {});
+            }, 100);
+          }
+        }
       } catch (err) {
-        setError(err.response?.data?.message || 'Ошибка загрузки пользователей');
+        setError(err.response?.data?.message || t('users.load_error'));
       } finally {
         setLoading(false);
       }
     }
     fetchUsers();
-  }, []);
+  }, [location.state, location.search, history, location.pathname]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
     if (savedTheme) setTheme(savedTheme);
-    // Listen for theme changes dispatched globally
     const handleThemeChange = () => {
       const th = localStorage.getItem('theme');
       if (th) setTheme(th);
@@ -92,7 +129,6 @@ function Users() {
     return () => window.removeEventListener('themeChanged', handleThemeChange);
   }, []);
 
-  // Persist theme selection changes
   useEffect(() => {
     if (theme) {
       localStorage.setItem('theme', theme);
@@ -105,12 +141,10 @@ function Users() {
   const fieldColor = dark ? '#ddd' : '#222';
   const borderColor = dark ? '#36607e' : '#e0e0e0';
 
-  // Filter users by role
-  const filtered = users
+  const filteredUsers = users
     .filter(u => {
-      if (currentUserRole === 'ADMIN') return true;
-      if (currentUserRole === 'USER') return u.role === 'USER';
-      return false;
+      if (!u) return false;
+      return true;
     })
     .filter(u => {
       const q = query.toLowerCase();
@@ -124,17 +158,14 @@ function Users() {
     })
     .sort((a, b) => {
       if (sort === 'name') return (a.name || a.username || '').localeCompare(b.name || b.username || '');
-      if (sort === 'date') return new Date(b.createdAt || b.registered) - new Date(a.createdAt || a.registered);
       if (sort === 'role') return (a.role || '').localeCompare(b.role || '');
       return 0;
     });
-
-  // Fetch profile by user id when selected
   useEffect(() => {
     if (selected && selected.id) {
       const token = localStorage.getItem('jwtToken');
       axios.get(`/profile/user/${selected.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { Authorization: {Authorization: `Bearer ${token}`} },
       })
         .then(res => setSelectedProfile(res.data))
         .catch(() => setSelectedProfile(null));
@@ -143,7 +174,6 @@ function Users() {
     }
   }, [selected]);
 
-  // Helper to render only filled fields in pretty format
   function renderProfileFields(profile) {
     if (!profile) return null;
     const fields = [
@@ -162,7 +192,7 @@ function Users() {
       { label: t('profile.status') + ':', value: profile.status },
       { label: t('profile.aboutMe') + ':', value: profile.aboutMe },
     ];
-    // Truncate long values (like bio) with ellipsis
+
     const maxLen = 220;
     function truncate(val) {
       if (!val) return '';
@@ -179,9 +209,103 @@ function Users() {
     );
   }
 
+  const openEdit = async (u) => {
+    console.log('openEdit called with user:', u);
+    setEditUser(u);
+    setEditOpen(true);
+    setAvatarFile(null);
+    setAvatarPreview(null);
+    console.log('editOpen set to true');
+    
+    try {
+      const token = localStorage.getItem('jwtToken');
+      const res = await axios.get(`/profile/user/${u.id}`, { headers: { Authorization: `Bearer ${token}` } });
+      console.log('Profile data loaded:', res.data);
+      
+      setEditProfile({
+        username: u.username || '',
+        name: res.data?.name || '',
+        surname: res.data?.surname || '',
+        additionalName: res.data?.additionalName || '',
+        email: u.email || '',
+        bio: res.data?.bio || '',
+        jobTitle: res.data?.jobTitle || '',
+        position: res.data?.position || '',
+        company: res.data?.company || '',
+        city: res.data?.city || '',
+        country: res.data?.country || '',
+        goal: res.data?.goal || '',
+        status: res.data?.status || '',
+        skills: Array.isArray(res.data?.skills) ? res.data.skills.join(', ') : (res.data?.skills || ''),
+        aboutMe: res.data?.aboutMe || '',
+        githubusername: res.data?.githubusername || '',
+        role: u.role || 'USER' 
+      });
+      console.log('editProfile set');
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      setEditProfile({ username: u.username || '', email: u.email || '' });
+    }
+  };
+
+  const saveEdit = async () => {
+    try {
+      setSavingEdit(true);
+      const token = localStorage.getItem('jwtToken');
+      
+      console.log('Отправляем данные для обновления:', { userId: editUser.id, ...editProfile });
+      
+      // Создаем FormData для отправки всех данных
+      const formData = new FormData();
+      formData.append('userId', editUser.id.toString());
+      
+      // Добавляем все поля профиля
+      Object.keys(editProfile).forEach(key => {
+        formData.append(key, editProfile[key]);
+      });
+      
+      // Добавляем файл аватарки, если он выбран
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+      
+      await axios.post(`/profile/admin/update`, formData, { 
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        } 
+      }).catch(async (err) => { throw err; });
+      
+      const res = await axios.get('/auth/users', { headers: { Authorization: `Bearer ${token}` } });
+      setUsers(res.data || []);
+      setEditOpen(false);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      toast.success(t('users.changes_saved'));
+    } catch (e) {
+      const msg = e?.response?.data?.username || e?.response?.data?.error || e?.response?.data?.message || t('users.save_error');
+      toast.error(msg);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setAvatarPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div style={{ background: pageBg, minHeight: '100vh', padding: '40px 0' }}>
       <div className="container" style={{ maxWidth: 900, margin: '0 auto' }}>
+        <ToastContainer position="top-center" theme={dark ? 'dark' : 'light'} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24, justifyContent: 'flex-end' }}>
           <select
             aria-label="Select language"
@@ -203,13 +327,13 @@ function Users() {
             style={{ padding: '0.5rem 1.5rem', backgroundColor: '#3976a8', color: '#fff', border: 'none', borderRadius: 20, cursor: 'pointer', fontSize: '1rem', transition: '0.3s', transform: 'translateY(0px)', boxShadow: 'none' }}
             onClick={() => history.goBack()}
           >
-            {t('reviews.back') || 'Назад'}
+            {t('reviews.back')}
           </button>
         </div>
         <div style={{ display: 'flex', gap: 16, marginBottom: 32 }}>
           <input
             type="search"
-            placeholder={t('users.search_placeholder', 'Поиск по имени, email...')}
+            placeholder={t('users.search_placeholder')}
             className="form-control"
             value={query}
             onChange={e => setQuery(e.target.value)}
@@ -230,7 +354,7 @@ function Users() {
           </select>
         </div>
         {loading ? (
-          <div style={{ color: '#888', fontSize: 18, textAlign: 'center', padding: 40 }}>Загрузка...</div>
+          <div style={{ color: '#888', fontSize: 18, textAlign: 'center', padding: 40 }}>{t('users.loading')}</div>
         ) : error ? (
           <div style={{ color: 'red', fontSize: 18, textAlign: 'center', padding: 40 }}>{error}</div>
         ) : (
@@ -254,7 +378,7 @@ function Users() {
               gap: 16,
               alignItems: 'flex-start',
             }}>
-              {filtered.map(u => (
+              {filteredUsers.map(u => (
                 <div
                   key={u.id}
                   className="user-card"
@@ -285,9 +409,7 @@ function Users() {
                   </div>
                   <h3 style={{ fontWeight: 700, fontSize: 20, marginBottom: 8, color: dark ? '#eaf4fd' : '#3976a8', textAlign: 'center' }}>{u.name || u.username}</h3>
                   <div style={{ color: fieldColor, fontSize: 15, marginBottom: 6, textAlign: 'center' }}>{u.email}</div>
-                  {currentUserRole === 'ADMIN' && (
-                    <div style={{ fontSize: 14, color: '#888', marginBottom: 6, textAlign: 'center' }}>{t('profile.role')}: {u.role}</div>
-                  )}
+                  <div style={{ fontSize: 14, color: '#888', marginBottom: 6, textAlign: 'center' }}>{t('profile.role')}: {u.role || 'USER'}</div>
                   <div style={{ color: dark ? '#b6d4fe' : '#888', fontSize: 16, marginBottom: 12, textAlign: 'center', minHeight: 32, maxHeight: 64, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%', display: 'block', lineHeight: 1.4, wordBreak: 'break-word' }}>
                     {(() => {
                       const bio = u.Profile && u.Profile.bio && String(u.Profile.bio).trim() ? String(u.Profile.bio) : '';
@@ -295,6 +417,11 @@ function Users() {
                       return bio;
                     })()}
                   </div>
+                  {currentUserRole === 'ADMIN' && (u.role === 'USER' || !u.role) && (
+                    <button type="button" onClick={(e)=>{ e.stopPropagation(); openEdit(u); }} style={{
+                      background: '#4485ed', color: '#fff', border: 'none', borderRadius: 10, padding: '8px 14px', fontWeight: 700, cursor: 'pointer'
+                    }}>{t('users.edit')}</button>
+                  )}
                 </div>
               ))}
             </div>
@@ -345,7 +472,7 @@ function Users() {
               <button
                 onClick={() => setSelected(null)}
                 style={{ position: 'absolute', top: 18, right: 18, background: 'transparent', border: 'none', color: dark ? '#eaf4fd' : '#3976a8', fontSize: 28, cursor: 'pointer', zIndex: 1002 }}
-                aria-label="Закрыть"
+                aria-label={t('common.close')}
               >×</button>
               <div style={{
                 width: 110,
@@ -370,11 +497,9 @@ function Users() {
               <div style={{ color: dark ? '#b6d4fe' : '#3976a8', fontSize: 15, marginBottom: 10, textAlign: 'center', fontWeight: 500, wordBreak: 'break-all' }}>
                 <i className="fa fa-envelope" style={{ marginRight: 6, color: '#888' }} />{selected.email}
               </div>
-              {currentUserRole === 'ADMIN' && selected.role && (
                 <div style={{ fontSize: 15, color: '#888', marginBottom: 10, textAlign: 'center', fontWeight: 500 }}>
-                  <i className="fa fa-user-shield" style={{ marginRight: 6, color: '#888' }} />{t('profile.role')}: {selected.role}
+                <i className="fa fa-user-shield" style={{ marginRight: 6, color: '#888' }} />{t('profile.role')}: {selected.role || 'USER'}
                 </div>
-              )}
               {/* BIO */}
               {selectedProfile?.bio && (
                 <div style={{
@@ -495,7 +620,7 @@ function Users() {
                 cursor: 'pointer',
                 letterSpacing: 1,
                 transition: 'background 0.2s',
-              }} onClick={() => setSelected(null)}>{t('reviews.back') || 'Назад'}</button>
+              }} onClick={() => setSelected(null)}>{t('reviews.back')}</button>
             </div>
             <style>{`
               @keyframes fadeInModal {
@@ -504,6 +629,105 @@ function Users() {
               }
               .fa { display: inline-block; }
             `}</style>
+          </>
+        )}
+        {editOpen && editUser && (
+          <>
+            <div onClick={()=>setEditOpen(false)} style={{ position:'fixed', inset:0, background:'#0007', zIndex:1000 }} />
+            <div style={{ position:'fixed', top:'50%', left:'50%', transform:'translate(-50%,-50%)', background: formBg, color: fieldColor, border:`1px solid ${borderColor}`, borderRadius:16, padding:24, width:560, maxWidth:'95vw', zIndex:1001 }}>
+              <h3 style={{ marginTop:0, marginBottom:12 }}>{t('users.edit_profile')}: {editUser.username || editUser.email}</h3>
+                              <div style={{ fontSize: 14, color: '#888', marginBottom: 12 }}>{t('profile.role')}: {editUser.role || 'USER'}</div>
+              
+              {/* Загрузка аватарки */}
+              <div style={{ marginBottom: 16, textAlign: 'center' }}>
+                <div style={{ 
+                  width: 100, 
+                  height: 100, 
+                  borderRadius: '50%', 
+                  border: `2px solid ${borderColor}`,
+                  margin: '0 auto 12px',
+                  overflow: 'hidden',
+                  background: fieldBg,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  {avatarPreview ? (
+                    <img 
+                      src={avatarPreview} 
+                      alt="Avatar preview" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : editUser.avatar ? (
+                    <img 
+                      src={editUser.avatar} 
+                      alt="Current avatar" 
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: 24, color: '#ccc' }}>👤</div>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarChange}
+                  style={{ display: 'none' }}
+                  id="avatar-upload"
+                />
+                <label
+                  htmlFor="avatar-upload"
+                  style={{
+                    padding: '8px 16px',
+                    background: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                  onMouseOut={(e) => e.target.style.background = '#007bff'}
+                >
+                  {avatarFile ? t('users.change_avatar') : t('users.upload_avatar')}
+                </label>
+                {avatarFile && (
+                                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                      {t('users.selected_file')}: {avatarFile.name}
+                    </div>
+                )}
+              </div>
+              
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <input placeholder="Username" value={editProfile.username||''} onChange={e=>setEditProfile(p=>({...p, username:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder="Email" value={editProfile.email||''} onChange={e=>setEditProfile(p=>({...p, email:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.first_name')} value={editProfile.name||''} onChange={e=>setEditProfile(p=>({...p, name:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.last_name')} value={editProfile.surname||''} onChange={e=>setEditProfile(p=>({...p, surname:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.additional_names')} value={editProfile.additionalName||''} onChange={e=>setEditProfile(p=>({...p, additionalName:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <select value={editProfile.role||'USER'} onChange={e=>setEditProfile(p=>({...p, role:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }}>
+                  <option value="USER">{t('users.user')}</option>
+                  <option value="ADMIN">{t('users.admin')}</option>
+                </select>
+                <input placeholder={t('profile.job_title')} value={editProfile.jobTitle||''} onChange={e=>setEditProfile(p=>({...p, jobTitle:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.position')} value={editProfile.position||''} onChange={e=>setEditProfile(p=>({...p, position:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.company')} value={editProfile.company||''} onChange={e=>setEditProfile(p=>({...p, company:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.city')} value={editProfile.city||''} onChange={e=>setEditProfile(p=>({...p, city:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.country')} value={editProfile.country||''} onChange={e=>setEditProfile(p=>({...p, country:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+              </div>
+                              <textarea placeholder={t('profile.bio')} value={editProfile.bio||''} onChange={e=>setEditProfile(p=>({...p, bio:e.target.value}))} style={{ marginTop:12, width:'100%', minHeight:80, padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                              <input placeholder={t('profile.skills_placeholder')} value={editProfile.skills||''} onChange={e=>setEditProfile(p=>({...p, skills:e.target.value}))} style={{ marginTop:12, width:'100%', padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12 }}>
+                <input placeholder={t('profile.goal')} value={editProfile.goal||''} onChange={e=>setEditProfile(p=>({...p, goal:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+                <input placeholder={t('profile.status')} value={editProfile.status||''} onChange={e=>setEditProfile(p=>({...p, status:e.target.value}))} style={{ padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+              </div>
+              <input placeholder={t('profile.github_username')} value={editProfile.githubusername||''} onChange={e=>setEditProfile(p=>({...p, githubusername:e.target.value}))} style={{ marginTop:12, width:'100%', padding:10, border:`1px solid ${borderColor}`, borderRadius:8, background: fieldBg, color: fieldColor }} />
+              <div style={{ display:'flex', justifyContent:'flex-end', gap:12, marginTop:16 }}>
+                <button type="button" onClick={()=>setEditOpen(false)} style={{ background:'#6c757d', color:'#fff', border:'none', borderRadius:10, padding:'10px 16px', fontWeight:700, cursor:'pointer' }}>{t('common.cancel')}</button>
+                <button type="button" disabled={savingEdit} onClick={saveEdit} style={{ background: savingEdit ? '#6c757d' : '#28a745', color:'#fff', border:'none', borderRadius:10, padding:'10px 16px', fontWeight:700, cursor: savingEdit ? 'not-allowed' : 'pointer' }}>{savingEdit ? t('users.saving') : t('users.save')}</button>
+              </div>
+            </div>
           </>
         )}
       </div>

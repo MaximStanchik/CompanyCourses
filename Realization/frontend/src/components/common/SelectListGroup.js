@@ -8,6 +8,11 @@ const SelectListGroup = ({ name, value, error, info, onChange, options }) => {
       {option.label}
     </option>
   ));
+  const isDark = typeof document !== 'undefined' && (document.body.getAttribute('data-theme') === 'dark' || localStorage.getItem('theme') === 'dark');
+  const selectStyle = isDark
+    ? { background: '#2d2d2d', color: '#fff', border: '1px solid #404040' }
+    : { background: '#fff', color: '#222' };
+  const infoStyle = isDark ? { color: '#eaf4fd' } : {};
   return (
     <div className="form-group">
       <select
@@ -17,10 +22,11 @@ const SelectListGroup = ({ name, value, error, info, onChange, options }) => {
         name={name}
         value={value}
         onChange={onChange}
+        style={selectStyle}
       >
         {selectOptions}
       </select>
-      {info && <small className="form-text text-muted">{info}</small>}
+      {info && <small className="form-text" style={infoStyle}>{info}</small>}
       {error && <div className="invalid-feedback">{error}</div>}
     </div>
   );

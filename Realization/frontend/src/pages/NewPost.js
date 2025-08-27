@@ -45,7 +45,7 @@ export default function NewPost() {
   const [description, setDescription] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [lang, setLang] = useState('ru');
-  const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
+  const [theme, setTheme] = useState(null);
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
   const history = useHistory();
@@ -54,7 +54,7 @@ export default function NewPost() {
   const textareaRef = useRef();
   const [linkModal, setLinkModal] = useState({ open: false, url: '', text: '' });
   const [imageModal, setImageModal] = useState({ open: false, url: '', file: null, size: '512' });
-  // Code editor modal
+
   const codeLanguages = [
     {value:'java',label:'Java'},{value:'python',label:'Python'},{value:'markdown',label:'Markdown'},{value:'javascript',label:'JavaScript'},{value:'typescript',label:'TypeScript'},{value:'csharp',label:'C#'},{value:'css',label:'CSS'},{value:'html',label:'HTML'},{value:'json',label:'JSON'},{value:'yaml',label:'YAML'},{value:'xml',label:'XML'},{value:'bash',label:'Bash'},{value:'sql',label:'SQL'},{value:'plsql',label:'PL/SQL'},{value:'groovy',label:'Groovy'},{value:'kotlin',label:'Kotlin'},{value:'dockerfile',label:'Dockerfile'},{value:'text',label:'Text'}
   ];
@@ -87,8 +87,6 @@ export default function NewPost() {
       setCoverUrl(null);
     }
   };
-
-  // Скрыть emoji picker при клике вне
   useEffect(() => {
     if (!emojiPicker.visible) return;
     const handleClick = (e) => {
@@ -100,7 +98,6 @@ export default function NewPost() {
     return () => window.removeEventListener('mousedown', handleClick);
   }, [emojiPicker.visible]);
 
-  // Вставка эмодзи в textarea
   const handleSelectEmoji = (emojiObj) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -113,7 +110,6 @@ export default function NewPost() {
     setEmojiPicker({ ...emojiPicker, visible: false });
   };
 
-  // --- Функция для форматирования текста ---
   const formatText = (type) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -167,7 +163,6 @@ export default function NewPost() {
     textarea.setSelectionRange(cursorPos, cursorPos + selected.length);
   };
 
-  // --- Вставка ссылки из модального окна ---
   const handleInsertLink = () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -186,7 +181,6 @@ export default function NewPost() {
     setLinkModal({ open: false, url: '', text: '' });
   };
 
-  // --- Вставка изображения из модального окна ---
   const handleInsertImage = async () => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -197,7 +191,6 @@ export default function NewPost() {
     const after = value.slice(end);
     let src = imageModal.url;
     if (!src && imageModal.file) {
-      // Локальный preview (base64)
       src = await new Promise(resolve => {
         const reader = new FileReader();
         reader.onload = e => resolve(e.target.result);
@@ -255,12 +248,12 @@ export default function NewPost() {
           {coverUrl ? (
             <div style={{ position: 'relative', width: '100%', height: '100%' }}>
               <img src={coverUrl} alt="cover" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: 16, display: 'block', margin: '0 auto' }} />
-              <button type="button" onClick={e => { e.stopPropagation(); setCover(null); setCoverUrl(null); fileInput.current.value = ''; }} style={{ position: 'absolute', top: 10, right: 10, background: '#fff', color: '#3976a8', border: '1.5px solid #3976a8', borderRadius: 8, padding: '4px 14px', fontWeight: 600, fontSize: 15, cursor: 'pointer', zIndex: 2 }}>{t('common.reset') || 'Сбросить'}</button>
+              <button type="button" onClick={e => { e.stopPropagation(); setCover(null); setCoverUrl(null); fileInput.current.value = ''; }} style={{ position: 'absolute', top: 10, right: 10, background: '#fff', color: '#3976a8', border: '1.5px solid #3976a8', borderRadius: 8, padding: '4px 14px', fontWeight: 600, fontSize: 15, cursor: 'pointer', zIndex: 2 }}>{t('common.reset')}</button>
             </div>
           ) : (
             <div style={{ color: '#7d7e7f', fontSize: 18, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
               <svg width="48" height="48" fill="none" viewBox="0 0 48 48"><rect x="8" y="12" width="32" height="24" rx="4" stroke={borderColor} strokeWidth="2" fill={fieldBg}/><path d="M8 36l8-8a4 4 0 0 1 5.7 0l10.3 10" stroke={borderColor} strokeWidth="2" fill="none"/><circle cx="16" cy="20" r="2" fill={borderColor}/></svg>
-              <span style={{ marginTop: 12, fontWeight: 500 }}>{t('editor.uploadCover') || 'Загрузить обложку'}</span>
+              <span style={{ marginTop: 12, fontWeight: 500 }}>{t('editor.uploadCover')}</span>
             </div>
           )}
           <input
@@ -278,12 +271,12 @@ export default function NewPost() {
           type="text"
           value={title}
           onChange={e=>setTitle(e.target.value)}
-          placeholder={t('editor.titlePlaceholder') || 'Введите заголовок'}
+          placeholder={t('editor.titlePlaceholder')} 
           className="form-control"
           style={{ fontSize: 22, marginBottom: 18, borderRadius: 12, padding: '12px 18px', border: `1.5px solid ${borderColor}`, background: fieldBg, color: fieldColor }}
         />
         <textarea
-          placeholder={t('editor.descPlaceholder') || 'Введите краткое описание'}
+          placeholder={t('editor.descPlaceholder')} 
           value={description}
           onChange={e=>setDescription(e.target.value)}
           className="form-control"
@@ -327,17 +320,17 @@ export default function NewPost() {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: dark ? '#23272f' : '#fff', color: dark ? '#eaf4fd' : '#23272f', borderRadius: 16, padding: 32, minWidth: 340, boxShadow: '0 4px 32px rgba(0,0,0,0.18)', position: 'relative' }}>
             <button onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label={t('common.close') || 'Закрыть'}>×</button>
-            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20 }}>{t('editor.insertLink') || 'Вставить ссылку'}</h3>
+            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20 }}>{t('editor.insertLink') }</h3>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.linkUrl') || 'Введите URL ссылки'}</label>
+              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.linkUrl') }</label>
               <input type="text" value={linkModal.url} onChange={e => setLinkModal(m => ({ ...m, url: e.target.value }))} placeholder="https://" style={{ width: '100%', borderRadius: 8, border: `1.5px solid ${borderColor}`, padding: '10px 14px', fontSize: 16, marginTop: 4, marginBottom: 10, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#23272f' }} />
             </div>
             <div style={{ marginBottom: 18 }}>
-              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.linkName') || 'Имя ссылки'}</label>
-              <input type="text" value={linkModal.text} onChange={e => setLinkModal(m => ({ ...m, text: e.target.value }))} placeholder={t('editor.linkName') || 'Имя ссылки'} style={{ width: '100%', borderRadius: 8, border: `1.5px solid ${borderColor}`, padding: '10px 14px', fontSize: 16, marginTop: 4, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#23272f' }} />
+              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.linkName') }</label>
+              <input type="text" value={linkModal.text} onChange={e => setLinkModal(m => ({ ...m, text: e.target.value }))} placeholder={t('editor.linkName')} style={{ width: '100%', borderRadius: 8, border: `1.5px solid ${borderColor}`, padding: '10px 14px', fontSize: 16, marginTop: 4, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#23272f' }} />
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              <button type="button" onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.cancel') || 'Отменить'}</button>
+              <button type="button" onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.cancel')}</button>
               <button type="button" onClick={handleInsertLink} style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.insert') || 'Вставить'}</button>
             </div>
           </div>
@@ -348,17 +341,17 @@ export default function NewPost() {
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: dark ? '#23272f' : '#fff', color: dark ? '#eaf4fd' : '#23272f', borderRadius: 16, padding: 32, minWidth: 360, boxShadow: '0 4px 32px rgba(0,0,0,0.18)', position: 'relative' }}>
             <button onClick={() => setImageModal({ open: false, url: '', file: null, size: '512' })} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label={t('common.close') || 'Закрыть'}>×</button>
-            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20, color: dark ? '#fff' : '#23272f' }}>{t('editor.imageUpload') || 'Загрузка изображения'}</h3>
+            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20, color: dark ? '#fff' : '#23272f' }}>{t('editor.imageUpload')}</h3>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageUrl') || 'Введите URL картинки'}</label>
+              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageUrl')}</label>
               <input type="text" value={imageModal.url} onChange={e => setImageModal(m => ({ ...m, url: e.target.value, file: null }))} placeholder="https://example.com/image.jpg" style={{ width: '100%', borderRadius: 8, border: `1.5px solid ${borderColor}`, padding: '10px 14px', fontSize: 16, marginTop: 4, marginBottom: 10, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#23272f' }} />
             </div>
             <div style={{ marginBottom: 14 }}>
-              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageFile') || 'Выберите изображение или перетащите его мышью'}</label>
+              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageFile')}</label>
               <input type="file" accept="image/*" onChange={e => setImageModal(m => ({ ...m, file: e.target.files[0], url: '' }))} style={{ width: '100%', borderRadius: 8, border: `1.5px solid ${borderColor}`, padding: '10px 14px', fontSize: 16, marginTop: 4, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#23272f' }} />
             </div>
             <div style={{ marginBottom: 18 }}>
-              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageSize') || 'Размер вставки изображения'}</label>
+              <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.imageSize')}</label>
               <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
                 {["256","512","800","1024","1080"].map(size => (
                   <label key={size} style={{ fontWeight: 500, fontSize: 15, display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -379,9 +372,9 @@ export default function NewPost() {
         <div style={{ position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(0,0,0,0.25)',zIndex:20000,display:'flex',alignItems:'center',justifyContent:'center' }}>
           <div style={{ background: dark ? '#23272f' : '#fff', color: dark ? '#eaf4fd' : '#23272f', borderRadius: 16, padding: 32, minWidth: 480, maxWidth:'90vw', boxShadow: '0 4px 32px rgba(0,0,0,0.18)', position: 'relative', width:'90vw', maxHeight:'90vh', display:'flex', flexDirection:'column' }}>
             <button onClick={() => setCodeModal({open:false,lang:'javascript',code:''})} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label="Close">×</button>
-            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20 }}>{t('editor.codeEditor')||'Редактор кода'}</h3>
+            <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20 }}>{t('editor.codeEditor')}</h3>
             <div style={{marginBottom:12}}>
-              <label style={{fontWeight:600, fontSize:15, marginRight:10}}>{t('editor.language')||'Язык'}:</label>
+              <label style={{fontWeight:600, fontSize:15, marginRight:10}}>{t('editor.language')}:</label>
               <select value={codeModal.lang} onChange={e=>setCodeModal(m=>({...m,lang:e.target.value}))} style={{padding:'6px 10px',borderRadius:8,border:`1.5px solid ${borderColor}`,background: dark? '#213747':'#f9fafd', color: fieldColor}}>
                 {codeLanguages.map(l=> (<option key={l.value} value={l.value}>{l.label}</option>))}
               </select>

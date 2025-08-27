@@ -39,6 +39,7 @@ export default function MyClasses() {
           <main style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: 32, marginTop: 24 }}>
             <h1 style={{ fontWeight: 700, fontSize: 32, marginBottom: 16, color: 'var(--text-color)' }}>{t('teach.classes')}</h1>
             <div style={{ fontSize: 18, color: 'var(--text-color)', marginBottom: 12 }}>{t('teach.no_classes')}</div>
+            <p className="new-class-form__fieldset" style={{ fontSize: 16, color: 'var(--text-color)', opacity: 0.8, marginBottom: 24 }}>{t('teach.class_description1')}</p>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 24 }}>
               <div style={{ position: 'relative' }}>
                 <button
@@ -84,8 +85,27 @@ export default function MyClasses() {
                     boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
                     zIndex: 10,
                     listStyle: 'none',
+                    maxHeight: '60vh',
+                    overflowY: 'auto',
+                    overscrollBehavior: 'contain'
                   }}
                 >
+                  <li
+                    key="choose-course-link"
+                    style={{
+                      padding: '8px 18px',
+                      cursor: 'pointer',
+                      color: 'var(--text-color)',
+                      fontSize: 15,
+                      transition: 'background 0.18s'
+                    }}
+                    onClick={() => { 
+                      setSelectedCourse(''); 
+                      setDropdownOpen(false); 
+                    }}
+                  >
+                    {t('choose_course', 'Выбрать курс')}
+                  </li>
                   {courses.map(course => (
                     <li
                       key={course.id}
@@ -104,19 +124,6 @@ export default function MyClasses() {
                   ))}
                 </ul>
               </div>
-              <a href="/new-class" className="button" style={{
-                padding: '10px 22px',
-                borderRadius: 6,
-                background: 'var(--teach-btn-bg)',
-                color: 'var(--teach-btn-fg)',
-                border: '1.5px solid var(--border-color)',
-                fontWeight: 600,
-                fontSize: 16,
-                textDecoration: 'none',
-                transition: 'background 0.2s, color 0.2s',
-                opacity: courses.length === 0 ? 0.5 : 1,
-                pointerEvents: courses.length === 0 ? 'none' : 'auto'
-              }}>{t('teach.create_class')}</a>
               <a href="/catalog" className="button success is-outlined" style={{
                 padding: '10px 22px',
                 borderRadius: 6,
@@ -129,8 +136,7 @@ export default function MyClasses() {
                 transition: 'background 0.2s, color 0.2s'
               }}>{t('teach.choose_course')}</a>
             </div>
-            <p className="new-class-form__fieldset">{t('teach.class_description1')}</p>
-            <p className="new-class-form__fieldset">{t('teach.class_description2')}</p>
+            <p className="new-class-form__fieldset" style={{ fontSize: 16, color: 'var(--text-color)', opacity: 0.8 }}>{t('teach.class_description2')}</p>
           </main>
         </div>
         <Footer />

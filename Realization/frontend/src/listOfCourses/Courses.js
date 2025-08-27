@@ -2,11 +2,21 @@ import React, { useState, useEffect } from "react";
 import axios from "../utils/axios";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
-import i18n from "../i18n";
+import { useLanguage } from "../hooks/useLanguage";
 import "../App.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faStar as faSolidStar } from "@fortawesome/free-solid-svg-icons";
-import { faStar as faRegularStar } from "@fortawesome/free-regular-svg-icons";
+import { 
+  faGraduationCap, 
+  faCode, 
+  faUsers, 
+  faRocket, 
+  faCheckCircle,
+  faArrowRight,
+  faPlay,
+  faBookOpen,
+  faLaptopCode,
+  faCertificate
+} from "@fortawesome/free-solid-svg-icons";
 import jwt_decode from "jwt-decode";
 
 const langOptions = [
@@ -32,39 +42,13 @@ function usePrefersDark() {
 }
 
 const Services = () => {
-  const [data, setData] = useState([]);
-  const [favorites, setFavorites] = useState([]);
   const [userRole, setUserRole] = useState('');
   const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
-  const [lang, setLang] = useState(localStorage.getItem('language') || 'ru');
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
-
-  const t = i18n.t.bind(i18n);
+  const { t, currentLanguage } = useLanguage();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await axios.get("/courses", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("jwtToken")}`,
-          },
-        });
-        setData(response.data);
-      } catch (error) {
-        if (
-          (error.response && error.response.status === 401) ||
-          (error.response && error.response.status === 403)
-        ) {
-          window.location.href = "/login";
-        } else {
-          console.log(error);
-        }
-      }
-    };
-    fetchData();
-
-    // определяем роль пользователя из токена
     try {
       const token = localStorage.getItem("jwtToken");
       if (token) {
@@ -74,14 +58,10 @@ const Services = () => {
       }
     } catch {}
 
-    // подгружаем избранное
-    axios
-      .get("/favorites", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("jwtToken")}` },
-      })
-      .then((res) => setFavorites(res.data.map((c) => c.id)))
-      .catch(() => {});
-  }, []);
+    if (userRole === 'ADMIN') {
+      window.location.href = '/teach';
+    }
+  }, [userRole]);
 
   useEffect(() => {
     const savedTheme = localStorage.getItem('theme');
@@ -91,98 +71,348 @@ const Services = () => {
     if (theme) localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const formBg = dark ? '#26272b' : '#fff';
   const pageBg = dark ? '#18191c' : '#f6f7fa';
-  const fieldBg = dark ? '#213747' : '#f9fafd';
-  const fieldColor = dark ? '#ddd' : '#222';
-  const borderColor = dark ? '#36607e' : '#e0e0e0';
+  const cardBg = dark ? '#26272b' : '#ffffff';
+  const textColor = dark ? '#eaf4fd' : '#333333';
+  const secondaryTextColor = dark ? '#cccccc' : '#666666';
+  const accentColor = '#4485ed';
 
-  const toggleFavorite = async (courseId, e) => {
-    e.stopPropagation();
-    e.preventDefault();
-    const isFav = favorites.includes(courseId);
-    try {
-      if (isFav) {
-        await axios.delete(`/favorites/${courseId}`, { headers: { Authorization: `Bearer ${localStorage.getItem("jwtToken")}` } });
-        setFavorites((prev) => prev.filter((id) => id !== courseId));
-      } else {
-        await axios.post(`/favorites/add/${courseId}`, {}, { headers: { Authorization: `Bearer ${localStorage.getItem("jwtToken")}` } });
-        setFavorites((prev) => [...prev, courseId]);
-      }
-    } catch (err) {
-      console.error(err);
+  const features = [
+    {
+      icon: faCode,
+      title: t('home.feature1_title') ,
+      description: t('home.feature1_desc') 
+    },
+    {
+      icon: faUsers,
+      title: t('home.feature2_title') ,
+      description: t('home.feature2_desc') 
+    },
+    {
+      icon: faRocket,
+      title: t('home.feature3_title') ,
+      description: t('home.feature3_desc') 
     }
-  };
+  ];
+
+  const benefits = [
+    t('home.benefit1'),
+    t('home.benefit2'),
+    t('home.benefit3') ,
+    t('home.benefit4') ,
+    t('home.benefit5'),
+    t('home.benefit6') 
+  ];
 
   return (
     <div style={{ background: pageBg, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <NavBar />
-      <div className="container" style={{ maxWidth: 900, margin: '0 auto', flex: 1, paddingTop: 48, paddingBottom: 48, marginTop: 0 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 32 }}>
-          {data.map((val, i) => (
-            <div
-              key={i}
-              className="course-card"
-              style={{
-                background: formBg,
-                borderRadius: 16,
-                boxShadow: dark ? '0 2px 8px rgba(0,0,0,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
-                padding: 24,
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                minHeight: 220,
-                transition: 'transform 0.18s cubic-bezier(.4,0,.2,1), box-shadow 0.25s cubic-bezier(.4,0,.2,1)',
-                cursor: 'pointer',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'scale(1.04)';
-                e.currentTarget.style.boxShadow = dark
-                  ? '0 8px 32px rgba(68,133,237,0.18)'
-                  : '0 8px 32px rgba(68,133,237,0.13)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'none';
-                e.currentTarget.style.boxShadow = dark
-                  ? '0 2px 8px rgba(0,0,0,0.12)'
-                  : '0 2px 8px rgba(0,0,0,0.04)';
-              }}
-            >
-              {/* изображение */}
-              {val.logoUrl ? (
-                <img src={val.logoUrl} alt={val.name} style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12, marginBottom: 12 }} />
-              ) : (
-                <div style={{ width: '100%', height: 160, background: '#e0e0e0', borderRadius: 12, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48, color: '#8c8c8c' }}>?</div>
-              )}
-
-              {/* значок избранного — только для USER */}
-              {userRole === 'USER' && (
+      
+      {/* Hero Section */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${accentColor}15, ${accentColor}05)`,
+        padding: '80px 20px',
+        textAlign: 'center'
+      }}>
+        <div className="container" style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <FontAwesomeIcon 
+            icon={faGraduationCap} 
+            style={{ 
+              fontSize: '4rem', 
+              color: accentColor, 
+              marginBottom: '20px' 
+            }} 
+          />
+          <h1 style={{ 
+            fontSize: '3rem', 
+            fontWeight: '700', 
+            color: textColor, 
+            marginBottom: '20px',
+            lineHeight: '1.2'
+          }}>
+            {t('home.hero_title') }
+          </h1>
+          <p style={{ 
+            fontSize: '1.3rem', 
+            color: secondaryTextColor, 
+            marginBottom: '40px',
+            maxWidth: '600px',
+            margin: '0 auto 40px auto',
+            lineHeight: '1.6'
+          }}>
+            {t('home.hero_subtitle')}
+          </p>
+          
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            {userRole === 'USER' ? (
+              <>
                 <button
-                  onClick={(e) => toggleFavorite(val.id, e)}
-                  title={favorites.includes(val.id) ? "Убрать из избранного" : "В избранное"}
+                  onClick={() => window.location.href = '/course-catalog'}
                   style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    alignSelf: "flex-end",
-                    marginBottom: 8,
-                    color: favorites.includes(val.id) ? "#f5c518" : dark ? "#ddd" : "#666",
-                    fontSize: 22,
+                    padding: '15px 30px',
+                    background: accentColor,
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#3371d6'}
+                  onMouseOut={(e) => e.target.style.background = accentColor}
+                >
+                  <FontAwesomeIcon icon={faPlay} />
+                  {t('home.start_learning') }
+                </button>
+                <button
+                  onClick={() => window.location.href = '/my-training'}
+                  style={{
+                    padding: '15px 30px',
+                    background: 'transparent',
+                    color: accentColor,
+                    border: `2px solid ${accentColor}`,
+                    borderRadius: '8px',
+                    fontSize: '1.1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px'
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.background = accentColor;
+                    e.target.style.color = 'white';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.background = 'transparent';
+                    e.target.style.color = accentColor;
                   }}
                 >
-                  <FontAwesomeIcon icon={favorites.includes(val.id) ? faSolidStar : faRegularStar} />
+                  <FontAwesomeIcon icon={faBookOpen} />
+                  {t('home.my_courses')}
                 </button>
-              )}
-              <h3 style={{ fontWeight: 700, fontSize: 22, marginBottom: 12, color: dark ? '#eaf4fd' : '#3976a8' }}>{val.name}</h3>
-              <p style={{ color: fieldColor, fontSize: 16, marginBottom: 18 }}>{val.description}</p>
-              <a href={`${process.env.PUBLIC_URL}/blog-details-left-sidebar/${val.id}`} style={{ color: '#fff', background: '#3976a8', borderRadius: 12, padding: '10px 24px', fontWeight: 600, fontSize: 16, textAlign: 'center', textDecoration: 'none', marginTop: 'auto', alignSelf: 'flex-start', transition: 'background 0.18s' }}>{t('footer.articles') || 'Подробнее'}</a>
-            </div>
-          ))}
+              </>
+            ) : (
+              <button
+                onClick={() => window.location.href = '/login'}
+                style={{
+                  padding: '15px 30px',
+                  background: accentColor,
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#3371d6'}
+                onMouseOut={(e) => e.target.style.background = accentColor}
+              >
+                <FontAwesomeIcon icon={faRocket} />
+                {t('home.get_started')}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Features Section */}
+      <div style={{ padding: '80px 20px' }}>
+        <div className="container" style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <h2 style={{ 
+            fontSize: '2.5rem', 
+            fontWeight: '700', 
+            color: textColor, 
+            textAlign: 'center',
+            marginBottom: '60px'
+          }}>
+            {t('home.why_choose')}
+          </h2>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', 
+            gap: '30px' 
+          }}>
+            {features.map((feature, index) => (
+              <div
+                key={index}
+                style={{
+                  background: cardBg,
+                  padding: '30px',
+                  borderRadius: '12px',
+                  textAlign: 'center',
+                  boxShadow: dark ? '0 4px 12px rgba(0,0,0,0.1)' : '0 4px 12px rgba(0,0,0,0.05)',
+                  transition: 'transform 0.2s',
+                  cursor: 'pointer'
+                }}
+                onMouseEnter={(e) => e.target.style.transform = 'translateY(-5px)'}
+                onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+              >
+                <FontAwesomeIcon 
+                  icon={feature.icon} 
+                  style={{ 
+                    fontSize: '2.5rem', 
+                    color: accentColor, 
+                    marginBottom: '20px' 
+                  }} 
+                />
+                <h3 style={{ 
+                  fontSize: '1.3rem', 
+                  fontWeight: '600', 
+                  color: textColor, 
+                  marginBottom: '15px' 
+                }}>
+                  {feature.title}
+                </h3>
+                <p style={{ 
+                  color: secondaryTextColor, 
+                  lineHeight: '1.6' 
+                }}>
+                  {feature.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Benefits Section */}
+      <div style={{ 
+        background: cardBg, 
+        padding: '80px 20px' 
+      }}>
+        <div className="container" style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
+            gap: '60px',
+            alignItems: 'center'
+          }}>
+            <div>
+              <h2 style={{ 
+                fontSize: '2.5rem', 
+                fontWeight: '700', 
+                color: textColor, 
+                marginBottom: '30px' 
+              }}>
+                {t('home.what_you_get')}
+              </h2>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
+                gap: '20px' 
+              }}>
+                {benefits.map((benefit, index) => (
+                  <div
+                    key={index}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '15px'
+                    }}
+                  >
+                    <FontAwesomeIcon 
+                      icon={faCheckCircle} 
+                      style={{ 
+                        color: accentColor, 
+                        fontSize: '1.2rem' 
+                      }} 
+                    />
+                    <span style={{ 
+                      color: secondaryTextColor, 
+                      fontSize: '1.1rem' 
+                    }}>
+                      {benefit}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div style={{ textAlign: 'center' }}>
+              <FontAwesomeIcon 
+                icon={faLaptopCode} 
+                style={{ 
+                  fontSize: '8rem', 
+                  color: accentColor,
+                  opacity: 0.8
+                }} 
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CTA Section */}
+      <div style={{ 
+        background: `linear-gradient(135deg, ${accentColor}, #3371d6)`,
+        padding: '80px 20px',
+        textAlign: 'center'
+      }}>
+        <div className="container" style={{ maxWidth: 800, margin: '0 auto' }}>
+          <h2 style={{ 
+            fontSize: '2.5rem', 
+            fontWeight: '700', 
+            color: 'white', 
+            marginBottom: '20px' 
+          }}>
+            {t('home.ready_to_start') }
+          </h2>
+          <p style={{ 
+            fontSize: '1.2rem', 
+            color: 'rgba(255,255,255,0.9)', 
+            marginBottom: '40px' 
+          }}>
+            {t('home.cta_text') }
+          </p>
+          
+          <button
+            onClick={() => window.location.href = userRole === 'USER' ? '/course-catalog' : '/login'}
+            style={{
+              padding: '18px 40px',
+              background: 'white',
+              color: accentColor,
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '1.2rem',
+              fontWeight: '600',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '12px'
+            }}
+            onMouseOver={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.boxShadow = '0 8px 20px rgba(0,0,0,0.2)';
+            }}
+            onMouseOut={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            <FontAwesomeIcon icon={faArrowRight} />
+            {userRole === 'USER' 
+              ? (t('home.browse_courses'))
+              : (t('home.create_account') )
+            }
+          </button>
+        </div>
+      </div>
+
       <div style={{ marginTop: 'auto' }}><Footer /></div>
     </div>
   );
 };
 
 export default Services;
+

@@ -13,6 +13,9 @@ const TextFieldGroup = ({
   onChange,
   disabled
 }) => {
+  const isDark = typeof document !== 'undefined' && (document.body.getAttribute('data-theme') === 'dark' || localStorage.getItem('theme') === 'dark');
+  const inputStyle = isDark ? { background: '#2d2d2d', color: '#fff', border: '1px solid #404040' } : {};
+  const infoStyle = isDark ? { color: '#eaf4fd' } : {};
   return (
     <div className="form-group">
       <input
@@ -25,8 +28,9 @@ const TextFieldGroup = ({
         value={value}
         onChange={onChange}
         disabled={disabled}
+        style={inputStyle}
       />
-      {info && <small className="form-text text-muted">{info}</small>}
+      {info && <small className="form-text" style={infoStyle}>{info}</small>}
       {error && <div className="invalid-feedback">{error}</div>}
     </div>
   );

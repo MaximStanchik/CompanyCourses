@@ -40,7 +40,7 @@ const AddCourseAdmin = () => {
   const [name, setName] = useState('');
   const [loading] = useState(false);
   const [lang, setLang] = useState(localStorage.getItem('language') || 'en');
-  const [theme, setTheme] = useState(null); // null=auto, 'dark', 'light'
+  const [theme, setTheme] = useState(null); 
   const prefersDark = usePrefersDark();
   const dark = theme ? theme === 'dark' : prefersDark;
 
@@ -65,22 +65,21 @@ const AddCourseAdmin = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim() || name.length > 64) {
-      toast.error(t('course.name_required', 'Название курса обязательно и не более 64 символов'));
+      toast.error(t('course.name_required')); 
       return;
     }
     try {
       const res = await axios.post('/course/add', {
         name,
-        userId: Number(userId)
       }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
       });
-      toast.success(t('course.created_success', 'Курс успешно создан!'));
+      toast.success(t('course.created_success'));
       setTimeout(() => {
-        history.push(`/editcourse/${res.data.id}`); // редирект на страницу редактирования курса
+        history.push(`/editcourse/${res.data.id}`); 
       }, 1200);
     } catch (err) {
-      toast.error(t('course.create_error', 'Ошибка при создании курса'));
+      toast.error(t('course.create_error'));
     }
   };
 
@@ -89,9 +88,8 @@ const AddCourseAdmin = () => {
       <NavBar />
       <ToastContainer />
       <div style={{ display: 'flex', flex: 1, minHeight: 'calc(100vh - 60px)' }}>
-        <TeachNavMenu userId={userId} />
+        <TeachNavMenu variant="teach" userId={userId} />
         <main className="marco-layout" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', background: pageBg, color: textColor }}>
-          {/* Удалён div с языковым select и кнопкой смены темы */}
           <header style={{ width: '100%', textAlign: 'center', margin: '24px 0 20px' }}>
             <h1 style={{
               fontFamily: 'Roboto, sans-serif',
@@ -100,7 +98,7 @@ const AddCourseAdmin = () => {
               fontSize: '2.125em',
               margin: '0.2em 0 0.5em',
               lineHeight: 1.2125
-            }}>{t('course.create_new', '\u0421\u043e\u0437\u0434\u0430\u043d\u0438\u0435 \u043d\u043e\u0432\u043e\u0433\u043e \u043a\u0443\u0440\u0441\u0430')}</h1>
+            }}>{t('course.create_new')}</h1>
           </header>
           <form onSubmit={handleSubmit} style={{
             width: '100%',
@@ -113,7 +111,7 @@ const AddCourseAdmin = () => {
           }}>
             <fieldset style={{ border: 'none', margin: 0, padding: 0 }}>
               <legend className="the-form-field__caption new-course-form__caption" style={{ margin: '0 0 8px', fontSize: 14, fontWeight: 400, lineHeight: 1.3, color: textColor }} data-required="">
-                {t('course.name', '\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043a\u0443\u0440\u0441\u0430')}
+                {t('course.name')}
               </legend>
               <input
                 type="text"
@@ -126,7 +124,7 @@ const AddCourseAdmin = () => {
                 style={{ width: '100%', fontSize: 16, padding: 10, marginBottom: 6, border: `1px solid ${borderColor}`, borderRadius: 4, background: fieldBg, color: textColor }}
               />
               <span className="new-course-form__note" style={{ fontSize: 13, color: dark ? '#aaa' : '#888', marginBottom: 12, display: 'block' }}>
-                {t('course.max_length', '\u041c\u0430\u043a\u0441\u0438\u043c\u0443\u043c 64 \u0441\u0438\u043c\u0432\u043e\u043b\u0430')}
+                {t('course.max_length')}
               </span>
             </fieldset>
             <button
@@ -147,14 +145,11 @@ const AddCourseAdmin = () => {
               }}
               disabled={false}
             >
-              {t('course.create', '\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043a\u0443\u0440\u0441')}
+              {t('common.create_course')}
             </button>
             <p style={{ margin: '18px 0 0', fontSize: 15, color: dark ? '#aaa' : '#535366' }}>
-              {t('course.draft_hint', '\u041d\u0430\u0447\u043d\u0438\u0442\u0435 \u0440\u0430\u0431\u043e\u0442\u0443 \u043d\u0430\u0434 \u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u043e\u043c \u043a\u0443\u0440\u0441\u0430, \u043f\u0435\u0440\u0435\u0434 \u043f\u0443\u0431\u043b\u0438\u043a\u0430\u0446\u0438\u0435\u0439 \u043c\u043e\u0436\u043d\u043e \u0431\u0443\u0434\u0435\u0442 ')}
-              <a href="https://help.stepik.org/article/54756" target="_blank" rel="noopener noreferrer" style={{ color: '#4485ed' }}>
-                {t('course.make_paid', '\u0441\u0434\u0435\u043b\u0430\u0442\u044c \u043a\u0443\u0440\u0441 \u043f\u043b\u0430\u0442\u043d\u044b\u043c')}
-              </a>
-              {t('course.or_leave_free', ' \u0438\u043b\u0438 \u043e\u0441\u0442\u0430\u0432\u0438\u0442\u044c \u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u043c.')}
+              {t('course.draft_hint')}
+              {t('course.or_leave_free')}
             </p>
           </form>
         </main>

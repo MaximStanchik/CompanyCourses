@@ -14,7 +14,8 @@ class TranslationsManager {
     try {
       const data = fs.readFileSync(this.translationsPath, 'utf8');
       return JSON.parse(data);
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Error reading translations file:', error);
       return null;
     }
@@ -24,7 +25,8 @@ class TranslationsManager {
     try {
       fs.writeFileSync(this.translationsPath, JSON.stringify(translations, null, 2), 'utf8');
       return true;
-    } catch (error) {
+    } 
+    catch (error) {
       console.error('Error writing translations file:', error);
       return false;
     }
@@ -46,12 +48,15 @@ class TranslationsManager {
       let translation = nameEn || categoryName; // по умолчанию английское
       if (lang === 'ru' && nameRu) {
         translation = nameRu;
-      } else if (lang === 'en' && nameEn) {
+      } 
+      else if (lang === 'en' && nameEn) {
         translation = nameEn;
-      } else if (lang === 'be') {
+      } 
+      else if (lang === 'be') {
         // Белорусский - можно использовать русский как основу
         translation = nameRu || nameEn || categoryName;
-      } else if (lang === 'uk') {
+      } 
+      else if (lang === 'uk') {
         // Украинский - можно использовать русский как основу
         translation = nameRu || nameEn || categoryName;
       } else if (lang === 'de') {
@@ -152,7 +157,7 @@ class categoryController {
           if (!roles.includes("ADMIN")) {
             return res.status(403).json("You don't have enough rights");
           }
-          const { name, nameEn, nameRu, parentId } = req.body;
+          const { name, nameEn, nameRu, nameZh, nameDe, nameEs, namePt, nameUk, nameBe, parentId } = req.body;
           
           // Check if the category already exists
           const existingCategory = await DbClient.category.findUnique({
@@ -182,6 +187,12 @@ class categoryController {
               name: nameEn || name, // основное название = английское
               nameEn: nameEn || name,
               nameRu: nameRu || "",
+              nameZh: nameZh || "",
+              nameDe: nameDe || "",
+              nameEs: nameEs || "",
+              namePt: namePt || "",
+              nameUk: nameUk || "",
+              nameBe: nameBe || "",
               parentId: parentId ? parseInt(parentId) : null,
             },
           });
@@ -223,24 +234,37 @@ class categoryController {
             ]
           });
 
-          // Строим дерево
-          function buildTree(items, parentId = null) {
-            const normalizedParentId = parentId !== null && parentId !== undefined ? Number(parentId) : null;
-            return items
-              .filter(item => (item.parentId !== null && item.parentId !== undefined ? Number(item.parentId) : null) === normalizedParentId)
-              .map(item => ({
-                ...item,
-                children: buildTree(items, item.id)
-              }));
-          }
-
-          const tree = buildTree(categories);
-          return res.json(tree);
+          // Возвращаем плоский список вместо дерева
+          return res.json(categories);
         }
       }
     } catch (e) {
       console.log(e);
       res.status(400).json({ message: "Categories error" });
+    }
+  }
+
+  async getPublicCategories(req, res) {
+    try {
+      // Публичный endpoint для получения категорий - не требует авторизации
+      const categories = await DbClient.category.findMany({
+        select: {
+          id: true,
+          name: true,
+          nameEn: true,
+          nameRu: true,
+          parentId: true
+        },
+        orderBy: [
+          { parentId: 'asc' },
+          { name: 'asc' }
+        ]
+      });
+
+      return res.json(categories);
+    } catch (e) {
+      console.error('getPublicCategories error:', e);
+      res.status(500).json({ message: "Error loading categories" });
     }
   }
 
@@ -304,29 +328,114 @@ class categoryController {
             return res.status(400).json({ message: "Invalid category ID" });
           }
 
-          // Удаление категории и всех связанных с ней курсов в рамках одной транзакции
-          await DbClient.$transaction(async (prisma) => {
-            await DbClient.course.deleteMany({
-              where: {
-                category: Number(id),
-              },
-            });
-
-            const category = await DbClient.category.delete({
-              where: {
-                id: Number(id),
-              },
-            });
-
-            if (!category) {
-              return res.status(404).json({ message: "Category not found" });
+          // Проверяем, используется ли категория в курсах
+          const coursesUsingCategory = await DbClient.course.findMany({
+            where: {
+              category: Number(id),
+            },
+            select: {
+              id: true,
+              name: true
             }
-
-            // Автоматически удаляем перевод из translations.json
-            translationsManager.removeCategoryTranslation(id);
-
-            return res.json(category);
           });
+
+          // Проверяем, используется ли категория в связях курсов с категориями
+          const coursesUsingCategoryRelation = await DbClient.courseCategory.findMany({
+            where: {
+              categoryId: Number(id),
+            },
+            include: {
+              course: {
+                select: {
+                  id: true,
+                  name: true
+                }
+              }
+            }
+          });
+
+          // Если категория используется в курсах, запрещаем удаление
+          if (coursesUsingCategory.length > 0 || coursesUsingCategoryRelation.length > 0) {
+            const usedInCourses = [
+              ...coursesUsingCategory.map(c => ({ id: c.id, name: c.name })),
+              ...coursesUsingCategoryRelation.map(cc => ({ id: cc.course.id, name: cc.course.name }))
+            ];
+            
+            return res.status(409).json({ 
+              message: "Cannot delete category that is used in courses",
+              usedInCourses: usedInCourses
+            });
+          }
+
+          // Проверяем, есть ли подкатегории
+          const subcategories = await DbClient.category.findMany({
+            where: {
+              parentId: Number(id),
+            },
+            select: {
+              id: true,
+              name: true,
+              nameEn: true,
+              nameRu: true
+            }
+          });
+
+          // Если есть подкатегории, проверяем, используются ли они в курсах
+          if (subcategories.length > 0) {
+            for (const subcategory of subcategories) {
+              const subcategoryCourses = await DbClient.course.findMany({
+                where: {
+                  category: subcategory.id,
+                },
+                select: {
+                  id: true,
+                  name: true
+                }
+              });
+
+              const subcategoryRelationCourses = await DbClient.courseCategory.findMany({
+                where: {
+                  categoryId: subcategory.id,
+                },
+                include: {
+                  course: {
+                    select: {
+                      id: true,
+                      name: true
+                    }
+                  }
+                }
+              });
+
+              if (subcategoryCourses.length > 0 || subcategoryRelationCourses.length > 0) {
+                const usedInCourses = [
+                  ...subcategoryCourses.map(c => ({ id: c.id, name: c.name })),
+                  ...subcategoryRelationCourses.map(cc => ({ id: cc.course.id, name: cc.course.name }))
+                ];
+                
+                return res.status(409).json({ 
+                  message: `Cannot delete category because its subcategory "${subcategory.nameEn || subcategory.name}" is used in courses`,
+                  usedInCourses: usedInCourses
+                });
+              }
+            }
+          }
+
+          // Если категория не используется, удаляем её
+          const category = await DbClient.category.delete({
+            where: {
+              id: Number(id),
+            },
+          });
+
+          if (!category) {
+            return res.status(404).json({ message: "Category not found" });
+          }
+
+          // Автоматически удаляем перевод из translations.json
+          translationsManager.removeCategoryTranslation(id);
+
+          return res.json(category);
         }
       }
     } catch (e) {
@@ -356,7 +465,7 @@ class categoryController {
           if (!Number.isInteger(id)) {
             return res.status(400).json({ message: "Invalid category ID" });
           }
-          const { name, nameEn, nameRu } = req.body;
+          const { name, nameEn, nameRu, nameZh, nameDe, nameEs, namePt, nameUk, nameBe } = req.body;
 
           // Check if the category already exists (excluding current category)
           const existingCategory = await DbClient.category.findFirst({
@@ -378,6 +487,12 @@ class categoryController {
               name: nameEn || name, // основное название = английское
               nameEn: nameEn || name,
               nameRu: nameRu || "",
+              nameZh: nameZh || "",
+              nameDe: nameDe || "",
+              nameEs: nameEs || "",
+              namePt: namePt || "",
+              nameUk: nameUk || "",
+              nameBe: nameBe || "",
             },
           });
           
@@ -390,6 +505,87 @@ class categoryController {
     } catch (e) {
       console.log(e);
       res.status(500).json({ message: "Category update error" });
+    }
+  }
+
+  async getCategoryUsageInfo(req, res) {
+    try {
+      const authorizationHeader = req.headers.authorization;
+      if (authorizationHeader) {
+        const tokenArray = authorizationHeader.split(" ");
+        if (tokenArray.length === 2) {
+          const token = tokenArray[1];
+          let decodedToken;
+          try {
+            decodedToken = jwt.verify(token, process.env.SECRET);
+          } catch (err) {
+            return res.status(401).json({ message: "Invalid token" });
+          }
+          const roles = decodedToken.roles;
+          if (!roles.includes("ADMIN")) {
+            return res.status(403).json("You don't have enough rights");
+          }
+
+          // Получаем все категории
+          const categories = await DbClient.category.findMany({
+            select: {
+              id: true,
+              name: true,
+              nameEn: true,
+              nameRu: true,
+              parentId: true
+            }
+          });
+
+          const usageInfo = {};
+
+          // Проверяем каждую категорию на использование в курсах
+          for (const category of categories) {
+            // Проверяем прямое использование в поле category
+            const directUsage = await DbClient.course.findMany({
+              where: {
+                category: category.id,
+              },
+              select: {
+                id: true,
+                name: true
+              }
+            });
+
+            // Проверяем использование в связях courseCategory
+            const relationUsage = await DbClient.courseCategory.findMany({
+              where: {
+                categoryId: category.id,
+              },
+              include: {
+                course: {
+                  select: {
+                    id: true,
+                    name: true
+                  }
+                }
+              }
+            });
+
+            const allUsage = [
+              ...directUsage.map(c => ({ id: c.id, name: c.name })),
+              ...relationUsage.map(cc => ({ id: cc.course.id, name: cc.course.name }))
+            ];
+
+            if (allUsage.length > 0) {
+              usageInfo[category.id] = {
+                categoryName: category.nameEn || category.name,
+                usedInCourses: allUsage
+              };
+            }
+          }
+
+          return res.json(usageInfo);
+        }
+      }
+    } catch (e) {
+      console.log(e);
+      res.status(500).json({ message: "Error getting category usage info" });
     }
   }
 }

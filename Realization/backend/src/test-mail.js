@@ -1,10 +1,6 @@
-require('dotenv').config({ path: '../.env' }); // <-- Обязательно
+require('dotenv').config();
 
 const nodemailer = require('nodemailer');
-
-console.log('EMAIL_HOST:', process.env.EMAIL_HOST);
-console.log('EMAIL_USER:', process.env.EMAIL_USER);
-console.log('EMAIL_PASS:', process.env.EMAIL_PASS ? '✓' : '❌');
 
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.mail.yahoo.com',
@@ -16,18 +12,16 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-async function main() {
+(async () => {
   try {
     const info = await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: 'maximpetrov420@gmail.com',
-      subject: 'Тестовое сообщение',
-      text: 'Привет! Это тест.',
+      to: process.env.EMAIL_USER,
+      subject: 'Test',
+      text: 'Hello from Yahoo SMTP test',
     });
-    console.log('✅ УСПЕХ: Письмо отправлено:', info.response);
-  } catch (err) {
-    console.error('❌ SEND FAIL:', err);
+    console.log('Sent:', info.messageId);
+  } catch (e) {
+    console.error(e);
   }
-}
-
-main();
+})();

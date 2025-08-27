@@ -1,0 +1,378 @@
+.enrollment-list-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.enrollment-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e1e5e9;
+}
+
+.enrollment-header h1 {
+  margin: 0;
+  color: #2c3e50;
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.enrollment-controls {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.filter-controls {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-btn {
+  padding: 8px 16px;
+  border: 2px solid #3498db;
+  background: white;
+  color: #3498db;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.filter-btn:hover {
+  background: #3498db;
+  color: white;
+}
+
+.filter-btn.active {
+  background: #3498db;
+  color: white;
+}
+
+.status-filter {
+  padding: 8px 12px;
+  border: 2px solid #e1e5e9;
+  border-radius: 6px;
+  background: white;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.enrollment-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+}
+
+.stat-card {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+  border: 1px solid #e1e5e9;
+}
+
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 8px;
+}
+
+.stat-number.pending {
+  color: #f39c12;
+}
+
+.stat-number.approved {
+  color: #27ae60;
+}
+
+.stat-number.rejected {
+  color: #e74c3c;
+}
+
+.stat-label {
+  color: #7f8c8d;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.enrollments-table {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  border: 1px solid #e1e5e9;
+}
+
+.enrollments-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.enrollments-table th {
+  background: #f8f9fa;
+  padding: 15px;
+  text-align: left;
+  font-weight: 600;
+  color: #2c3e50;
+  border-bottom: 2px solid #e1e5e9;
+}
+
+.enrollments-table td {
+  padding: 15px;
+  border-bottom: 1px solid #e1e5e9;
+  vertical-align: middle;
+}
+
+.enrollments-table tr:hover {
+  background: #f8f9fa;
+}
+
+.student-info, .course-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.student-info svg, .course-info svg {
+  color: #7f8c8d;
+  font-size: 16px;
+}
+
+.student-name, .course-name {
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.student-email, .course-status {
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.status-cell {
+  text-align: center;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.status-icon {
+  font-size: 16px;
+}
+
+.status-icon.pending {
+  color: #f39c12;
+}
+
+.status-icon.approved {
+  color: #27ae60;
+}
+
+.status-icon.rejected {
+  color: #e74c3c;
+}
+
+.status-pending {
+  background: rgba(243, 156, 18, 0.05);
+}
+
+.status-approved {
+  background: rgba(39, 174, 96, 0.05);
+}
+
+.status-rejected {
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.status-pending .status-indicator span {
+  color: #f39c12;
+  font-weight: 600;
+}
+
+.status-approved .status-indicator span {
+  color: #27ae60;
+  font-weight: 600;
+}
+
+.status-rejected .status-indicator span {
+  color: #e74c3c;
+  font-weight: 600;
+}
+
+.date-cell {
+  text-align: center;
+  color: #7f8c8d;
+  font-size: 14px;
+}
+
+.actions-cell {
+  text-align: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.approve-btn, .reject-btn, .edit-student-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: fit-content;
+  height: 32px;
+}
+
+.approve-btn {
+  background: #27ae60;
+  color: white;
+}
+
+.approve-btn:hover:not(:disabled) {
+  background: #229954;
+}
+
+.reject-btn {
+  background: #e74c3c;
+  color: white;
+}
+
+.reject-btn:hover:not(:disabled) {
+  background: #c0392b;
+}
+
+.edit-student-btn {
+  background: #3498db;
+  color: white;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+.edit-student-btn:hover {
+  background: #2980b9;
+}
+
+.edit-course-btn {
+  background: #9b59b6;
+  color: white;
+  font-size: 11px;
+  padding: 6px 10px;
+}
+
+.edit-course-btn:hover {
+  background: #8e44ad;
+}
+
+.approve-btn:disabled, .reject-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.status-text {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.no-enrollments {
+  text-align: center;
+  padding: 60px 20px;
+  color: #7f8c8d;
+}
+
+.no-enrollments svg {
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.loading-spinner {
+  text-align: center;
+  padding: 60px 20px;
+  color: #7f8c8d;
+}
+
+.loading-spinner svg {
+  margin-bottom: 20px;
+  color: #3498db;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .enrollment-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+  
+  .enrollment-controls {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .filter-controls {
+    justify-content: center;
+  }
+  
+  .enrollment-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .enrollments-table {
+    overflow-x: auto;
+  }
+  
+  .enrollments-table table {
+    min-width: 600px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+    gap: 4px;
+    align-items: stretch;
+  }
+  
+  .approve-btn, .reject-btn, .edit-student-btn, .edit-course-btn {
+    width: 100%;
+    justify-content: center;
+    height: auto;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .enrollment-stats {
+    grid-template-columns: 1fr;
+  }
+  
+  .student-info, .course-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+} 

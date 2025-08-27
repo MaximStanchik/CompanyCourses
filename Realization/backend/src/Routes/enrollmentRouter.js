@@ -11,11 +11,16 @@ router.get(
 router.get("/enrollments", enrollmentController.getAllEnrollments);
 router.get("/checkenrollment", enrollmentController.checkEnrollment);
 router.get("/students", enrollmentController.getCoursesWithStudents);
+router.get("/enrollment/pending", enrollmentController.getPendingEnrollments);
 router.post("/enroll/add", enrollmentController.addEnrollment);
+router.post("/enrollment", enrollmentController.addEnrollmentByStudent);
 router.post(
   "/enrollmentbystudent/add/:courseId",
   enrollmentController.addEnrollmentByStudent
 );
+router.put("/enrollment/:enrollmentId/approve", enrollmentController.approveEnrollment);
+// ВРЕМЕННЫЙ РОУТ ДЛЯ ИСПРАВЛЕНИЯ СУЩЕСТВУЮЩИХ ЗАПИСЕЙ
+router.post("/fix-enrollments", enrollmentController.fixExistingEnrollments);
 router.delete("/enrollment/", enrollmentController.deleteEnrollment);
 router.delete("/enrollmentbystudent/delete/:courseId", enrollmentController.deleteEnrollmentByStudent);
 

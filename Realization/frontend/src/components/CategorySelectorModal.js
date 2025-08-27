@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChevronRight, faChevronDown, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faChevronRight, faChevronDown, faTimes, faFolder, faFolderOpen } from '@fortawesome/free-solid-svg-icons';
+import { useTranslation } from 'react-i18next';
 import axios from '../utils/axios';
 
 /**
@@ -12,6 +13,7 @@ import axios from '../utils/axios';
  *   initialSelected - массив ранее выбранных id
  */
 export default function CategorySelectorModal({ open, onClose, onConfirm, initialSelected = [] }) {
+  const { t } = useTranslation();
   const [tree, setTree] = useState([]);
   const [expanded, setExpanded] = useState({}); // id -> bool
   const [selected, setSelected] = useState(initialSelected);
@@ -30,11 +32,49 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
       axios.get('/categories', {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` },
       })
-        .then(res => setTree(res.data))
+        .then(res => {
+          // Строим дерево категорий
+          const categories = res.data || [];
+          const categoryTree = buildCategoryTree(categories);
+          setTree(categoryTree);
+        })
         .catch(err => console.error('Failed to load categories', err))
         .finally(() => setLoading(false));
     }
   }, [open, tree.length]);
+
+  // Функция для построения дерева категорий
+  const buildCategoryTree = (flatList) => {
+    const idToNode = {};
+    const roots = [];
+    
+    // Создаем узлы
+    (flatList || []).forEach(cat => {
+      const rawId = cat.id ?? cat.ID ?? cat.categoryId ?? cat.category_id;
+      if (rawId === undefined || rawId === null) return;
+      const key = String(rawId);
+      idToNode[key] = { ...cat, id: rawId, children: [] };
+    });
+    
+    // Строим связи
+    (flatList || []).forEach(cat => {
+      const rawId = cat.id ?? cat.ID ?? cat.categoryId ?? cat.category_id;
+      if (rawId === undefined || rawId === null) return;
+      const selfKey = String(rawId);
+      const rawParent = cat.parentId ?? cat.parent_id ?? cat.parent ?? cat.ParentId;
+      const parentKey = rawParent === null || rawParent === undefined || rawParent === '-' || rawParent === '' ? null : String(rawParent);
+      
+      if (!parentKey || !idToNode[parentKey]) {
+        if (idToNode[selfKey]) {
+          roots.push(idToNode[selfKey]);
+        }
+      } else {
+        idToNode[parentKey].children.push(idToNode[selfKey]);
+      }
+    });
+    
+    return roots;
+  };
 
   // reset selection each time modal opens
   useEffect(() => {
@@ -43,40 +83,221 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
 
   const toggleExpand = id => setExpanded(prev => ({ ...prev, [id]: !prev[id] }));
 
+  // Вспомогательная функция для поиска узла по ID
+  const findNodeById = (nodes, targetId) => {
+    for (const node of nodes) {
+      if (node.id === targetId) {
+        return node;
+      }
+      if (node.children) {
+        const found = findNodeById(node.children, targetId);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
   const toggleSelect = id => {
     if (selected.includes(id)) {
-      setSelected(selected.filter(x => x !== id));
+      // При снятии выбора с подкатегории проверяем, нужно ли снять выбор с родительской
+      const newSelected = selected.filter(x => x !== id);
+      
+      // Находим родительскую категорию для данной подкатегории
+      const findParentId = (nodes, targetId) => {
+        for (const node of nodes) {
+          if (node.children && node.children.some(child => child.id === targetId)) {
+            return node.id;
+          }
+          if (node.children) {
+            const found = findParentId(node.children, targetId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      
+      const parentId = findParentId(tree, id);
+      
+      // Если это подкатегория, проверяем, остались ли другие выбранные подкатегории у родителя
+      if (parentId && newSelected.includes(parentId)) {
+        const parentNode = findNodeById(tree, parentId);
+        if (parentNode && parentNode.children) {
+          const hasSelectedChildren = parentNode.children.some(child => 
+            newSelected.includes(child.id)
+          );
+          
+          // Если у родителя нет выбранных подкатегорий, снимаем выбор с родителя
+          if (!hasSelectedChildren) {
+            const finalSelected = newSelected.filter(x => x !== parentId);
+            setSelected(finalSelected);
+            return;
+          }
+        }
+      }
+      
+      // Если это родительская категория, снимаем выбор со всех её подкатегорий
+      const currentNode = findNodeById(tree, id);
+      if (currentNode && currentNode.children && currentNode.children.length > 0) {
+        currentNode.children.forEach(child => {
+          const childIndex = newSelected.indexOf(child.id);
+          if (childIndex > -1) {
+            newSelected.splice(childIndex, 1);
+          }
+        });
+      }
+      
+      setSelected(newSelected);
     } else {
       if (selected.length >= MAX) {
         alert(`Можно выбрать не более ${MAX} категорий`);
         return;
       }
-      setSelected([...selected, id]);
+      
+      // Находим родительскую категорию для данной подкатегории
+      const findParentId = (nodes, targetId) => {
+        for (const node of nodes) {
+          if (node.children && node.children.some(child => child.id === targetId)) {
+            return node.id;
+          }
+          if (node.children) {
+            const found = findParentId(node.children, targetId);
+            if (found) return found;
+          }
+        }
+        return null;
+      };
+      
+      const parentId = findParentId(tree, id);
+      const newSelected = [...selected, id];
+      
+      // Если это подкатегория и родительская категория еще не выбрана, добавляем её
+      if (parentId && !selected.includes(parentId)) {
+        newSelected.push(parentId);
+      }
+      
+      // Если это родительская категория, добавляем все её подкатегории
+      const currentNode = findNodeById(tree, id);
+      if (currentNode && currentNode.children && currentNode.children.length > 0) {
+        currentNode.children.forEach(child => {
+          if (!newSelected.includes(child.id)) {
+            newSelected.push(child.id);
+          }
+        });
+      }
+      
+      setSelected(newSelected);
     }
   };
 
   const renderTree = (nodes, level = 0) => (
-    <ul style={{ listStyle: 'none', margin: 0, paddingLeft: level === 0 ? 0 : 16 }}>
-      {nodes.map(node => (
-        <li key={node.id} style={{ margin: '4px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {node.children && node.children.length > 0 && (
-              <button type="button" onClick={() => toggleExpand(node.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <FontAwesomeIcon icon={expanded[node.id] ? faChevronDown : faChevronRight} />
-              </button>
+    <ul style={{ 
+      listStyle: 'none', 
+      margin: 0, 
+      paddingLeft: level === 0 ? 0 : 20,
+      borderLeft: level > 0 ? '2px solid #e0e0e0' : 'none',
+      marginLeft: level > 0 ? 10 : 0
+    }}>
+      {nodes.map(node => {
+        const hasChildren = node.children && node.children.length > 0;
+        const isExpanded = expanded[node.id];
+        const isSelected = selected.includes(node.id);
+        const canExpand = hasChildren && level < 1; // Ограничиваем 2 уровнями (0 и 1)
+        
+        return (
+          <li key={node.id} style={{ 
+            margin: '8px 0',
+            padding: '8px 12px',
+            borderRadius: '8px',
+            background: isSelected ? '#e3f2fd' : 'transparent',
+            border: isSelected ? '2px solid #2196f3' : '1px solid transparent',
+            transition: 'all 0.2s ease'
+          }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 8,
+              cursor: 'pointer'
+            }}>
+              {canExpand && (
+                <button 
+                  type="button" 
+                  onClick={() => toggleExpand(node.id)} 
+                  style={{ 
+                    background: 'none', 
+                    border: 'none', 
+                    cursor: 'pointer', 
+                    padding: 4,
+                    borderRadius: 4,
+                    color: '#666',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#f0f0f0'}
+                  onMouseOut={(e) => e.target.style.background = 'transparent'}
+                >
+                  <FontAwesomeIcon 
+                    icon={isExpanded ? faChevronDown : faChevronRight} 
+                    style={{ fontSize: '12px' }}
+                  />
+                </button>
+              )}
+              {!canExpand && <span style={{ width: 20 }} />}
+              
+              <FontAwesomeIcon 
+                icon={hasChildren ? (isExpanded ? faFolderOpen : faFolder) : faFolder} 
+                style={{ 
+                  fontSize: '14px', 
+                  color: hasChildren ? '#ff9800' : '#4caf50',
+                  marginRight: 4
+                }} 
+              />
+              
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggleSelect(node.id)}
+                id={`cat-${node.id}`}
+                style={{ margin: 0 }}
+              />
+              
+              <label 
+                htmlFor={`cat-${node.id}`} 
+                style={{ 
+                  cursor: 'pointer',
+                  fontWeight: level === 0 ? '600' : '400',
+                  fontSize: level === 0 ? '16px' : '14px',
+                  color: level === 0 ? '#333' : '#555',
+                  flex: 1,
+                  margin: 0
+                }}
+              >
+                {node.nameRu || node.nameEn || node.name}
+              </label>
+              
+              {hasChildren && level === 0 && (
+                <span style={{ 
+                  fontSize: '12px', 
+                  color: '#999', 
+                  background: '#f0f0f0', 
+                  padding: '2px 6px', 
+                  borderRadius: '10px' 
+                }}>
+                  {node.children.length} {t('categorySelector.subcategories')}
+                </span>
+              )}
+            </div>
+            
+            {canExpand && isExpanded && (
+              <div style={{ 
+                marginTop: 8,
+                paddingTop: 8,
+                borderTop: '1px solid #f0f0f0'
+              }}>
+                {renderTree(node.children, level + 1)}
+              </div>
             )}
-            {!(node.children && node.children.length > 0) && <span style={{ width: 14 }} />} {/* spacer */}
-            <input
-              type="checkbox"
-              checked={selected.includes(node.id)}
-              onChange={() => toggleSelect(node.id)}
-              id={`cat-${node.id}`}
-            />
-            <label htmlFor={`cat-${node.id}`} style={{ cursor: 'pointer' }}>{node.nameRu || node.nameEn || node.name}</label>
-          </div>
-          {node.children && node.children.length > 0 && expanded[node.id] && renderTree(node.children, level + 1)}
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 
@@ -84,7 +305,7 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
 
   const handleClose = () => {
     setLeaving(true);
-    setTimeout(() => onClose(), 250); // время должно совпадать с анимацией fadeOut 0.25s
+    setTimeout(() => onClose(), 250);
   };
 
   /* Анимации */
@@ -95,14 +316,14 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
     animation: `${leaving ? 'fadeOut' : 'fadeIn'} 0.25s ease forwards`
   };
   const modalStyle = {
-    background: '#fff', maxWidth: 600, width: '90%', borderRadius: 12, padding: 24,
+    background: '#fff', maxWidth: 700, width: '90%', borderRadius: 12, padding: 24,
     maxHeight: '80vh', overflowY: 'auto', position: 'relative',
-    animation: `${leaving ? 'scaleOut' : 'scaleIn'} 0.25s ease forwards`
+    animation: `${leaving ? 'scaleOut' : 'scaleIn'} 0.25s ease forwards`,
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
   };
 
   return (
     <div style={overlayStyle}>
-      {/* Добавляем ключевые кадры один раз */}
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes fadeOut { from { opacity: 1 } to { opacity: 0 } }
@@ -110,21 +331,105 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
         @keyframes scaleOut { from { transform: scale(1); opacity: 1 } to { transform: scale(0.9); opacity: 0 } }
       `}</style>
       <div style={modalStyle}>
-        <button onClick={handleClose} title="Закрыть" style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', fontSize: 20, color: '#666' }}>
+        <button 
+          onClick={handleClose} 
+          title={t('categorySelector.close')} 
+          style={{ 
+            position: 'absolute', 
+            top: 12, 
+            right: 12, 
+            background: 'none', 
+            border: 'none', 
+            cursor: 'pointer', 
+            fontSize: 20, 
+            color: '#666',
+            padding: 4,
+            borderRadius: 4,
+            transition: 'all 0.2s ease'
+          }}
+          onMouseOver={(e) => e.target.style.background = '#f0f0f0'}
+          onMouseOut={(e) => e.target.style.background = 'transparent'}
+        >
           <FontAwesomeIcon icon={faTimes} />
         </button>
-        <h2 style={{ marginTop: 0 }}>Выберите категорию курса</h2>
-        <p style={{ color: '#555', marginTop: 0, marginBottom: 16 }}>Более точные категории лучше работают в поиске. Вы можете выбрать до 5 категорий и подкатегорий.</p>
-        {loading ? <p>Загрузка...</p> : renderTree(tree)}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
-          <button type="button" onClick={handleClose} style={{ background: '#fff', border: '1.5px solid #888', borderRadius: 6, padding: '8px 20px', fontSize: 15, cursor: 'pointer' }}>Отменить</button>
-          <button
-            type="button"
-            onClick={() => onConfirm(selected)}
-            style={{ background: '#54ad54', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 20px', fontSize: 15, cursor: 'pointer' }}
-          >
-            Выбрать
-          </button>
+        
+        <h2 style={{ marginTop: 0, marginBottom: 8, color: '#333' }}>{t('categorySelector.title')}</h2>
+        <p style={{ 
+          color: '#666', 
+          marginTop: 0, 
+          marginBottom: 16, 
+          fontSize: '14px',
+          lineHeight: '1.5'
+        }}>
+          {t('categorySelector.description')}
+          <br />
+          <strong>{t('categorySelector.limitation')}</strong>
+        </p>
+        
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            {t('categorySelector.loading')}
+          </div>
+        ) : (
+          <div style={{ 
+            border: '1px solid #e0e0e0', 
+            borderRadius: '8px', 
+            padding: '16px',
+            maxHeight: '400px',
+            overflowY: 'auto'
+          }}>
+            {renderTree(tree)}
+          </div>
+        )}
+        
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginTop: 24,
+          paddingTop: 16,
+          borderTop: '1px solid #e0e0e0'
+        }}>
+          <div style={{ fontSize: '14px', color: '#666' }}>
+            {t('categorySelector.selected')}: {selected.length} {t('categorySelector.of')} {MAX}
+          </div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <button 
+              type="button" 
+              onClick={handleClose} 
+              style={{ 
+                background: '#fff', 
+                border: '1.5px solid #888', 
+                borderRadius: 6, 
+                padding: '10px 20px', 
+                fontSize: 14, 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.target.style.background = '#f8f8f8'}
+              onMouseOut={(e) => e.target.style.background = '#fff'}
+            >
+              {t('categorySelector.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={() => onConfirm(selected)}
+              style={{ 
+                background: '#54ad54', 
+                color: '#fff', 
+                border: 'none', 
+                borderRadius: 6, 
+                padding: '10px 20px', 
+                fontSize: 14, 
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseOver={(e) => e.target.style.background = '#45a049'}
+              onMouseOut={(e) => e.target.style.background = '#54ad54'}
+            >
+              {t('categorySelector.select')} ({selected.length})
+            </button>
+          </div>
         </div>
       </div>
     </div>

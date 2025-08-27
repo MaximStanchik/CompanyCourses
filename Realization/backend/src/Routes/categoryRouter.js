@@ -6,6 +6,8 @@ const roleMiddleware = require("../Middleware/roleMiddleware");
 
 router.post("/category/add", categoryController.addCategory);
 router.get("/categories", categoryController.getAllCategories);
+router.get("/categories/public", categoryController.getPublicCategories);
+router.get("/categories/usage-info", categoryController.getCategoryUsageInfo);
 router.get("/category", categoryController.getCategoryById);
 router.delete("/category/", categoryController.deleteCategory);
 router.put("/category/", categoryController.updateCategory);

@@ -1,8 +1,7 @@
-//set default header for axios
 import axios from "axios";
 const setAuthToken = (token) => {
   if (token) {
-    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`; // Authorization - это ключ, token - это значение
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`; 
   } else {
     delete axios.defaults.headers.common["Authorization"];
   }

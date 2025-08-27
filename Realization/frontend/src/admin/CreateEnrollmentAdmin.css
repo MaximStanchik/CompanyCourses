@@ -1,0 +1,263 @@
+/* Кнопка закрытия */
+.enrollment-close-btn {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: #f8f9fa;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 10;
+  color: #6c757d;
+  font-size: 16px;
+}
+
+.enrollment-close-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+  transform: scale(1.1);
+}
+
+.enrollment-close-btn:active {
+  transform: scale(0.95);
+}
+
+/* Модальное окно */
+.enrollment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+.enrollment-modal.visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Затемнение фона */
+.enrollment-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+/* Контент модального окна */
+.enrollment-content {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  transform: scale(0.8) translateY(20px);
+  transition: all 0.3s ease-in-out;
+}
+
+.enrollment-modal.visible .enrollment-content {
+  transform: scale(1) translateY(0);
+}
+
+/* Выпадающие списки с прокруткой */
+.enrollment-select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #95c4e2;
+  border-radius: 5px;
+  background: white;
+  font-size: 14px;
+  line-height: 1.4;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #95c4e2 #f0f0f0;
+}
+
+.enrollment-select::-webkit-scrollbar {
+  width: 8px;
+}
+
+.enrollment-select::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 4px;
+}
+
+.enrollment-select::-webkit-scrollbar-thumb {
+  background: #95c4e2;
+  border-radius: 4px;
+}
+
+.enrollment-select::-webkit-scrollbar-thumb:hover {
+  background: #7bb3d1;
+}
+
+/* Стили для опций */
+.enrollment-select option {
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s ease;
+}
+
+.enrollment-select option:hover {
+  background-color: #f8f9fa;
+}
+
+.enrollment-select option:checked {
+  background-color: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+/* Кнопка редактирования студента */
+.edit-student-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 14px;
+  background: #6c757d;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.edit-student-btn:hover {
+  background: #5a6268;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-student-btn:active {
+  transform: translateY(0);
+}
+
+/* Кнопка редактирования курса */
+.btn-warning {
+  background: #ffc107;
+  border: none;
+  border-radius: 6px;
+  color: #212529;
+  transition: all 0.2s ease;
+}
+
+.btn-warning:hover {
+  background: #e0a800;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.btn-warning:active {
+  transform: translateY(0);
+}
+
+/* Кнопка отправки */
+.submit-btn {
+  width: auto;
+  min-width: fit-content;
+  padding: 12px 24px;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  display: inline-block;
+  background: #17a2b8;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 8px rgba(23, 162, 184, 0.2);
+}
+
+.submit-btn:hover {
+  background: #138496;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(23, 162, 184, 0.3);
+}
+
+.submit-btn:active {
+  transform: translateY(0);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .enrollment-content {
+    width: 95%;
+    max-height: 95vh;
+    margin: 20px;
+  }
+  
+  .enrollment-select {
+    font-size: 16px; /* Увеличиваем размер шрифта для мобильных */
+  }
+  
+  .submit-btn {
+    width: 100%;
+    padding: 15px 20px;
+    font-size: 18px;
+  }
+}
+
+/* Анимация появления для элементов формы */
+.enrollment-content form > div {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeInUp 0.5s ease forwards;
+}
+
+.enrollment-content form > div:nth-child(1) { animation-delay: 0.1s; }
+.enrollment-content form > div:nth-child(2) { animation-delay: 0.2s; }
+.enrollment-content form > div:nth-child(3) { animation-delay: 0.3s; }
+.enrollment-content form > div:nth-child(4) { animation-delay: 0.4s; }
+.enrollment-content form > div:nth-child(5) { animation-delay: 0.5s; }
+.enrollment-content form > div:nth-child(6) { animation-delay: 0.6s; }
+
+@keyframes fadeInUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Стили для лейблов */
+.enrollment-content label {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8px;
+  display: block;
+}
+
+/* Стили для параграфов с выбранными значениями */
+.enrollment-content p {
+  margin: 8px 0;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border-left: 3px solid #17a2b8;
+  font-size: 14px;
+  color: #495057;
+}
+
+/* Анимация для ToastContainer */
+.Toastify__toast-container {
+  z-index: 1001;
+} 

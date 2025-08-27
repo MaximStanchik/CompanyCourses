@@ -18,5 +18,7 @@ router.get("/check-username/:username", profileController.checkUsername);
 router.post("/avatar-user", uploadAvatarMulter, profileController.uploadUserAvatar);
 router.post("/update-ip", profileController.updateUserIp);
 router.post("/change-password", profileController.changePassword);
+// Admin: update any user's profile
+router.post("/admin/update", uploadAvatarMulter, profileController.adminUpdateProfile);
 
 module.exports = router;

@@ -15,6 +15,11 @@
   --teach-hover-bg: #f0f0f0;
   --teach-active-bg: #e6f4ff;
   --teach-link-color: #000; /* pure black for light theme */
+  --course-title-color: #23272f; /* цвет названия курса для светлой темы */
+  --teach-text-color: #000; /* черный цвет для текста в светлой теме */
+  --border-color: #eaeaea; /* цвет границ для светлой темы */
+  --text-color: #222; /* основной цвет текста для светлой темы */
+  --teach-tile-bg: #fff; /* цвет фона плиток для светлой темы */
 }
 body.dark-theme, body[data-theme="dark"], .teach-nav--dark {
   --teach-nav-bg: #23272f;
@@ -26,6 +31,11 @@ body.dark-theme, body[data-theme="dark"], .teach-nav--dark {
   --teach-hover-bg: #2d3038;
   --teach-active-bg: #1f2127;
   --teach-link-color: #fff;
+  --course-title-color: #ffffff; /* цвет названия курса для темной темы */
+  --teach-text-color: #eaf4fd; /* светлый цвет для текста в темной теме */
+  --border-color: #36607e; /* цвет границ для темной темы */
+  --text-color: #eaf4fd; /* основной цвет текста для темной темы */
+  --teach-tile-bg: #2d2d2d; /* цвет фона плиток для темной темы - темнее, но не черный */
 }
 .teach-nav, .teach-nav--dark, .teach-nav--light {
   transition: background 0.2s, color 0.2s;
@@ -360,6 +370,8 @@ body.dark-theme .select-box__option.menu-item:hover, .teach-nav--dark .select-bo
   width: 220px !important;
   background: var(--teach-tile-bg, #fff) !important;
   z-index: 99 !important;
+  max-height: 70vh;
+  overflow-y: auto;
 }
 .teach-nav__menu .menu-item > a {
   min-width: 200px;
@@ -479,3 +491,402 @@ body.dark-theme .select-box__option.menu-item {
   color: var(--teach-link-color, #fff) !important;
 }
 /* -------------------------------------------------------------------- */
+/* Fix textarea text color in dark theme */
+textarea.st-input {
+  color: var(--teach-fg) !important;
+}
+
+textarea.st-input::placeholder {
+  color: var(--teach-fg);
+  opacity: 0.7;
+}
+
+/* Fix navigation text color for light theme */
+.teach-nav--light .teach-nav-link,
+.teach-nav--light .menu-item > a,
+.teach-nav--light .menu-item > button,
+.teach-nav--light .menu-item > span {
+  color: var(--teach-link-color, #23272f) !important;
+}
+
+.teach-nav--light .teach-nav__section-title {
+  color: var(--teach-link-color, #23272f) !important;
+}
+
+/* Fix dropdown background for light theme */
+.teach-nav--light .teach-nav__dropdown {
+  background: var(--teach-tile-bg, #fff) !important;
+  color: var(--teach-link-color, #23272f) !important;
+}
+
+/* Fix navigation height and colors for dark theme */
+.teach-nav--dark {
+  height: 100vh !important;
+  min-height: 100vh !important;
+}
+
+.teach-nav--dark .teachlearn__course-nav {
+  background: var(--teach-nav-bg, #23272f) !important;
+  color: var(--teach-nav-fg, #fff) !important;
+}
+
+.teach-nav--dark .nav-menu__menu {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Fix the bottom spacer div */
+.teachlearn__course-nav > div:last-child {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+}
+
+/* Fix dropdown backgrounds for both themes */
+.teach-nav__dropdown {
+  background: var(--teach-tile-bg) !important;
+  color: var(--teach-link-color) !important;
+}
+
+/* Ensure proper background for light and dark themes */
+.teach-nav--light .teach-nav__dropdown {
+  background: var(--teach-tile-bg, #fff) !important;
+  color: var(--teach-link-color, #23272f) !important;
+}
+
+.teach-nav--dark .teach-nav__dropdown {
+  background: var(--teach-tile-bg, #2d3038) !important;
+  color: var(--teach-link-color, #fff) !important;
+}
+
+/* Fix the main navigation container */
+.teachlearn__course-nav {
+  background: var(--teach-nav-bg) !important;
+  color: var(--teach-nav-fg) !important;
+}
+
+/* Ensure no white backgrounds in dark theme */
+.teach-nav--dark,
+.teach-nav--dark * {
+  background: var(--teach-nav-bg) !important;
+}
+
+.teach-nav--dark .teach-nav__dropdown,
+.teach-nav--dark .teach-nav__dropdown * {
+  background: var(--teach-tile-bg, #2d3038) !important;
+}
+
+/* Fix upload widget text colors for both themes */
+.course-info-editor__upload-widget-label,
+.course-info-editor__upload-widget-text {
+  color: var(--text-color) !important;
+}
+
+/* Ensure upload widget background matches theme */
+.course-info-editor__upload-widget-content {
+  background: var(--teach-tile-bg) !important;
+  border-color: var(--border-color) !important;
+}
+
+.course-info-editor__upload-widget-content:hover {
+  background: var(--teach-hover-bg) !important;
+}
+
+/* Дополнительные стили для темной темы */
+.teach-nav--dark .teach-nav__menu .menu-item a,
+.teach-nav--dark .teach-nav__menu .menu-item button,
+.teach-nav--dark .teach-nav__menu .menu-item span {
+  color: var(--teach-link-color) !important;
+}
+
+.teach-nav--dark .teach-nav__dropdown .menu-item button {
+  color: var(--teach-link-color) !important;
+}
+
+.teach-nav--dark .teach-nav__dropdown .menu-item button:hover {
+  background: var(--teach-hover-bg) !important;
+  color: var(--teach-fg) !important;
+}
+
+/* Стили для названия курса */
+.teach-nav--dark h1 {
+  color: var(--course-title-color) !important;
+}
+
+.teach-nav--light h1 {
+  color: var(--course-title-color) !important;
+}
+
+/* Исправляю видимость элементов в светлой теме */
+.teach-nav--light .teach-nav__menu .menu-item a,
+.teach-nav--light .teach-nav__menu .menu-item button,
+.teach-nav--light .teach-nav__menu .menu-item span,
+.teach-nav--light .teach-nav__dropdown .menu-item button {
+  color: var(--teach-link-color, #000) !important;
+}
+
+.teach-nav--light .teach-nav__dropdown {
+  background: var(--teach-tile-bg, #fff) !important;
+  color: var(--teach-link-color, #000) !important;
+  border: 1px solid var(--border-color, #eaeaea) !important;
+}
+
+.teach-nav--light .teach-nav__dropdown .menu-item button:hover {
+  background: var(--teach-hover-bg, #f0f0f0) !important;
+  color: var(--teach-link-color, #000) !important;
+}
+
+/* Убираю конфликтующие стили высоты */
+.teachlearn__course-nav {
+  height: auto !important;
+  min-height: auto !important;
+  max-height: none !important;
+  overflow-y: visible !important;
+}
+
+/* Убираю дублирующиеся правила */
+.teach-nav {
+  height: auto !important;
+  min-height: auto !important;
+  background: var(--teach-nav-bg) !important;
+  color: var(--teach-nav-fg) !important;
+}
+
+/* Убираю фиксированную высоту для навигации */
+.teach-nav .nav-menu__menu {
+  flex: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Убираю нижний спейсер который создает белый прямоугольник */
+.teach-nav > div:last-child,
+.teachlearn__course-nav > div:last-child {
+  display: none !important;
+}
+
+/* Rich text editor placeholder and whitespace handling */
+.rich-text-editor__content[data-empty="true"]::before {
+  content: attr(data-placeholder);
+  color: #999;
+  font-style: italic;
+  display: block;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+
+.rich-text-editor__content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Rich Text Editor Styles */
+.rich-text-editor__content {
+  font-size: 16px;
+  line-height: 1.6;
+  font-family: Roboto, sans-serif;
+  color: var(--teach-fg);
+  word-wrap: break-word;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rich-text-editor__content.cke_editable {
+  cursor: text;
+  min-height: 120px;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border-color);
+  background: var(--teach-bg);
+  color: var(--teach-fg);
+  outline: none;
+  text-align: left;
+  overflow: hidden;
+  resize: vertical;
+}
+
+.rich-text-editor__content.cke_editable:focus {
+  border-color: #4485ed;
+  box-shadow: 0 0 0 2px rgba(68, 133, 237, 0.1);
+}
+
+/* Стили для содержимого редактора */
+.rich-text-editor__content.cke_editable * {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.rich-text-editor__content.cke_editable p {
+  margin: 0 0 8px 0;
+  word-wrap: break-word;
+}
+
+.rich-text-editor__content.cke_editable ul,
+.rich-text-editor__content.cke_editable ol {
+  margin: 0 0 8px 0;
+  padding-left: 20px;
+}
+
+.rich-text-editor__content.cke_editable li {
+  margin-bottom: 4px;
+}
+
+.rich-text-editor__content.cke_editable a {
+  color: #4485ed;
+  text-decoration: underline;
+}
+
+.rich-text-editor__content.cke_editable img {
+  max-width: 100%;
+  height: auto;
+}
+
+.rich-text-editor__content.cke_editable code {
+  background: rgba(0, 0, 0, 0.05);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+}
+
+/* Плейсхолдер */
+.rich-text-editor__content.cke_editable[data-empty="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: #999;
+  font-style: italic;
+  pointer-events: none;
+}
+
+/* Toolbar styles */
+.custom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border: 1.5px solid #4485ed;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: var(--teach-bg);
+  margin-bottom: 0;
+}
+
+.custom-toolbar .cke_button_icon {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  transition: opacity 0.2s;
+}
+
+.custom-toolbar .cke_button_icon:hover {
+  opacity: 0.8;
+}
+
+.custom-toolbar .cke_button_icon.active {
+  opacity: 1;
+  background-color: rgba(68, 133, 237, 0.1);
+  border-radius: 3px;
+}
+
+/* --- Promo rich HTML formatting --- */
+.promo-html table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+.promo-html th,
+.promo-html td {
+  border: 1px solid var(--border-color);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.promo-html thead th {
+  background: var(--teach-hover-bg);
+  font-weight: 600;
+}
+.promo-html tbody tr:nth-child(odd) td {
+  background: rgba(0,0,0,0.03);
+}
+.promo-html tbody tr:hover td {
+  background: rgba(68,133,237,0.06);
+}
+/* dark theme adjustments */
+body.dark-theme .promo-html thead th {
+  background: #2d3038;
+}
+body.dark-theme .promo-html tbody tr:nth-child(odd) td {
+  background: #1f2127;
+}
+body.dark-theme .promo-html td,
+body.dark-theme .promo-html th {
+  border-color: #404040;
+}
+.promo-html strong,
+.promo-html b {
+  font-weight: 700;
+}
+.promo-html { color: var(--text-color); }
+
+/* Hide CKEditor image button everywhere */
+.cke_button__image_icon,
+.cke_button__image_label,
+span[class*="_image_icon"] { display:none !important; }
+
+/* Normalize list markers in rich HTML blocks */
+.promo-html ul { list-style: disc outside; margin-left: 0; padding-left: 1.25rem; }
+.promo-html ol { list-style: decimal outside; margin-left: 0; padding-left: 1.25rem; }
+
+/* Ensure in-editor visual markers as well */
+.rich-text-editor__content ul { list-style: disc inside; }
+.rich-text-editor__content ol { list-style: decimal inside; }
+
+/* Distinct link styling inside promo blocks */
+.promo-html a {
+  color: var(--accent-color, #4485ed);
+  text-decoration: underline;
+  font-weight: 500;
+}
+.promo-html a:hover {
+  text-decoration: underline;
+  filter: brightness(0.9);
+}
+.promo-html a:focus-visible {
+  outline: 2px solid var(--accent-color, #4485ed);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+.promo-html a:visited {
+  color: #6f42c1;
+}
+
+/* Стили для кода в уроках */
+.lesson-code-block.dark-theme,
+.lesson-code.dark-theme {
+  color: #ffffff !important;
+  background-color: transparent !important;
+}
+
+.lesson-code-block.light-theme,
+.lesson-code.light-theme {
+  color: #333333 !important;
+  background-color: transparent !important;
+}
+
+/* Принудительное применение стилей для кода */
+.lesson-code-block.dark-theme pre,
+.lesson-code-block.dark-theme code,
+.lesson-code.dark-theme {
+  color: #ffffff !important;
+  background-color: transparent !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+}
+
+.lesson-code-block.light-theme pre,
+.lesson-code-block.light-theme code,
+.lesson-code.light-theme {
+  color: #333333 !important;
+  background-color: transparent !important;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+}

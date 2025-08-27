@@ -75,7 +75,7 @@ export const createProfile = (profileData, history) => dispatch => {
         payload: {}, // очищаем ошибки
       });
 
-      history.push("/dashboard");
+      // Остаёмся на текущей странице после сохранения
     })
     .catch(err =>
       dispatch({

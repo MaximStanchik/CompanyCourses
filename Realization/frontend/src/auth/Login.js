@@ -6,8 +6,7 @@ import { useHistory, Link } from "react-router-dom";
 import { connect } from "react-redux";
 import { loginUser } from "../actions/authActions";
 import NavBar from "../components/NavBar";
-import SocialButtons from '../components/SocialButtons';
-import ConsentModal from '../components/ConsentModal';
+
 import SimpleCaptchaModal from '../components/SimpleCaptchaModal';
 import { API_BASE_URL } from '../utils/constants';
 import Modal from "../components/Modal";
@@ -18,8 +17,7 @@ const Login = (props) => {
   const [errors, setErrors] = useState({});
   const [checkbox1, setCheckbox1] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedSocialProvider, setSelectedSocialProvider] = useState(null);
+
   const [showVerifyModal, setShowVerifyModal] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
@@ -51,45 +49,11 @@ const Login = (props) => {
     props.loginUser(newUser);
   };
 
-  // Обработчик для клика по кнопкам социальных сетей
-  const handleSocialButtonClick = (provider) => {
-    setSelectedSocialProvider(provider);
-    setIsModalOpen(true);
-  };
 
-  // Логика входа через соцсеть после согласия
-  const handleSocialLogin = async () => {
-    setIsModalOpen(false); // Закрыть модальное окно
-    setErrors({}); // Очистить предыдущие ошибки
-
-    // Просто перенаправляем пользователя на соответствующий эндпоинт бэкенда,
-    // который инициирует OAuth-аутентификацию.
-    let url;
-    switch (selectedSocialProvider) {
-      case 'google':
-        url = `${API_BASE_URL}/auth/google`;
-        break;
-      case 'facebook':
-        url = `${API_BASE_URL}/auth/facebook`;
-        break;
-      case 'github':
-        url = `${API_BASE_URL}/auth/social/github`;
-        break;
-      case 'yandex':
-        url = `${API_BASE_URL}/auth/yandex`;
-        break;
-      case 'dribbble':
-        url = `${API_BASE_URL}/auth/dribbble`;
-        break;
-      default:
-        setErrors({ social: 'Неизвестный провайдер социальной сети' });
-        return;
-    }
-    window.location.href = url;
-  };
 
   React.useEffect(() => {
-    if (props.auth.isAuthenticated) {
+    // Перенаправляем только если пользователь находится на странице login
+    if (props.auth.isAuthenticated && window.location.pathname === '/login') {
       const role =
         props.auth.users.role || props.auth.users.roles?.[0];
       if (role === "ADMIN") {
@@ -226,14 +190,7 @@ const Login = (props) => {
                     )}
                   </form>
                   
-                  <div className="divider-with-text my-4">
-                    <span>Other methods of authorization</span>
-                  </div>
 
-                  {/* Social buttons */}
-                  <div className="social-buttons">
-                    <SocialButtons onSocialClick={handleSocialButtonClick} />
-                  </div>
 
                   <p className="mt-3 text-muted text-center small terms-text">
                     By authorizing, you agree with{' '}
@@ -248,11 +205,7 @@ const Login = (props) => {
         </div>
       </div>
 
-      <ConsentModal 
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onRegister={handleSocialLogin}
-      />
+
       {showVerifyModal && (
         <Modal onClose={() => setShowVerifyModal(false)}>
           <div style={{ padding: '2.2rem 1.5rem 2rem 1.5rem', maxWidth: 400, margin: '0 auto', textAlign: 'center' }}>

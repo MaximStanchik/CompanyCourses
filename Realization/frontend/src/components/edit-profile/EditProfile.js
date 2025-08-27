@@ -9,17 +9,13 @@ import SelectListGroup from '../common/SelectListGroup';
 import { GET_ERRORS } from "../../actions/types";
 import { createProfile, getCurrentProfile, clearCurrentProfile, deleteAccount } from '../../actions/profileActions';
 import Cropper from 'react-easy-crop';
-import { FaUpload, FaWindows, FaApple, FaLinux, FaMobileAlt, FaChrome, FaFirefox, FaSafari, FaEdge } from 'react-icons/fa';
+import { FaUpload } from 'react-icons/fa';
 import Footer from '../Footer';
 import NavBar from '../NavBar';
 import i18n from '../../i18n';
+import useTheme from '../../hooks/useTheme';
 const t = i18n.t.bind(i18n);
 
-const CONNECTED_ACCOUNTS = [
-  'VK', 'Яндекс', 'Одноклассники', 'Mail.ru', 'Google', 'Facebook', 'Instagram', 'LinkedIn', 'GitHub', 'Telegram', 'Viber', 'Dribbble'
-];
-
-// Добавить функцию для отправки внешнего IP на backend
 async function sendExternalIpToBackend(ip) {
   const token = localStorage.getItem('jwtToken');
   await fetch('/profile/update-ip', {
@@ -68,10 +64,10 @@ class EditProfile extends Component {
       currentError: '',
       newError: '',
       repeatError: '',
-      connectedAccounts: CONNECTED_ACCOUNTS.reduce((acc, name) => ({ ...acc, [name]: false }), {}),
       lastActivity: null,
       avatar: null,
       passwordStrength: '',
+      isAuthenticated: false,
     };
 
     this.onChange = this.onChange.bind(this);
@@ -92,9 +88,25 @@ class EditProfile extends Component {
     this.handlePasswordField = this.handlePasswordField.bind(this);
     this.handleToggleAccount = this.handleToggleAccount.bind(this);
     this.handleSavePassword = this.handleSavePassword.bind(this);
+    this.handleDragOver = this.handleDragOver.bind(this);
+    this.handleDrop = this.handleDrop.bind(this);
   }
 
   async componentDidMount() {
+    // Проверяем авторизацию
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+      // Если пользователь не авторизован, показываем сообщение о необходимости входа
+      this.setState({
+        isAuthenticated: false
+      });
+      return;
+    }
+
+    this.setState({
+      isAuthenticated: true
+    });
+
     this.props.getCurrentProfile();
     // Очистка ошибок при монтировании
     this.props.dispatch({ type: GET_ERRORS, payload: {} });
@@ -119,13 +131,13 @@ class EditProfile extends Component {
     this.props.clearErrors && this.props.clearErrors(); 
   }
 
-  componentWillReceiveProps(nextProps) {
-    if (nextProps.errors) {
-      this.setState({ errors: nextProps.errors });
+  componentDidUpdate(prevProps) {
+    if (prevProps.errors !== this.props.errors && this.props.errors) {
+      this.setState({ errors: this.props.errors });
     }
 
-    if (nextProps.profile.profile) {
-      const profile = nextProps.profile.profile;
+    if (prevProps.profile.profile !== this.props.profile.profile && this.props.profile.profile) {
+      const profile = this.props.profile.profile;
       const skillsCSV = Array.isArray(profile.skills) ? profile.skills.join(",") : "";
       // lastActivity из user
       const user = profile.user || {};
@@ -136,8 +148,9 @@ class EditProfile extends Component {
         country: user.lastCountry,
         browser: user.lastBrowser,
         time: getTimeAgo(user.lastActivityTime),
-        icon: getDeviceIcon(user.lastDevice, user.lastOS),
-        browserIcon: getBrowserIcon(user.lastBrowser),
+        deviceType: user.lastDevice,
+        osType: user.lastOS,
+        browserType: user.lastBrowser,
       } : null;
       this.setState({
         handle: profile.handle || "",
@@ -231,7 +244,7 @@ class EditProfile extends Component {
   }
 
   onAvatarClose() {
-    this.setState({ showAvatarModal: false });
+    this.setState({ showAvatarModal: false, avatarSrc: null, crop: { x: 0, y: 0 }, zoom: 1 });
   }
 
   onCropChange(crop) {
@@ -248,15 +261,29 @@ class EditProfile extends Component {
 
   onChooseImage(e) {
     if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      
+      // Проверяем размер файла (максимум 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Файл слишком большой. Максимальный размер: 5MB');
+        return;
+      }
+      
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        alert('Пожалуйста, выберите изображение');
+        return;
+      }
+      
       const reader = new FileReader();
       reader.addEventListener('load', () => {
         if (typeof reader.result === 'string') {
-          this.setState({ avatarSrc: reader.result });
+          this.setState({ avatarSrc: reader.result, crop: { x: 0, y: 0 }, zoom: 1 });
         } else {
           this.setState({ avatarSrc: null });
         }
       });
-      reader.readAsDataURL(e.target.files[0]);
+      reader.readAsDataURL(file);
     } else {
       this.setState({ avatarSrc: null });
     }
@@ -268,53 +295,74 @@ class EditProfile extends Component {
     }
   }
 
-  async onSaveCropped() {
-    const createImage = (url) => new Promise((resolve, reject) => {
-      const img = new window.Image();
-      img.addEventListener('load', () => resolve(img));
-      img.addEventListener('error', error => reject(error));
-      img.setAttribute('crossOrigin', 'anonymous');
-      img.src = this.state.avatarSrc;
-    });
-    const getCroppedImg = async (imageSrc, crop) => {
-      const image = await createImage(imageSrc);
-      const canvas = document.createElement('canvas');
-      canvas.width = crop.width;
-      canvas.height = crop.height;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(
-        image,
-        crop.x,
-        crop.y,
-        crop.width,
-        crop.height,
-        0,
-        0,
-        crop.width,
-        crop.height
-      );
-      return new Promise((resolve) => {
-        canvas.toBlob((blob) => {
-          resolve(blob);
-        }, 'image/jpeg');
+  handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+
+  handleDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      
+      // Проверяем размер файла (максимум 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Файл слишком большой. Максимальный размер: 5MB');
+        return;
+      }
+      
+      // Проверяем тип файла
+      if (!file.type.startsWith('image/')) {
+        alert('Пожалуйста, выберите изображение');
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.addEventListener('load', () => {
+        if (typeof reader.result === 'string') {
+          this.setState({ avatarSrc: reader.result, crop: { x: 0, y: 0 }, zoom: 1 });
+        } else {
+          this.setState({ avatarSrc: null });
+        }
       });
-    };
-    if (typeof this.state.avatarSrc === 'string' && this.state.croppedAreaPixels) {
-      const blob = await getCroppedImg(this.state.avatarSrc, this.state.croppedAreaPixels);
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async onSaveCropped() {
+    if (!this.state.avatarSrc) {
+      alert('Сначала выберите изображение');
+      return;
+    }
+
+    try {
+      // Создаем blob из base64 изображения
+      const response = await fetch(this.state.avatarSrc);
+      const blob = await response.blob();
+      
       const formData = new FormData();
       formData.append('avatar', blob, 'avatar.jpg');
+      
       const token = localStorage.getItem('jwtToken');
       const res = await fetch('/profile/avatar-user', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
+      
       const data = await res.json();
       if (data.avatar && typeof data.avatar === 'string') {
         this.setState({ avatar: data.avatar, showAvatarModal: false, avatarSrc: null });
+        alert('Аватарка успешно загружена!');
       } else {
-        this.setState({ avatar: null, showAvatarModal: false, avatarSrc: null });
+        alert('Ошибка при загрузке аватарки');
       }
+    } catch (error) {
+      console.error('Ошибка при сохранении аватарки:', error);
+      alert('Ошибка при сохранении аватарки');
     }
   }
 
@@ -384,7 +432,7 @@ class EditProfile extends Component {
     if (/\d/.test(newPassword)) score++;
     if (/[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) score++;
     if (score < 3) {
-      this.setState({ currentError: '', newError: t('profile.password_too_simple'), repeatError: '', passwordError: '' });
+      this.setState({ currentError: '', newError: t('profile.password_too_simple'), repeatError: '', passwordError: '' });   
       return;
     }
     // 5. Проверка: введён ли повторный пароль
@@ -419,45 +467,7 @@ class EditProfile extends Component {
     this.setState(prev => ({ connectedAccounts: { ...prev.connectedAccounts, [name]: !prev.connectedAccounts[name] } }));
   }
 
-  renderAvatar() {
-    const isValidImg = v => typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http') || v.startsWith('/'));
-    const safe = v => (typeof v === 'string' ? v : null);
-    const avatar = safe(this.state.avatar);
-    const avatarSrc = safe(this.state.avatarSrc);
-    if (avatar && typeof avatar !== 'string') {
-      console.warn('Avatar is not a string:', avatar, 'Type:', typeof avatar);
-      return null;
-    }
-    if (avatarSrc && typeof avatarSrc !== 'string') {
-      console.warn('AvatarSrc is not a string:', avatarSrc, 'Type:', typeof avatarSrc);
-      return null;
-    }
-    if (!(!avatar || typeof avatar === 'string') || !(!avatarSrc || typeof avatarSrc === 'string')) {
-      console.error('Invalid avatar/avatarSrc type:', { avatar, avatarSrc, avatarType: typeof avatar, avatarSrcType: typeof avatarSrc });
-      return null;
-    }
-    if (isValidImg(avatar)) {
-      return (
-        <img
-          src={avatar}
-          alt="Avatar"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      );
-    } else if (isValidImg(avatarSrc)) {
-      return (
-        <img
-          src={avatarSrc}
-          alt="Avatar"
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-        />
-      );
-    } else {
-      return (
-        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>{t('profile.no_image')}</div>
-      );
-    }
-  }
+
 
   renderProfileForm(errors, jobOptions, goalOptions) {
     // Проверка на наличие ошибок о ненормативной лексике
@@ -473,9 +483,71 @@ class EditProfile extends Component {
           </div>
         )}
         <div className="d-flex flex-column align-items-center mb-4">
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: '#d3dbe6', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 12, cursor: 'pointer', overflow: 'hidden', position: 'relative' }} onClick={this.onAvatarClick}>
-            {this.renderAvatar()}
-            <div style={{ position: 'absolute', bottom: 0, width: '100%', background: 'rgba(0,0,0,0.3)', color: '#fff', fontSize: 12, textAlign: 'center' }}>Edit</div>
+          <div style={{ 
+            width: 100, 
+            height: 100, 
+            borderRadius: '50%', 
+            background: '#d3dbe6', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center', 
+            marginBottom: 16, 
+            cursor: 'pointer', 
+            overflow: 'hidden', 
+            position: 'relative',
+            border: '3px solid #fff',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            transition: 'transform 0.2s ease'
+          }} 
+          onClick={this.onAvatarClick}
+          onMouseEnter={(e) => e.target.style.transform = 'scale(1.05)'}
+          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+          onDragOver={this.handleDragOver}
+          onDrop={this.handleDrop}
+          >
+            {(() => {
+              const isValidImg = v => typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http') || v.startsWith('/'));
+              const avatar = this.state.avatar;
+              const avatarSrc = this.state.avatarSrc;
+              
+              if (isValidImg(avatar)) {
+                return (
+                  <img
+                    src={avatar}
+                    alt="Avatar"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                );
+              } else if (isValidImg(avatarSrc)) {
+                return (
+                  <img
+                    src={avatarSrc}
+                    alt="Avatar"
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                );
+              } else {
+                return (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>
+                    {t('profile.no_image')}
+                  </div>
+                );
+              }
+            })()}
+            <div style={{ 
+              position: 'absolute', 
+              bottom: 0, 
+              left: 0,
+              right: 0,
+              background: 'rgba(0,0,0,0.7)', 
+              color: '#fff', 
+              fontSize: 12, 
+              textAlign: 'center',
+              padding: '4px 0',
+              fontWeight: '500'
+            }}>
+              {this.state.avatar ? 'Изменить' : 'Добавить'}
+            </div>
           </div>
           <h4 className="mb-0" style={{ fontWeight: 600 }}>{this.state.username || 'Anonymous'}</h4>
           <small className="text-muted">{t('profile.profile_settings')}</small>
@@ -546,9 +618,9 @@ class EditProfile extends Component {
               <TextFieldGroup
                 placeholder={t('profile.ed_bio')}
                 name="bio"
-                value={this.state.ed_bio}
+                value={this.state.bio}
                 onChange={this.onChange}
-                error={errors.ed_bio}
+                error={errors.bio}
                 info={t('profile.ed_bio')}
               />
             </div>
@@ -638,7 +710,6 @@ class EditProfile extends Component {
     const { showPasswordModal, passwordFields, connectedAccounts, passwordError } = this.state;
     const isPasswordValid = passwordFields.new && passwordFields.new.length >= 6 && passwordFields.new === passwordFields.repeat && !passwordError;
     let lastActivity = this.state.lastActivity;
-    // Определяем онлайн ли пользователь (lastActivityTime < 2 мин)
     let isOnline = false;
     let time = lastActivity.time;
     if (this.state.lastActivity && this.props.profile && this.props.profile.profile && this.props.profile.profile.user && this.props.profile.profile.user.lastActivityTime) {
@@ -646,7 +717,7 @@ class EditProfile extends Component {
       const now = new Date();
       if ((now - last) < 2 * 60 * 1000) {
         isOnline = true;
-        time = 'только что';
+        time = t('profile.just_now');
       } else {
         isOnline = false;
         time = getTimeAgo(this.props.profile.profile.user.lastActivityTime);
@@ -678,21 +749,17 @@ class EditProfile extends Component {
             </div>
           </div>
         </div>
-        <div className="card shadow p-4 mb-4" style={{ borderRadius: 18, background: '#f8fafc', marginBottom: 32 }}>
-          <h5 className="mb-4">{t('profile.connected_accounts')}</h5>
-          <ul className="list-group list-group-flush">
-            {CONNECTED_ACCOUNTS.map(acc => (
-              <li className="list-group-item d-flex justify-content-between align-items-center" key={acc} style={{ background: 'transparent', border: 'none', padding: '12px 0' }}>
-                <span style={{ fontWeight: 500 }}>{acc}</span>
-                <label className="switch">
-                  <input type="checkbox" checked={connectedAccounts[acc]} onChange={() => this.handleToggleAccount(acc)} />
-                  <span className="slider round"></span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <LastActivitySection data={lastActivity} />
+        {lastActivity && (
+          <div className="card shadow p-4" style={{ borderRadius: 18, background: '#f8fafc', marginBottom: 0 }}>
+            <h5 className="mb-4">{t('profile.last_activity')}</h5>
+            <div>
+              <div style={{ fontWeight: 500 }}>{lastActivity.os} · {lastActivity.ip} {lastActivity.country}</div>
+              <div style={{ color: '#888', fontSize: 15 }}>
+                {lastActivity.browser} · {lastActivity.isOnline ? t('profile.just_now') : lastActivity.time}
+              </div>
+            </div>
+          </div>
+        )}
         {showPasswordModal && (
           <>
             <div style={{
@@ -756,7 +823,7 @@ class EditProfile extends Component {
                           {this.state.passwordStrength === 'Weak' && t('profile.password_strength_weak')}
                           {this.state.passwordStrength === 'Moderate' && t('profile.password_strength_moderate')}
                           {this.state.passwordStrength === 'Strong' && t('profile.password_strength_strong')}
-                          {!this.state.passwordStrength && '* минимум 8 символов, буквы, цифры'}
+                          {!this.state.passwordStrength && `* ${t('profile.password_minimum')}`}
                         </small>
                       </div>
                     )}
@@ -799,6 +866,128 @@ class EditProfile extends Component {
 
   render() {
     const { errors } = this.state;
+    
+    // Проверяем авторизацию
+    if (!this.state.isAuthenticated) {
+      return (
+        <div style={{ 
+          minHeight: '100vh', 
+          background: '#f8f9fa',
+          color: '#333333'
+        }}>
+          <NavBar />
+          
+          <div style={{ 
+            maxWidth: '800px', 
+            margin: '0 auto', 
+            padding: '40px 20px',
+            minHeight: 'calc(100vh - 200px)'
+          }}>
+            {/* Заголовок */}
+            <div style={{ 
+              textAlign: 'center', 
+              marginBottom: '40px' 
+            }}>
+              <h1 style={{ 
+                fontSize: '2.5rem', 
+                fontWeight: '700', 
+                marginBottom: '10px',
+                color: '#333333'
+              }}>
+                Редактирование профиля
+              </h1>
+              <p style={{ 
+                fontSize: '1.1rem', 
+                color: '#666666'
+              }}>
+                Войдите в систему, чтобы редактировать профиль
+              </p>
+            </div>
+
+            {/* Карточка для входа */}
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '60px 20px',
+              background: '#ffffff',
+              borderRadius: '12px',
+              border: '1px solid #e9ecef'
+            }}>
+              <h3 style={{ 
+                fontSize: '1.3rem', 
+                fontWeight: '600', 
+                marginBottom: '10px',
+                color: '#333333'
+              }}>
+                Войдите в систему
+              </h3>
+              <p style={{ 
+                color: '#666666',
+                marginBottom: '30px'
+              }}>
+                Чтобы редактировать свой профиль, необходимо войти в систему или зарегистрироваться
+              </p>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                gap: '15px',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  onClick={() => window.location.href = '/login'}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#007bff',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                  onMouseOut={(e) => e.target.style.background = '#007bff'}
+                >
+                  Войти
+                </button>
+                <button
+                  onClick={() => window.location.href = '/register'}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#28a745',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '1rem',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'background 0.2s'
+                  }}
+                  onMouseOver={(e) => e.target.style.background = '#218838'}
+                  onMouseOut={(e) => e.target.style.background = '#28a745'}
+                >
+                  Зарегистрироваться
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <Footer />
+        </div>
+      );
+    }
+    
+    // Получаем текущую тему
+    const darkTheme = document.body.classList.contains('dark-theme') || 
+                     localStorage.getItem('theme') === 'dark' ||
+                     (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
+    const theme = darkTheme ? 'dark' : 'light';
+    const pageBg = theme === 'dark' ? '#1a1a1a' : '#f8f9fa';
+    const cardBg = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+    const textColor = theme === 'dark' ? '#ffffff' : '#333333';
+    const secondaryTextColor = theme === 'dark' ? '#cccccc' : '#666666';
+    const borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
 
     const jobTitles = [
       { key: 'back_end', value: 'Back End Developer/Engineer' },
@@ -903,7 +1092,7 @@ class EditProfile extends Component {
     const goalOptions = goalList.map(g => ({ label: t('goals.'+g.key) || g.value, value: g.value }));
 
     return (
-      <div className="edit-profile" style={{ background: '#e9ecf3', minHeight: 'calc(100vh - 80px)', paddingTop: 0 }}>
+      <div className="edit-profile" style={{ background: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#18191c' : '#fff', minHeight: 'calc(100vh - 80px)', paddingTop: 0 }}>
         <NavBar />
         <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '80vh', flexDirection: 'column', paddingTop: 0, marginTop: 0 }}>
           <div className="d-flex mb-4 tab-btns" style={{ gap: 32, width: 'auto', minWidth: 400, maxWidth: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 21, minHeight: 60, zIndex: 10 }}>
@@ -911,77 +1100,235 @@ class EditProfile extends Component {
             <button className={`btn tab-btn ${this.state.activeTab === 'security' ? 'tab-btn-active' : ''}`} onClick={() => this.handleTabChange('security')}>{t('profile.security_and_login')}</button>
           </div>
           <div className="form-anim-wrapper" key={this.state.activeTab} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-            <div className="card shadow p-4 form-anim" style={{ maxWidth: 420, width: '100%', borderRadius: 16, margin: '0 auto' }}>
+            <div className="card shadow p-4 form-anim" style={{ maxWidth: 420, width: '100%', borderRadius: 16, margin: '0 auto', background: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#2d2d2d' : '#fff', color: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#fff' : '#000', border: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '1px solid #404040' : '1px solid #e9ecef' }}>
               {this.state.activeTab === 'profile'
                 ? this.renderProfileForm(errors, jobTitleOptions, goalOptions)
                 : this.renderSecurityForms()}
             </div>
           </div>
         </div>
-        {/* Avatar Crop Modal */}
+        <div style={{ marginBottom: 24 }} />
+        <Footer />
+        
+        {/* Модальное окно для загрузки аватарки */}
         {this.state.showAvatarModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={this.handleModalClick}>
-            <div ref={this.avatarModalRef} style={{ background: '#fff', borderRadius: 12, padding: 24, minWidth: 350, maxWidth: 400, width: '100%', boxShadow: '0 5px 15px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative' }} onClick={e => e.stopPropagation()}>
-              <h3 style={{ marginBottom: 16 }}>{t('profile.edit_photo')}</h3>
-              <div style={{ width: 300, height: 300, background: '#eee', position: 'relative' }}>
-                {(() => {
-                  const cropValid = typeof this.state.crop === 'object' && this.state.crop !== null && typeof this.state.crop.x === 'number' && typeof this.state.crop.y === 'number';
-                  const zoomValid = typeof this.state.zoom === 'number';
-                  const onCropChangeValid = typeof this.onCropChange === 'function';
-                  const onZoomChangeValid = typeof this.onZoomChange === 'function';
-                  const onCropCompleteValid = typeof this.onCropComplete === 'function';
-                  console.log('CROPPER DEBUG:', {
-                    avatarSrc: this.state.avatarSrc,
-                    crop: this.state.crop,
-                    zoom: this.state.zoom,
-                    onCropChange: typeof this.onCropChange,
-                    onZoomChange: typeof this.onZoomChange,
-                    onCropComplete: typeof this.onCropComplete,
-                    cropValid,
-                    zoomValid,
-                    onCropChangeValid,
-                    onZoomChangeValid,
-                    onCropCompleteValid
-                  });
-                  if (
-                    typeof this.state.avatarSrc === 'string' && this.state.avatarSrc.startsWith('data:image') &&
-                    cropValid && zoomValid && onCropChangeValid && onZoomChangeValid && onCropCompleteValid
-                  ) {
-                    return (
-                      <Cropper
-                        image={this.state.avatarSrc}
-                        crop={this.state.crop}
-                        zoom={this.state.zoom}
-                        aspect={1}
-                        cropShape="round"
-                        showGrid={false}
-                        onCropChange={this.onCropChange}
-                        onZoomChange={this.onZoomChange}
-                        onCropComplete={this.onCropComplete}
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(0,0,0,0.7)',
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px'
+            }}
+            onClick={this.handleModalClick}
+          >
+            <div 
+              ref={this.avatarModalRef}
+              style={{
+                background: '#fff',
+                borderRadius: '16px',
+                padding: '32px',
+                maxWidth: '600px',
+                width: '100%',
+                maxHeight: '90vh',
+                overflow: 'auto',
+                position: 'relative'
+              }}
+            >
+              <h3 style={{ marginBottom: '24px', textAlign: 'center', fontWeight: '600' }}>
+                Настройка аватарки
+              </h3>
+              
+              {!this.state.avatarSrc ? (
+                // Экран выбора файла
+                <div style={{ textAlign: 'center' }}>
+                  <div 
+                    style={{ 
+                      border: '2px dashed #ddd', 
+                      borderRadius: '12px', 
+                      padding: '40px 20px',
+                      marginBottom: '24px',
+                      background: '#f8f9fa',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onDragOver={this.handleDragOver}
+                    onDrop={this.handleDrop}
+                    onDragEnter={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#007bff';
+                      e.currentTarget.style.background = '#e3f2fd';
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.style.borderColor = '#ddd';
+                      e.currentTarget.style.background = '#f8f9fa';
+                    }}
+                  >
+                    <div style={{ fontSize: '48px', color: '#666', marginBottom: '16px' }}>📷</div>
+                    <p style={{ marginBottom: '16px', color: '#666' }}>
+                      Перетащите изображение сюда или нажмите для выбора
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={this.onChooseImage}
+                      style={{ display: 'none' }}
+                      id="avatar-input"
+                    />
+                    <label 
+                      htmlFor="avatar-input"
+                      style={{
+                        background: '#007bff',
+                        color: 'white',
+                        padding: '12px 24px',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        display: 'inline-block',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Выбрать изображение
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '14px', color: '#666' }}>
+                    Поддерживаемые форматы: JPG, PNG, GIF. Максимальный размер: 5MB
+                  </p>
+                </div>
+              ) : (
+                // Экран настройки и кропа
+                <div>
+                  <div style={{ 
+                    position: 'relative', 
+                    height: '300px', 
+                    background: '#f8f9fa',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    marginBottom: '24px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    {this.state.avatarSrc && (
+                      <img
+                        src={this.state.avatarSrc}
+                        alt="Preview"
+                        style={{ 
+                          maxWidth: '100%', 
+                          maxHeight: '100%', 
+                          objectFit: 'contain'
+                        }}
                       />
-                    );
-                  } else {
-                    return (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#aaa' }}>{t('profile.no_image')}</div>
-                    );
-                  }
-                })()}
-              </div>
-              <input type="range" min={1} max={3} step={0.01} value={this.state.zoom || 2} onChange={e => this.onZoomChange(Number(e.target.value))} style={{ width: 300, margin: '16px 0', accentColor: '#3976a8', height: 6, borderRadius: 3 }} />
-              <div style={{ display: 'flex', gap: 8, width: '100%', justifyContent: 'center', alignItems: 'center', margin: 0 }}>
-                <label className="btn btn-primary avatar-modal-btn" style={{ minWidth: 160, maxWidth: 220, width: '100%', height: 44, fontSize: 16, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 0, textAlign: 'center', margin: 0 }}>
-                  <FaUpload /> {t('profile.choose_image')}
-                  <input type="file" accept="image/*" onChange={this.onChooseImage} style={{ display: 'none' }} />
-                </label>
-                <button className="btn btn-success avatar-modal-btn" onClick={this.onSaveCropped} disabled={!this.state.avatarSrc} style={{ minWidth: 160, maxWidth: 220, width: '100%', height: 44, fontSize: 16, borderRadius: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 0, textAlign: 'center', margin: 0 }}>
-                  {t('profile.save_image')}
+                    )}
+                  </div>
+                  
+                  {/* Контролы зума - временно отключены */}
+                  
+                  {/* Предпросмотр */}
+                  <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+                    <h5 style={{ marginBottom: '12px' }}>Предпросмотр</h5>
+                    <div style={{ 
+                      display: 'inline-block',
+                      width: '80px',
+                      height: '80px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      border: '2px solid #ddd',
+                      background: '#f8f9fa'
+                    }}>
+                      {this.state.avatarSrc && (
+                        <img
+                          src={this.state.avatarSrc}
+                          alt="Preview"
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover'
+                          }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Кнопки */}
+              <div style={{ 
+                display: 'flex', 
+                gap: '12px', 
+                justifyContent: 'center',
+                flexWrap: 'wrap'
+              }}>
+                <button
+                  onClick={this.onAvatarClose}
+                  style={{
+                    padding: '12px 24px',
+                    background: '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  Отмена
                 </button>
+                
+                {this.state.avatarSrc && (
+                  <>
+                    <button
+                      onClick={() => {
+                        this.setState({ avatarSrc: null, crop: { x: 0, y: 0 }, zoom: 1 });
+                        const input = document.getElementById('avatar-input');
+                        if (input) {
+                          input.value = '';
+                        }
+                      }}
+                      style={{
+                        padding: '12px 24px',
+                        background: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Выбрать другое
+                    </button>
+                    
+                    <button
+                      onClick={this.onSaveCropped}
+                      style={{
+                        padding: '12px 24px',
+                        background: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Сохранить аватарку
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
         )}
-        <Footer />
         <style>{`
+  body[data-theme="light"], body:not([data-theme]) { background: #fff !important; }
+  .edit-profile { background: #e9ecf3; }
+  [data-theme="dark"] .edit-profile { background: #18191c; }
+  [data-theme="dark"] .form-anim h4.mb-0 { color: #fff !important; }
+  [data-theme="dark"] .form-anim small, [data-theme="dark"] .form-anim .form-text { color: #eaf4fd !important; }
+
   body {
     overflow-y: scroll;
   }
@@ -1005,9 +1352,9 @@ class EditProfile extends Component {
     font-size: 17px;
     padding: 12px 0;
     margin-right: 0;
-    border: 2px solid #3976A8;
-    background: #fff;
-    color: #3976A8;
+    border: 2px solid ${theme === 'dark' ? '#4485ed' : '#3976A8'};
+    background: ${theme === 'dark' ? '#2d2d2d' : '#fff'};
+    color: ${theme === 'dark' ? '#4485ed' : '#3976A8'};
     box-shadow: none;
     outline: none;
     border-bottom: none;
@@ -1017,9 +1364,9 @@ class EditProfile extends Component {
   }
 
   .tab-btn.tab-btn-active {
-    background: #3976A8;
+    background: ${theme === 'dark' ? '#4485ed' : '#3976A8'};
     color: #fff;
-    border: 2px solid #3976A8;
+    border: 2px solid ${theme === 'dark' ? '#4485ed' : '#3976A8'};
     transition: none;
     box-shadow: none;
     transform: none;
@@ -1246,55 +1593,17 @@ const mapDispatchToProps = dispatch => ({
 
 export default connect(mapStateToProps, mapDispatchToProps )(withRouter(EditProfile));
 
-class LastActivitySection extends React.Component {
-  render() {
-    if (!this.props.data) return null;
-    const { device, os, ip, country, browser, time, icon, browserIcon, isOnline } = this.props.data;
-    const safeIcon = React.isValidElement(icon) ? icon : null;
-    const safeBrowserIcon = React.isValidElement(browserIcon) ? browserIcon : null;
-    return (
-      <div className="card shadow p-4" style={{ borderRadius: 18, background: '#f8fafc', marginBottom: 0 }}>
-        <h5 className="mb-4">{t('profile.last_activity')} {isOnline && <span style={{color: '#27ae60', fontWeight: 600, fontSize: 16, marginLeft: 12}}>({t('profile.online')})</span>}</h5>
-        <div className="d-flex align-items-center gap-3">
-          <span style={{ fontSize: 32, marginRight: 18 }}>{safeIcon}</span>
-          <div>
-            <div style={{ fontWeight: 500 }}>{os} · <span style={{fontWeight:700}}>{ip}</span> {country}</div>
-            <div style={{ color: '#888', fontSize: 15 }}>{safeBrowserIcon} {browser} · {isOnline ? t('profile.just_now') : time}</div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-}
+
 
 // --- Вспомогательные функции ---
-function getDeviceIcon(device, os) {
-  if (!device && !os) return <FaWindows />;
-  const d = (device || '').toLowerCase();
-  const o = (os || '').toLowerCase();
-  if (d.includes('windows') || o.includes('windows')) return <FaWindows />;
-  if (d.includes('mac') || o.includes('mac')) return <FaApple />;
-  if (d.includes('linux') || o.includes('linux')) return <FaLinux />;
-  if (d.includes('android') || d.includes('mobile') || o.includes('android')) return <FaMobileAlt />;
-  return <FaWindows />;
-}
-function getBrowserIcon(browser) {
-  if (!browser) return <FaChrome />;
-  const b = browser.toLowerCase();
-  if (b.includes('chrome')) return <FaChrome />;
-  if (b.includes('firefox')) return <FaFirefox />;
-  if (b.includes('safari')) return <FaSafari />;
-  if (b.includes('edge')) return <FaEdge />;
-  return <FaChrome />;
-}
 function getTimeAgo(dateStr) {
   if (!dateStr) return '';
   const date = new Date(dateStr);
   const now = new Date();
   const diff = Math.floor((now - date) / 1000);
   if (diff < 60) return t('profile.just_now');
-  if (diff < 3600) return `около ${Math.floor(diff/60)} минут назад`;
-  if (diff < 86400) return `около ${Math.floor(diff/3600)} часов назад`;
+  if (diff < 3600) return t('profile.minutes_ago', { count: Math.floor(diff/60) });
+  if (diff < 86400) return t('profile.hours_ago', { count: Math.floor(diff/3600) });
   return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
 }
 // --- END ---

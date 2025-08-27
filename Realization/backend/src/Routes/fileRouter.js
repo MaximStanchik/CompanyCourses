@@ -25,10 +25,19 @@ router.get('/download/:filename', (req, res) => {
   const filename = req.params.filename;
   const filePath = path.join(__dirname, '../../static/uploads', filename);
   const originalName = req.query.name ? decodeURIComponent(req.query.name) : filename;
+  
+  console.log('=== File Download Request ===');
+  console.log('Filename:', filename);
+  console.log('File path:', filePath);
+  console.log('Original name:', originalName);
+  console.log('File exists:', fs.existsSync(filePath));
+  
   if (fs.existsSync(filePath)) {
+    console.log('Sending file:', filePath);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(originalName)}`);
     res.sendFile(filePath);
   } else {
+    console.log('File not found:', filePath);
     res.status(404).send('File not found');
   }
 });

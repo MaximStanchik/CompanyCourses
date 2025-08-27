@@ -12,23 +12,59 @@ model Category {
   name     String     @unique
   nameEn   String?    // Название на английском
   nameRu   String?    // Название на русском
+  nameZh   String?    // Название на китайском (упрощенном)
+  nameDe   String?    // Название на немецком
+  nameEs   String?    // Название на испанском
+  namePt   String?    // Название на португальском
+  nameUk   String?    // Название на украинском
+  nameBe   String?    // Название на белорусском
   parentId Int?       // ID родительской категории
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
   children Category[] @relation("CategoryHierarchy")
   Course   Course[]
+  courseCategories CourseCategory[]
 }
 
 model Course {
-  id            Int            @id @default(autoincrement())
-  name          String         @unique
-  description   String?
-  status        String         @default("draft") // draft | open | inactive
-  category      Int?
-  Category      Category?      @relation(fields: [category], references: [id], onDelete: Cascade)
-  enrollments   Enrollment[]
-  lectures      Lecture[]
-  notifications Notification[]
-  favorites     FavoriteCourse[]
+  id                 Int            @id @default(autoincrement())
+  name               String         @unique
+  description        String?        // Описание курса (HTML) - "О курсе"
+  targeting          String?        // Для кого этот курс (HTML)
+  shortDescription   String?        // Краткое описание курса
+  workload           String?        // Нагрузка курса
+  learningOutcomes   String?        // Что вы научитесь
+  requirements       String?        // Требования к курсу (HTML) - "Начальные требования"
+  learningFormat     String?        // Формат обучения (HTML) - "Формат обучения"
+  language           String?        // Язык курса
+  level              String?        // Уровень сложности
+  status             String         @default("draft") // draft | published | inactive
+  category           Int?           // Основная категория (для обратной совместимости)
+  logoUrl            String?        // URL логотипа курса
+  introUrl           String?        // URL вступительного видео
+  acquiredAssets     String?        // Что Вы получаете
+  Category           Category?      @relation(fields: [category], references: [id], onDelete: Cascade)
+  courseCategories   CourseCategory[]
+  enrollments        Enrollment[]
+  lectures           Lecture[]
+  notifications      Notification[]
+  favorites          FavoriteCourse[]
+  ratings            CourseRating[]
+  comments           CourseComment[]
+  lessonCompletions  LessonCompletion[]
+  moduleProgresses   ModuleProgress[]
+  stepCompletions    StepCompletion[]
+  testAttempts       TestAttempt[]
+}
+
+// Таблица для связи many-to-many между курсами и категориями
+model CourseCategory {
+  id         Int      @id @default(autoincrement())
+  courseId   Int
+  categoryId Int
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, categoryId])
 }
 
 model Enrollment {
@@ -36,6 +72,7 @@ model Enrollment {
   user_id   Int?
   course_id Int?
   approved  Boolean @default(false)
+  progress  Int     @default(0)
   Course    Course? @relation(fields: [course_id], references: [id], onDelete: Cascade)
   User      User?   @relation(fields: [user_id], references: [id], onDelete: Cascade)
 }
@@ -59,6 +96,65 @@ model Lecture {
   content   String?
   course_id Int?
   Course    Course? @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  steps     Step[]
+  lessonCompletions LessonCompletion[]
+}
+
+model Step {
+  id        Int      @id @default(autoincrement())
+  lesson_id Int
+  Lesson    Lecture  @relation(fields: [lesson_id], references: [id], onDelete: Cascade)
+  type      String
+  title     String?
+  content   String?
+  description String?
+  videoUrl  String?
+  order     Int
+}
+
+// Tracks which lectures a user has completed
+model LessonCompletion {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  course_id   Int
+  lecture_id  Int
+  completedAt DateTime @default(now())
+
+  User    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Course  Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+  Lecture Lecture @relation(fields: [lecture_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, lecture_id], name: "user_id_lecture_id")
+}
+
+// Tracks which steps a user has completed
+model StepCompletion {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  course_id   Int
+  lesson_id   Int
+  step_index  Int
+  completedAt DateTime @default(now())
+
+  User    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Course  Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, lesson_id, step_index], name: "user_id_lesson_id_step_index")
+}
+
+// Stores per-module progress snapshot per user
+model ModuleProgress {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  course_id  Int
+  module_key String
+  progress   Int      // 0..100
+  updatedAt  DateTime @updatedAt
+
+  User   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Course Course @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, course_id, module_key], name: "user_id_course_id_module_key")
 }
 
 model User {
@@ -89,6 +185,14 @@ model User {
   messages                 Message[]
   reactions                Reaction[]
   favorites                FavoriteCourse[]
+  ratings                  CourseRating[]
+  comments                 CourseComment[]
+  lessonCompletions        LessonCompletion[]
+  moduleProgresses         ModuleProgress[]
+  stepCompletions          StepCompletion[]
+  commentReactions         CommentReaction[]
+  notifications            Notification[]
+  testAttempts            TestAttempt[]
 }
 
 model Profile {
@@ -116,11 +220,17 @@ model Profile {
 }
 
 model Notification {
-  id       Int      @id @default(autoincrement())
-  courseId Int?
-  content  String
-  date     DateTime @default(now())
-  course   Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+  userId    Int?     // ID пользователя, которому отправлено уведомление
+  courseId  Int?     // ID курса (если уведомление связано с курсом)
+  title     String   @default("Уведомление") // Заголовок уведомления
+  message   String   @default("Новое уведомление") // Текст уведомления
+  type      String   @default("info") // info, success, warning, error
+  read      Boolean  @default(false)  // Прочитано ли уведомление
+  createdAt DateTime @default(now())
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course    Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
 }
 
 model SupportMessage {
@@ -168,7 +278,72 @@ model Reaction {
   @@unique([messageId, userId, emoji])
 }
 
+// =====  Рейтинги курсов  =====
+model CourseRating {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  rating    Int      // 1-5 stars
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+}
+
+// =====  Комментарии к курсам  =====
+model CourseComment {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  isEdited  Boolean  @default(false)
+
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reactions CommentReaction[]
+}
+
 enum Roles {
   ADMIN
   USER
+}
+
+// =====  Реакции на комментарии (лайк / дизлайк)  =====
+model CommentReaction {
+  id        Int      @id @default(autoincrement())
+  commentId Int
+  userId    Int
+  type      String   // 'like' | 'dislike'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comment   CourseComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, userId], name: "commentId_userId")
+}
+
+// =====  Попытки тестов  =====
+model TestAttempt {
+  id          Int      @id @default(autoincrement())
+  user_id     Int
+  course_id   Int
+  lesson_id   Int
+  step_index  Int
+  attempts    Int      @default(1)
+  lastScore   Int      // 0-100
+  lastPassed  Boolean
+  lastAnswers Json     // Store the user's last submitted answers
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  User    User    @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  Course  Course  @relation(fields: [course_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, lesson_id, step_index], name: "user_id_lesson_id_step_index")
 }
