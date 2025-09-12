@@ -14,21 +14,22 @@ router.delete("/user/", authController.deleteUser);
 router.get('/check-email', authController.checkEmailExists);
 router.get("/checkUsernameExists", authController.checkUsernameExists);
 router.get("/verify-email", authController.verifyEmail);
+router.post("/resend-verification", authController.resendVerificationEmail);
 
 // Google OAuth
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-router.get('/google/callback', passport.authenticate('google', { session: false }), socialCallback);
+//router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+//router.get('/google/callback', passport.authenticate('google', { session: false }), socialCallback);
 
 // Facebook OAuth
-router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
-router.get('/facebook/callback', passport.authenticate('facebook', { session: false }), socialCallback);
+//router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+//router.get('/facebook/callback', passport.authenticate('facebook', { session: false }), socialCallback);
 
 // Yandex OAuth
-router.get('/yandex', passport.authenticate('yandex'));
-router.get('/yandex/callback', passport.authenticate('yandex', { session: false }), socialCallback);
+//router.get('/yandex', passport.authenticate('yandex'));
+//router.get('/yandex/callback', passport.authenticate('yandex', { session: false }), socialCallback);
 
 // Dribbble OAuth
-router.get('/dribbble', passport.authenticate('dribbble'));
-router.get('/dribbble/callback', passport.authenticate('dribbble', { session: false }), socialCallback);
+//router.get('/dribbble', passport.authenticate('dribbble'));
+//router.get('/dribbble/callback', passport.authenticate('dribbble', { session: false }), socialCallback);
 
 module.exports = router;

@@ -272,7 +272,7 @@ const Register = (props) => {
                       <button type="submit" className="btn btn-primary shadow-2 w-100 mb-2">
                         Sign Up
                       </button>
-                      <a href={`${process.env.PUBLIC_URL}/login/`} className="btn btn-outline-primary w-100">
+                      <a href={`${process.env.PUBLIC_URL}/login`} className="btn btn-outline-primary w-100">
                         Login
                       </a>
                     </div>

@@ -3,6 +3,7 @@ import { useHistory } from 'react-router-dom';
 import TeachNavMenu from './TeachNavMenu';
 import { useTranslation } from 'react-i18next';
 import axios from '../utils/axios';
+import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEllipsisV, faPen, faCopy, faTrash, faThumbtack } from '@fortawesome/free-solid-svg-icons';
 import NavBar from '../components/NavBar';
@@ -33,17 +34,53 @@ const ShowAllLessonsAdmin = ({ match }) => {
     setActiveMenuId(prev => prev === lessonId ? null : lessonId);
   };
 
-  const togglePin = (lessonId) => {
-    setPinnedIds(prev => {
-      const next = prev.includes(lessonId) ? prev.filter(id => id !== lessonId) : [...prev, lessonId];
-      localStorage.setItem('pinnedLessons', JSON.stringify(next));
-      return next;
-    });
+  const togglePin = async (lessonId) => {
+    try {
+      const isCurrentlyPinned = pinnedIds.includes(lessonId);
+      const newPinnedState = !isCurrentlyPinned;
+      
+      // Сохраняем в базу данных
+      const response = await axios.patch(`/lesson/${lessonId}`, {
+        isPinned: newPinnedState
+      }, { headers });
+      
+      // Обновляем локальное состояние
+      setPinnedIds(prev => {
+        const next = newPinnedState 
+          ? [...prev, lessonId] 
+          : prev.filter(id => id !== lessonId);
+        localStorage.setItem('pinnedLessons', JSON.stringify(next));
+        return next;
+      });
+      
+      // Обновляем состояние уроков, чтобы отразить новое закрепление
+      setLessons(prev => {
+        const updated = prev.map(lesson => 
+          lesson.id === lessonId 
+            ? { ...lesson, isPinned: newPinnedState }
+            : lesson
+        );
+        // Сортируем: закрепленные уроки вверху
+        return updated.sort((a, b) => 
+          (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+        );
+      });
+      
+      console.log(`Lesson ${lessonId} pinned status updated to: ${newPinnedState}`);
+      
+      // Показываем уведомление
+      toast.success(newPinnedState ? t('lessons.pinned') : t('lessons.unpinned'));
+      
+    } catch (error) {
+      console.error('Error toggling pin:', error);
+      toast.error(t('lessons.pin_error'));
+    }
   };
 
   const headers = { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` };
 
   const handleEdit = (id) => {
+    console.log('Navigating to lesson editor:', id);
     history.push(`/teach/lessons/${id}/content`);
   };
 
@@ -52,9 +89,23 @@ const ShowAllLessonsAdmin = ({ match }) => {
       await axios.post(`/lesson/${id}/duplicate`, {}, { headers });
       // reload list
       const res = await axios.get('/lessons', { headers });
-      setLessons(res.data);
+      const all = res.data || [];
+      
+      // Синхронизируем закрепление из базы данных
+      const pinnedFromDB = all.filter(lesson => lesson.isPinned).map(lesson => lesson.id);
+      setPinnedIds(pinnedFromDB);
+      localStorage.setItem('pinnedLessons', JSON.stringify(pinnedFromDB));
+      
+      // Сортируем уроки: закрепленные вверху
+      const ordered = [...all].sort((a, b) => 
+        (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+      );
+      setLessons(ordered);
+      
+      toast.success(t('lessons.duplicated'));
     } catch (e) {
-      console.error('Duplicate failed');
+      console.error('Duplicate failed:', e);
+      toast.error(t('lessons.duplicate_error'));
     }
   };
 
@@ -62,9 +113,21 @@ const ShowAllLessonsAdmin = ({ match }) => {
     if (!window.confirm('Удалить урок безвозвратно?')) return;
     try {
       await axios.delete(`/lesson/${id}`, { headers });
+      
+      // Удаляем урок из состояния
       setLessons(prev => prev.filter(l => l.id !== id));
+      
+      // Обновляем закрепленные уроки
+      setPinnedIds(prev => {
+        const next = prev.filter(pinnedId => pinnedId !== id);
+        localStorage.setItem('pinnedLessons', JSON.stringify(next));
+        return next;
+      });
+      
+      toast.success(t('lessons.deleted'));
     } catch (e) {
-      console.error('Delete failed');
+      console.error('Delete failed:', e);
+      toast.error(t('lessons.delete_error'));
     }
   };
 
@@ -72,11 +135,25 @@ const ShowAllLessonsAdmin = ({ match }) => {
     axios.get('/lessons', { headers:{ Authorization:`Bearer ${localStorage.getItem('jwtToken')}` }})
       .then(res => {
         const all = res.data || [];
-        const ordered = [...all].sort((a,b)=> (pinnedIds.includes(a.id)?-1:0) - (pinnedIds.includes(b.id)?-1:0));
+        
+        // Синхронизируем закрепление из базы данных с localStorage
+        const pinnedFromDB = all.filter(lesson => lesson.isPinned).map(lesson => lesson.id);
+        setPinnedIds(pinnedFromDB);
+        localStorage.setItem('pinnedLessons', JSON.stringify(pinnedFromDB));
+        
+        // Сортируем уроки: закрепленные вверху
+        const ordered = [...all].sort((a, b) => 
+          (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0)
+        );
         setLessons(ordered);
         setLoading(false);
+        
+        console.log('Lessons loaded:', { total: all.length, pinned: pinnedFromDB.length, pinnedIds: pinnedFromDB });
       })
-      .catch(()=> setLoading(false));
+      .catch((error) => {
+        console.error('Failed to load lessons:', error);
+        setLoading(false);
+      });
 
     const handleClickOutside = (e) => {
       if (!e.target.closest('.item-tile__tools') && !e.target.closest('.item-tile__dropdown')) setActiveMenuId(null);
@@ -84,13 +161,6 @@ const ShowAllLessonsAdmin = ({ match }) => {
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    setLessons(prev => {
-      const ordered = [...prev].sort((a,b)=> (pinnedIds.includes(a.id)?-1:0) - (pinnedIds.includes(b.id)?-1:0));
-      return ordered;
-    });
-  }, [pinnedIds]);
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--teach-bg)', display:'flex', flexDirection:'column' }}>

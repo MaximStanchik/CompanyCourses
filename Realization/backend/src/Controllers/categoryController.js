@@ -14,8 +14,7 @@ class TranslationsManager {
     try {
       const data = fs.readFileSync(this.translationsPath, 'utf8');
       return JSON.parse(data);
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Error reading translations file:', error);
       return null;
     }
@@ -25,8 +24,7 @@ class TranslationsManager {
     try {
       fs.writeFileSync(this.translationsPath, JSON.stringify(translations, null, 2), 'utf8');
       return true;
-    } 
-    catch (error) {
+    } catch (error) {
       console.error('Error writing translations file:', error);
       return false;
     }
@@ -35,7 +33,7 @@ class TranslationsManager {
   addCategoryTranslation(categoryName, categoryId, nameEn = null, nameRu = null) {
     const translations = this.readTranslations();
     if (!translations) return false;
-
+  
     const categoryKey = `category_${categoryId}`;
     
     // Добавляем переводы для всех языков
@@ -43,80 +41,73 @@ class TranslationsManager {
       if (!translations[lang].common) {
         translations[lang].common = {};
       }
-      
+  
       // Используем соответствующий перевод для каждого языка
-      let translation = nameEn || categoryName; // по умолчанию английское
-      if (lang === 'ru' && nameRu) {
-        translation = nameRu;
-      } 
-      else if (lang === 'en' && nameEn) {
-        translation = nameEn;
-      } 
-      else if (lang === 'be') {
-        // Белорусский - можно использовать русский как основу
-        translation = nameRu || nameEn || categoryName;
-      } 
-      else if (lang === 'uk') {
-        // Украинский - можно использовать русский как основу
-        translation = nameRu || nameEn || categoryName;
-      } else if (lang === 'de') {
-        // Немецкий - используем английский как основу
-        translation = nameEn || categoryName;
-      } else if (lang === 'es') {
-        // Испанский - используем английский как основу
-        translation = nameEn || categoryName;
-      } else if (lang === 'pt') {
-        // Португальский - используем английский как основу
-        translation = nameEn || categoryName;
-      } else if (lang === 'zh') {
-        // Упрощенный китайский - используем английский как основу
-        translation = nameEn || categoryName;
-      }
+      let translation = categoryName; // по умолчанию оригинальное название
       
+      if (lang === 'ru') {
+        translation = nameRu || categoryName;
+      } else if (lang === 'en') {
+        translation = nameEn || categoryName;
+      } else if (lang === 'be') {
+        translation = categoryName; // по умолчанию оригинальное
+      } else if (lang === 'uk') {
+        translation = categoryName; // по умолчанию оригинальное
+      } else if (lang === 'de') {
+        translation = categoryName; // по умолчанию оригинальное
+      } else if (lang === 'es') {
+        translation = categoryName; // по умолчанию оригинальное
+      } else if (lang === 'pt') {
+        translation = categoryName; // по умолчанию оригинальное
+      } else if (lang === 'zh') {
+        translation = categoryName; // по умолчанию оригинальное
+      }
+  
       translations[lang].common[categoryKey] = translation;
     });
-
+  
     return this.writeTranslations(translations);
   }
 
-  updateCategoryTranslation(categoryName, categoryId, nameEn = null, nameRu = null) {
+  updateCategoryTranslation(categoryName, categoryId, nameEn = null, nameRu = null, nameZh = null, nameDe = null, nameEs = null, namePt = null, nameUk = null, nameBe = null) {
     const translations = this.readTranslations();
     if (!translations) return false;
-
+  
     const categoryKey = `category_${categoryId}`;
     
-    Object.keys(translations).forEach(lang => {
-      if (translations[lang].common) {
-        // Используем соответствующий перевод для каждого языка
-        let translation = nameEn || categoryName; // по умолчанию английское
-        if (lang === 'ru' && nameRu) {
-          translation = nameRu;
-        } else if (lang === 'en' && nameEn) {
-          translation = nameEn;
-        } else if (lang === 'be') {
-          // Белорусский - можно использовать русский как основу
-          translation = nameRu || nameEn || categoryName;
-        } else if (lang === 'uk') {
-          // Украинский - можно использовать русский как основу
-          translation = nameRu || nameEn || categoryName;
-        } else if (lang === 'de') {
-          // Немецкий - используем английский как основу
-          translation = nameEn || categoryName;
-        } else if (lang === 'es') {
-          // Испанский - используем английский как основу
-          translation = nameEn || categoryName;
-        } else if (lang === 'pt') {
-          // Португальский - используем английский как основу
-          translation = nameEn || categoryName;
-        } else if (lang === 'zh') {
-          // Упрощенный китайский - используем английский как основу
-          translation = nameEn || categoryName;
-        }
-        
-        translations[lang].common[categoryKey] = translation;
-      }
-    });
-
+    // Обновляем переводы ТОЛЬКО для тех языков, которые явно переданы
+    if (nameEn !== null && translations.en && translations.en.common) {
+      translations.en.common[categoryKey] = nameEn || categoryName;
+    }
+    
+    if (nameRu !== null && translations.ru && translations.ru.common) {
+      translations.ru.common[categoryKey] = nameRu || categoryName;
+    }
+    
+    if (nameZh !== null && translations.zh && translations.zh.common) {
+      translations.zh.common[categoryKey] = nameZh || categoryName;
+    }
+    
+    if (nameDe !== null && translations.de && translations.de.common) {
+      translations.de.common[categoryKey] = nameDe || categoryName;
+    }
+    
+    if (nameEs !== null && translations.es && translations.es.common) {
+      translations.es.common[categoryKey] = nameEs || categoryName;
+    }
+    
+    if (namePt !== null && translations.pt && translations.pt.common) {
+      translations.pt.common[categoryKey] = namePt || categoryName;
+    }
+    
+    if (nameUk !== null && translations.uk && translations.uk.common) {
+      translations.uk.common[categoryKey] = nameUk || categoryName;
+    }
+    
+    if (nameBe !== null && translations.be && translations.be.common) {
+      translations.be.common[categoryKey] = nameBe || categoryName;
+    }
+  
     return this.writeTranslations(translations);
   }
 
@@ -125,7 +116,6 @@ class TranslationsManager {
     if (!translations) return false;
 
     const categoryKey = `category_${categoryId}`;
-    
     Object.keys(translations).forEach(lang => {
       if (translations[lang].common && translations[lang].common[categoryKey]) {
         delete translations[lang].common[categoryKey];
@@ -457,48 +447,73 @@ class categoryController {
           } catch (err) {
             return res.status(401).json({ message: "Invalid token" });
           }
+  
           const roles = decodedToken.roles;
           if (!roles.includes("ADMIN")) {
             return res.status(403).json("You don't have enough rights");
           }
+  
           const id = parseInt(req.query.id);
           if (!Number.isInteger(id)) {
             return res.status(400).json({ message: "Invalid category ID" });
           }
+  
           const { name, nameEn, nameRu, nameZh, nameDe, nameEs, namePt, nameUk, nameBe } = req.body;
-
+  
+          // Получаем текущую категорию для сохранения существующих значений
+          const currentCategory = await DbClient.category.findUnique({
+            where: { id: Number(id) },
+          });
+  
+          if (!currentCategory) {
+            return res.status(404).json({ message: "Category not found" });
+          }
+  
           // Check if the category already exists (excluding current category)
           const existingCategory = await DbClient.category.findFirst({
             where: {
-              name,
+              name: nameEn || name,
               id: { not: id }
             },
           });
+  
           if (existingCategory) {
-            // Return an error response if the category already exists
             return res.status(409).send("Category already exists");
           }
-          
+  
+          // Подготавливаем данные для обновления
+          const updateData = {
+            name: nameEn !== undefined ? (nameEn || currentCategory.nameEn) : currentCategory.name,
+            nameEn: nameEn !== undefined ? (nameEn || currentCategory.nameEn) : currentCategory.nameEn,
+            nameRu: nameRu !== undefined ? (nameRu || currentCategory.nameRu) : currentCategory.nameRu,
+            nameZh: nameZh !== undefined ? (nameZh || currentCategory.nameZh) : currentCategory.nameZh,
+            nameDe: nameDe !== undefined ? (nameDe || currentCategory.nameDe) : currentCategory.nameDe,
+            nameEs: nameEs !== undefined ? (nameEs || currentCategory.nameEs) : currentCategory.nameEs,
+            namePt: namePt !== undefined ? (namePt || currentCategory.namePt) : currentCategory.namePt,
+            nameUk: nameUk !== undefined ? (nameUk || currentCategory.nameUk) : currentCategory.nameUk,
+            nameBe: nameBe !== undefined ? (nameBe || currentCategory.nameBe) : currentCategory.nameBe,
+          };
+  
           const category = await DbClient.category.update({
-            where: {
-              id: Number(id),
-            },
-            data: {
-              name: nameEn || name, // основное название = английское
-              nameEn: nameEn || name,
-              nameRu: nameRu || "",
-              nameZh: nameZh || "",
-              nameDe: nameDe || "",
-              nameEs: nameEs || "",
-              namePt: namePt || "",
-              nameUk: nameUk || "",
-              nameBe: nameBe || "",
-            },
+            where: { id: Number(id) },
+            data: updateData,
           });
-          
+  
           // Автоматически обновляем перевод в translations.json
-          translationsManager.updateCategoryTranslation(name, id, nameEn, nameRu);
-          
+          // Передаем только те поля, которые были изменены
+          translationsManager.updateCategoryTranslation(
+            category.name,
+            id,
+            nameEn !== undefined ? nameEn : null,
+            nameRu !== undefined ? nameRu : null,
+            nameZh !== undefined ? nameZh : null,
+            nameDe !== undefined ? nameDe : null,
+            nameEs !== undefined ? nameEs : null,
+            namePt !== undefined ? namePt : null,
+            nameUk !== undefined ? nameUk : null,
+            nameBe !== undefined ? nameBe : null
+          );
+  
           return res.json(category);
         }
       }

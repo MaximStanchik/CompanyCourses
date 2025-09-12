@@ -4,6 +4,7 @@ import axios from "../utils/axios";
 import "./admin.css";
 import Footer from "../components/Footer";
 import i18n from "../i18n";
+import { getAvatarUrl } from "../utils/minioUtils";
 
 const divStyle = {
   display: "contents",
@@ -11,6 +12,7 @@ const divStyle = {
 
 const Todo = (props) => {
   const [currentUser, setCurrentUser] = useState(null);
+  const [avatarError, setAvatarError] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("jwtToken");
@@ -50,13 +52,21 @@ const Todo = (props) => {
               fontSize: 16,
               fontWeight: 700,
               color: '#666',
-              background: props.todo.avatar ? `url(${props.todo.avatar})` : '#f8f9fa',
+              background: (props.todo.avatar && !avatarError) ? `url(${getAvatarUrl(props.todo.avatar)})` : '#f8f9fa',
               backgroundSize: 'cover',
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               flexShrink: 0
             }}>
-              {!props.todo.avatar && ((props.todo.name || props.todo.username || props.todo.firstName)?.[0] || '?')}
+              {props.todo.avatar && (
+                <img
+                  src={getAvatarUrl(props.todo.avatar)}
+                  alt=""
+                  style={{ display: 'none' }}
+                  onError={() => setAvatarError(true)}
+                />
+              )}
+              {(!props.todo.avatar || avatarError) && ((props.todo.name || props.todo.username || props.todo.firstName)?.[0] || '?')}
             </div>
             <span>{props.todo.name || props.todo.username || props.todo.firstName || '-'}</span>
           </div>

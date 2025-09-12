@@ -1,12 +1,23 @@
 const { PrismaClient } = require("@prisma/client");
 const DbClient = new PrismaClient();
 const bcrypt = require("bcryptjs");
+const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const validateRegisterInput = require("../Validation/register");
 const validateLoginInput = require("../Validation/login");
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
 const useragent = require('useragent');
+
+// Helper function to process user avatars
+const processUserAvatar = (user) => {
+  if (!user) return user;
+  
+  return {
+    ...user,
+    avatar: user.avatar ? user.avatar.split('/').pop() : null
+  };
+};
 
 // Функция для отправки письма для подтверждения
 async function sendVerificationEmail(email, token) {
@@ -45,6 +56,8 @@ async function sendVerificationEmail(email, token) {
         console.error("Error sending verification email:", error);
     }
 }
+
+
 
 const generateAccessToken = (id, roles) => {
     const payload = { id, roles: Array.isArray(roles) ? roles : [roles] };
@@ -179,6 +192,12 @@ class authController {
                 return res.status(403).json({ message: "Please verify your email address to log in." });
             }
 
+            // Проверяем пароль
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) {
+                return res.status(400).json({ password: "Invalid password" });
+            }
+
             // --- LAST ACTIVITY LOGIC ---
             const agent = useragent.parse(req.headers['user-agent']);
             const device = agent.device.toString() || agent.os.family;
@@ -226,7 +245,11 @@ class authController {
                     const users = await DbClient.user.findMany({
                         include: { Profile: true }
                     });
-                    return res.json(users);
+                    
+                    // Обрабатываем аватары пользователей
+                    const processedUsers = users.map(processUserAvatar);
+                    
+                    return res.json(processedUsers);
                 }
             }
             return res.status(401).json({ message: "Missing or invalid authorization token" });
@@ -357,7 +380,50 @@ class authController {
             console.log(err);
             res.status(500).json(err);
         }
-    }  
+    }
+    
+    async resendVerificationEmail(req, res) {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({ message: "Email is required." });
+        }
+        
+        try {
+            const user = await DbClient.user.findFirst({
+                where: { email: email }
+            });
+            
+            if (!user) {
+                return res.status(404).json({ message: "User not found." });
+            }
+            
+            if (user.isVerified) {
+                return res.status(400).json({ message: "Email is already verified." });
+            }
+            
+            const verificationToken = crypto.randomBytes(32).toString('hex');
+            const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); 
+            
+            await DbClient.user.update({
+                where: { id: user.id },
+                data: {
+                    emailVerificationToken: verificationToken,
+                    emailVerificationExpires: verificationExpires
+                }
+            });
+            
+            await sendVerificationEmail(email, verificationToken);
+            
+            console.log(`Resend verification email sent to ${email}`);
+            res.json({ message: "Verification email sent successfully." });
+            
+        } 
+        catch (error) {
+            console.error("Error resending verification email:", error);
+            res.status(500).json({ message: "Error sending verification email." });
+        }
+    }
 }
 
 module.exports = new authController();

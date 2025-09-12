@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronRight, faChevronDown, faTimes, faFolder, faFolderOpen } from '@fortawesome/free-solid-svg-icons';
 import { useTranslation } from 'react-i18next';
+import useTheme from '../hooks/useTheme';
 import axios from '../utils/axios';
 
 /**
@@ -14,6 +15,8 @@ import axios from '../utils/axios';
  */
 export default function CategorySelectorModal({ open, onClose, onConfirm, initialSelected = [] }) {
   const { t } = useTranslation();
+  const { theme } = useTheme();
+  const dark = theme === 'dark';
   const [tree, setTree] = useState([]);
   const [expanded, setExpanded] = useState({}); // id -> bool
   const [selected, setSelected] = useState(initialSelected);
@@ -189,117 +192,121 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
     }
   };
 
-  const renderTree = (nodes, level = 0) => (
-    <ul style={{ 
-      listStyle: 'none', 
-      margin: 0, 
-      paddingLeft: level === 0 ? 0 : 20,
-      borderLeft: level > 0 ? '2px solid #e0e0e0' : 'none',
-      marginLeft: level > 0 ? 10 : 0
-    }}>
-      {nodes.map(node => {
-        const hasChildren = node.children && node.children.length > 0;
-        const isExpanded = expanded[node.id];
-        const isSelected = selected.includes(node.id);
-        const canExpand = hasChildren && level < 1; // Ограничиваем 2 уровнями (0 и 1)
-        
-        return (
-          <li key={node.id} style={{ 
-            margin: '8px 0',
-            padding: '8px 12px',
-            borderRadius: '8px',
-            background: isSelected ? '#e3f2fd' : 'transparent',
-            border: isSelected ? '2px solid #2196f3' : '1px solid transparent',
-            transition: 'all 0.2s ease'
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: 8,
-              cursor: 'pointer'
+  const renderTree = (nodes, level = 0) => {
+    if (!nodes || nodes.length === 0) return null;
+    
+    return (
+      <ul style={{ 
+        listStyle: 'none', 
+        padding: 0, 
+        margin: 0,
+        borderLeft: level > 0 ? `2px solid ${dark ? '#4a4f5a' : '#e0e0e0'}` : 'none',
+        marginLeft: level > 0 ? 10 : 0
+      }}>
+        {nodes.map(node => {
+          const hasChildren = node.children && node.children.length > 0;
+          const isExpanded = expanded[node.id];
+          const isSelected = selected.includes(node.id);
+          const canExpand = hasChildren && level < 1; // Ограничиваем 2 уровнями (0 и 1)
+          
+          return (
+            <li key={node.id} style={{ 
+              margin: '8px 0',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              background: isSelected ? (dark ? '#1e3a5f' : '#e3f2fd') : 'transparent',
+              border: isSelected ? '2px solid #2196f3' : `1px solid ${dark ? '#4a4f5a' : 'transparent'}`,
+              transition: 'all 0.2s ease'
             }}>
-              {canExpand && (
-                <button 
-                  type="button" 
-                  onClick={() => toggleExpand(node.id)} 
-                  style={{ 
-                    background: 'none', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    padding: 4,
-                    borderRadius: 4,
-                    color: '#666',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseOver={(e) => e.target.style.background = '#f0f0f0'}
-                  onMouseOut={(e) => e.target.style.background = 'transparent'}
-                >
-                  <FontAwesomeIcon 
-                    icon={isExpanded ? faChevronDown : faChevronRight} 
-                    style={{ fontSize: '12px' }}
-                  />
-                </button>
-              )}
-              {!canExpand && <span style={{ width: 20 }} />}
-              
-              <FontAwesomeIcon 
-                icon={hasChildren ? (isExpanded ? faFolderOpen : faFolder) : faFolder} 
-                style={{ 
-                  fontSize: '14px', 
-                  color: hasChildren ? '#ff9800' : '#4caf50',
-                  marginRight: 4
-                }} 
-              />
-              
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => toggleSelect(node.id)}
-                id={`cat-${node.id}`}
-                style={{ margin: 0 }}
-              />
-              
-              <label 
-                htmlFor={`cat-${node.id}`} 
-                style={{ 
-                  cursor: 'pointer',
-                  fontWeight: level === 0 ? '600' : '400',
-                  fontSize: level === 0 ? '16px' : '14px',
-                  color: level === 0 ? '#333' : '#555',
-                  flex: 1,
-                  margin: 0
-                }}
-              >
-                {node.nameRu || node.nameEn || node.name}
-              </label>
-              
-              {hasChildren && level === 0 && (
-                <span style={{ 
-                  fontSize: '12px', 
-                  color: '#999', 
-                  background: '#f0f0f0', 
-                  padding: '2px 6px', 
-                  borderRadius: '10px' 
-                }}>
-                  {node.children.length} {t('categorySelector.subcategories')}
-                </span>
-              )}
-            </div>
-            
-            {canExpand && isExpanded && (
               <div style={{ 
-                marginTop: 8,
-                paddingTop: 8,
-                borderTop: '1px solid #f0f0f0'
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 8,
+                cursor: 'pointer'
               }}>
-                {renderTree(node.children, level + 1)}
+                {canExpand && (
+                  <button 
+                    type="button" 
+                    onClick={() => toggleExpand(node.id)} 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      cursor: 'pointer', 
+                      padding: 4,
+                      borderRadius: 4,
+                      color: dark ? '#b8c5d1' : '#666',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseOver={(e) => e.target.style.background = dark ? '#3a3f4a' : '#f0f0f0'}
+                    onMouseOut={(e) => e.target.style.background = 'transparent'}
+                  >
+                    <FontAwesomeIcon 
+                      icon={isExpanded ? faChevronDown : faChevronRight} 
+                      style={{ fontSize: '12px' }}
+                    />
+                  </button>
+                )}
+                {!canExpand && <span style={{ width: 20 }} />}
+                
+                <FontAwesomeIcon 
+                  icon={hasChildren ? (isExpanded ? faFolderOpen : faFolder) : faFolder} 
+                  style={{ 
+                    fontSize: '14px', 
+                    color: hasChildren ? '#ff9800' : '#4caf50',
+                    marginRight: 4
+                  }} 
+                />
+                
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => toggleSelect(node.id)}
+                  id={`cat-${node.id}`}
+                  style={{ margin: 0 }}
+                />
+                
+                <label 
+                  htmlFor={`cat-${node.id}`} 
+                  style={{ 
+                    cursor: 'pointer',
+                    fontWeight: level === 0 ? '600' : '400',
+                    fontSize: level === 0 ? '16px' : '14px',
+                    color: level === 0 ? (dark ? '#eaf4fd' : '#333') : (dark ? '#b8c5d1' : '#555'),
+                    flex: 1,
+                    margin: 0
+                  }}
+                >
+                  {node.nameRu || node.nameEn || node.name}
+                </label>
+                
+                {hasChildren && level === 0 && (
+                  <span style={{ 
+                    fontSize: '12px', 
+                    color: dark ? '#8a9ba8' : '#999', 
+                    background: dark ? '#3a3f4a' : '#f0f0f0', 
+                    padding: '2px 6px', 
+                    borderRadius: '10px' 
+                  }}>
+                    {node.children.length} {t('categorySelector.subcategories')}
+                  </span>
+                )}
               </div>
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
+              
+              {canExpand && isExpanded && (
+                <div style={{ 
+                  marginTop: 8,
+                  paddingTop: 8,
+                  borderTop: `1px solid ${dark ? '#4a4f5a' : '#f0f0f0'}`
+                }}>
+                  {renderTree(node.children, level + 1)}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
 
   if (!open) return null;
 
@@ -311,15 +318,17 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
   /* Анимации */
   const overlayStyle = {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    background: 'rgba(0,0,0,0.4)', zIndex: 1000,
+    background: dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.4)', zIndex: 1000,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     animation: `${leaving ? 'fadeOut' : 'fadeIn'} 0.25s ease forwards`
   };
   const modalStyle = {
-    background: '#fff', maxWidth: 700, width: '90%', borderRadius: 12, padding: 24,
+    background: dark ? '#2d3038' : '#fff', 
+    color: dark ? '#eaf4fd' : '#333',
+    maxWidth: 700, width: '90%', borderRadius: 12, padding: 24,
     maxHeight: '80vh', overflowY: 'auto', position: 'relative',
     animation: `${leaving ? 'scaleOut' : 'scaleIn'} 0.25s ease forwards`,
-    boxShadow: '0 10px 30px rgba(0,0,0,0.2)'
+    boxShadow: dark ? '0 10px 30px rgba(0,0,0,0.4)' : '0 10px 30px rgba(0,0,0,0.2)'
   };
 
   return (
@@ -342,20 +351,20 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
             border: 'none', 
             cursor: 'pointer', 
             fontSize: 20, 
-            color: '#666',
+            color: dark ? '#eaf4fd' : '#666',
             padding: 4,
             borderRadius: 4,
             transition: 'all 0.2s ease'
           }}
-          onMouseOver={(e) => e.target.style.background = '#f0f0f0'}
+          onMouseOver={(e) => e.target.style.background = dark ? '#3a3f4a' : '#f0f0f0'}
           onMouseOut={(e) => e.target.style.background = 'transparent'}
         >
           <FontAwesomeIcon icon={faTimes} />
         </button>
         
-        <h2 style={{ marginTop: 0, marginBottom: 8, color: '#333' }}>{t('categorySelector.title')}</h2>
+        <h2 style={{ marginTop: 0, marginBottom: 8, color: dark ? '#eaf4fd' : '#333' }}>{t('categorySelector.title')}</h2>
         <p style={{ 
-          color: '#666', 
+          color: dark ? '#b8c5d1' : '#666', 
           marginTop: 0, 
           marginBottom: 16, 
           fontSize: '14px',
@@ -367,16 +376,17 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
         </p>
         
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+          <div style={{ textAlign: 'center', padding: '40px', color: dark ? '#b8c5d1' : '#666' }}>
             {t('categorySelector.loading')}
           </div>
         ) : (
           <div style={{ 
-            border: '1px solid #e0e0e0', 
+            border: `1px solid ${dark ? '#4a4f5a' : '#e0e0e0'}`, 
             borderRadius: '8px', 
             padding: '16px',
             maxHeight: '400px',
-            overflowY: 'auto'
+            overflowY: 'auto',
+            background: dark ? '#23272a' : '#fff'
           }}>
             {renderTree(tree)}
           </div>
@@ -388,9 +398,9 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
           alignItems: 'center',
           marginTop: 24,
           paddingTop: 16,
-          borderTop: '1px solid #e0e0e0'
+          borderTop: `1px solid ${dark ? '#4a4f5a' : '#e0e0e0'}`
         }}>
-          <div style={{ fontSize: '14px', color: '#666' }}>
+          <div style={{ fontSize: '14px', color: dark ? '#b8c5d1' : '#666' }}>
             {t('categorySelector.selected')}: {selected.length} {t('categorySelector.of')} {MAX}
           </div>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -398,16 +408,17 @@ export default function CategorySelectorModal({ open, onClose, onConfirm, initia
               type="button" 
               onClick={handleClose} 
               style={{ 
-                background: '#fff', 
-                border: '1.5px solid #888', 
+                background: dark ? '#2d3038' : '#fff', 
+                color: dark ? '#eaf4fd' : '#333',
+                border: `1.5px solid ${dark ? '#4a4f5a' : '#888'}`, 
                 borderRadius: 6, 
                 padding: '10px 20px', 
                 fontSize: 14, 
                 cursor: 'pointer',
                 transition: 'all 0.2s ease'
               }}
-              onMouseOver={(e) => e.target.style.background = '#f8f8f8'}
-              onMouseOut={(e) => e.target.style.background = '#fff'}
+              onMouseOver={(e) => e.target.style.background = dark ? '#3a3f4a' : '#f8f8f8'}
+              onMouseOut={(e) => e.target.style.background = dark ? '#2d3038' : '#fff'}
             >
               {t('categorySelector.cancel')}
             </button>

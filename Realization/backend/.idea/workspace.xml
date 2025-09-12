@@ -1,39 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="354c6dd5-bb43-43ef-bf49-18eeb9cc3d2a" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/../.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/prisma/schema.prisma" beforeDir="false" afterPath="$PROJECT_DIR$/prisma/schema.prisma" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Controllers/courseController.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Controllers/courseController.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Controllers/favoriteController.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Controllers/favoriteController.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Controllers/lessonController.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Controllers/lessonController.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/Routes/courseRouter.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/Routes/courseRouter.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/AddCourseAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/AddCourseAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/NewLessonAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/NewLessonAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/ShowAllCoursesAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/ShowAllCoursesAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/ShowAllLessonsAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/ShowAllLessonsAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/ShowCategoryAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/ShowCategoryAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/ShowEnrollmentAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/ShowEnrollmentAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/SyllabusEditor.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/SyllabusEditor.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/TeachNavMenu.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/TeachNavMenu.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/admin.css" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/admin.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/editCourseAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/editCourseAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/admin/showCourseAdmin.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/admin/showCourseAdmin.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/NavBar.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/NavBar.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/components/edit-profile/EditProfile.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/components/edit-profile/EditProfile.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/i18n/translations.json" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/i18n/translations.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/index.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/index.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/ArticleView.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/ArticleView.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/Chat.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/Chat.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/CoursePromo.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/CoursePromo.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/MyClasses.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/MyClasses.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/MyStudents.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/MyStudents.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/NewPost.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/NewPost.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/Services.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/Services.js" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../frontend/src/pages/Users.js" beforeDir="false" afterPath="$PROJECT_DIR$/../frontend/src/pages/Users.js" afterDir="false" />
-    </list>
+    <list default="true" id="257a9be0-fa20-4b6d-b3b0-62c13939b15d" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -42,41 +10,32 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../.." />
   </component>
-  <component name="MarkdownSettingsMigration">
-    <option name="stateVersion" value="1" />
-  </component>
   <component name="ProjectCodeStyleSettingsMigration">
     <option name="version" value="2" />
   </component>
-  <component name="ProjectId" id="2yb29aScyLrtFLjs4s0EcnjZUrz" />
+  <component name="ProjectId" id="32XjASkcuGyKABdUSIVkoiqTaFE" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent">{
-  &quot;keyToString&quot;: {
-    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
-    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
-    &quot;WebServerToolWindowFactoryState&quot;: &quot;false&quot;,
-    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "vue.rearranger.settings.migration": "true"
   }
-}</component>
+}]]></component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
-      <changelist id="354c6dd5-bb43-43ef-bf49-18eeb9cc3d2a" name="Changes" comment="" />
-      <created>1750088809294</created>
+      <changelist id="257a9be0-fa20-4b6d-b3b0-62c13939b15d" name="Changes" comment="" />
+      <created>1757573676116</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
-      <updated>1750088809294</updated>
-      <workItem from="1750088820907" duration="29000" />
-      <workItem from="1752695451103" duration="3000" />
-      <workItem from="1755073268597" duration="41000" />
-      <workItem from="1755083107101" duration="7000" />
+      <updated>1757573676116</updated>
+      <workItem from="1757573679738" duration="28000" />
     </task>
     <servers />
-  </component>
-  <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="3" />
   </component>
 </project>

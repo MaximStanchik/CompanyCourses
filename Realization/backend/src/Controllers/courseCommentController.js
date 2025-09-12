@@ -167,7 +167,13 @@ class CourseCommentController {
             select: {
               id: true,
               username: true,
-              email: true
+              email: true,
+              avatar: true,
+              Profile: {
+                select: {
+                  avatar: true
+                }
+              }
             }
           },
           reactions: true

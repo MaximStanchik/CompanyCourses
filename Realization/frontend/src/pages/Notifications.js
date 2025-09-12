@@ -17,6 +17,178 @@ import {
 import useTheme from '../hooks/useTheme';
 import axios from '../utils/axios';
 
+
+// Компонент для отображения переведенного уведомления
+function TranslatedNotificationItem({ notification, theme, currentLanguage, onMarkAsRead, t }) {
+  const [translatedTitle, setTranslatedTitle] = useState(notification.title);
+  const [translatedMessage, setTranslatedMessage] = useState(notification.message);
+  
+  const getNotificationIcon = (type) => {
+    switch (type) {
+      case 'success':
+        return faCheckCircle;
+      case 'warning':
+        return faExclamationTriangle;
+      case 'error':
+        return faTimes;
+      default:
+        return faInfoCircle;
+    }
+  };
+
+  const getNotificationColor = (type) => {
+    switch (type) {
+      case 'success':
+        return '#28a745';
+      case 'warning':
+        return '#ffc107';
+      case 'error':
+        return '#dc3545';
+      default:
+        return '#17a2b8';
+    }
+  };
+  
+  useEffect(() => {
+    const translateNotification = () => {
+      try {
+        // Проверяем, является ли заголовок ключом перевода
+        const translationKeys = [
+          'step_modified', 'step_added', 'step_deleted',
+          'lesson_modified', 'lesson_added', 'lesson_deleted',
+          'module_modified', 'module_added', 'module_deleted',
+          'course_updated', 'profile_updated'
+        ];
+        
+        if (translationKeys.includes(notification.title)) {
+          // Это ключ перевода, получаем перевод из translations.json
+          const titleKey = `notifications.${notification.title}`;
+          const messageKey = `notifications.${notification.title}_message`;
+          
+          let title = t(titleKey);
+          let message = t(messageKey);
+          
+          // Заменяем параметры в сообщении, если они есть
+          if (notification.message) {
+            // Извлекаем параметры из оригинального сообщения
+            const lessonMatch = notification.message.match(/"([^"]+)"/g);
+            if (lessonMatch && lessonMatch.length >= 1) {
+              const lessonName = lessonMatch[0].replace(/"/g, '');
+              
+              message = message
+                .replace('{lessonName}', lessonName);
+              
+              // Если есть второй параметр (для шагов)
+              if (lessonMatch.length >= 2) {
+                const stepName = lessonMatch[1].replace(/"/g, '');
+                message = message.replace('{stepTitle}', stepName);
+              }
+            }
+          }
+          
+          setTranslatedTitle(title);
+          setTranslatedMessage(message);
+        } else {
+          // Это обычный текст, оставляем как есть
+          setTranslatedTitle(notification.title);
+          setTranslatedMessage(notification.message);
+        }
+      } catch (error) {
+        console.error('Error translating notification:', error);
+        setTranslatedTitle(notification.title);
+        setTranslatedMessage(notification.message);
+      }
+    };
+    
+    translateNotification();
+  }, [notification, currentLanguage, t]);
+  
+  return (
+    <div
+      style={{
+        background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
+        padding: '20px',
+        borderRadius: '12px',
+        border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+        boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+        opacity: notification.read ? 0.7 : 1,
+        transition: 'all 0.2s'
+      }}
+    >
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'flex-start', 
+        gap: '15px' 
+      }}>
+        <FontAwesomeIcon 
+          icon={getNotificationIcon(notification.type)} 
+          style={{ 
+            fontSize: '1.5rem', 
+            color: getNotificationColor(notification.type),
+            marginTop: '2px'
+          }} 
+        />
+        
+        <div style={{ flex: 1 }}>
+          <h3 style={{ 
+            fontSize: '1.1rem', 
+            fontWeight: '600', 
+            marginBottom: '8px',
+            color: theme === 'dark' ? '#ffffff' : '#333333'
+          }}>
+            {translatedTitle}
+          </h3>
+          <p style={{ 
+            color: theme === 'dark' ? '#cccccc' : '#666666',
+            marginBottom: '10px',
+            lineHeight: '1.5'
+          }}>
+            {translatedMessage}
+          </p>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            fontSize: '0.9rem',
+            color: theme === 'dark' ? '#999999' : '#888888'
+          }}>
+            <span>
+              {new Date(notification.createdAt).toLocaleDateString(currentLanguage === 'ru' ? 'ru-RU' : 
+                                                               currentLanguage === 'de' ? 'de-DE' :
+                                                               currentLanguage === 'es' ? 'es-ES' :
+                                                               currentLanguage === 'pt' ? 'pt-BR' :
+                                                               currentLanguage === 'uk' ? 'uk-UA' :
+                                                               currentLanguage === 'zh' ? 'zh-CN' :
+                                                               'en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+            {!notification.read && (
+              <button
+                onClick={() => onMarkAsRead(notification.id)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#007bff',
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                  textDecoration: 'underline'
+                }}
+              >
+                {t('notifications.mark_as_read')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnimatedSelectBox({ value, onChange, options, style }) {
   const [open, setOpen] = useState(false);
   const ref = React.useRef();
@@ -134,8 +306,6 @@ const Notifications = () => {
 
   const [statusFilter, setStatusFilter] = useState('unread');
   const [sortOrder, setSortOrder] = useState('newest');
-  const [categoryFilter, setCategoryFilter] = useState('all');
-  const [courseFilter, setCourseFilter] = useState('all');
 
   const statusOptions = [
     { value: 'unread', label: t('notifications.unread'), icon: faBell },
@@ -146,19 +316,6 @@ const Notifications = () => {
   const sortOptions = [
     { value: 'newest', label: t('notifications.newest_first'), icon: faSort },
     { value: 'oldest', label: t('notifications.oldest_first'), icon: faSort }
-  ];
-
-  const categoryOptions = [
-          { value: 'all', label: t('notifications.all_categories'), icon: faFilter },
-          { value: 'learning', label: t('notifications.learning'), icon: faBook },
-      { value: 'reviews', label: t('notifications.reviews'), icon: faList },
-      { value: 'comments', label: t('course.comments'), icon: faList },
-      { value: 'teaching', label: t('notifications.teaching'), icon: faList },
-      { value: 'other', label: t('notifications.other'), icon: faList }
-  ];
-
-  const courseOptions = [
-    { value: 'all', label: t('notifications.all_courses'), icon: faBook }
   ];
 
   useEffect(() => {
@@ -253,22 +410,20 @@ const Notifications = () => {
     }
   };
 
-  const filteredNotifications = notifications.filter(notification => {
-    if (statusFilter === 'unread' && notification.read) return false;
-    if (statusFilter === 'read' && !notification.read) return false;
-    
-    if (categoryFilter !== 'all' && notification.category !== categoryFilter) return false;
-    
-    if (courseFilter !== 'all' && notification.courseId !== courseFilter) return false;
-    
-    return true;
-  }).sort((a, b) => {
-    if (sortOrder === 'newest') {
-      return new Date(b.createdAt) - new Date(a.createdAt);
-    } else {
-      return new Date(a.createdAt) - new Date(b.createdAt);
-    }
-  });
+  const filteredNotifications = React.useMemo(() => {
+    return notifications.filter(notification => {
+      if (statusFilter === 'unread' && notification.read) return false;
+      if (statusFilter === 'read' && !notification.read) return false;
+      
+      return true;
+    }).sort((a, b) => {
+      if (sortOrder === 'newest') {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      } else {
+        return new Date(a.createdAt) - new Date(b.createdAt);
+      }
+    });
+  }, [notifications, statusFilter, sortOrder]);
 
   if (loading) {
     return (
@@ -341,14 +496,6 @@ const Notifications = () => {
             textAlign: 'center', 
             marginBottom: '40px' 
           }}>
-            <FontAwesomeIcon 
-              icon={faBell} 
-              style={{ 
-                fontSize: '3rem', 
-                color: '#4485ed', 
-                marginBottom: '20px' 
-              }} 
-            />
             <h1 style={{ 
               fontSize: '2.5rem', 
               fontWeight: '700', 
@@ -357,12 +504,6 @@ const Notifications = () => {
             }}>
               {t('notifications.title')}
             </h1>
-            <p style={{ 
-              fontSize: '1.1rem', 
-              color: theme === 'dark' ? '#cccccc' : '#666666'
-            }}>
-              {t('notifications.login_to_receive')}
-            </p>
           </div>
 
           {/* Карточка для входа */}
@@ -377,7 +518,7 @@ const Notifications = () => {
               icon={faBell} 
               style={{ 
                 fontSize: '3rem', 
-                color: '#6c757d', 
+                color: '#4485ed', 
                 marginBottom: '20px' 
               }} 
             />
@@ -387,7 +528,7 @@ const Notifications = () => {
               marginBottom: '10px',
               color: theme === 'dark' ? '#ffffff' : '#333333'
             }}>
-              {t('notifications.login_to_system')}
+              {t('notifications.login_to_receive')}
             </h3>
             <p style={{ 
               color: theme === 'dark' ? '#cccccc' : '#666666',
@@ -475,10 +616,6 @@ const Notifications = () => {
           </h1>
         </header>
         
-        <div style={{ width: '100%', textAlign: 'center', marginBottom: '12px', fontWeight: 600, fontSize: 18, color: 'var(--text-color)', letterSpacing: 0.2 }}>
-          {t('notifications.course_filter')}
-        </div>
-        
         <div className="notifications__filters" style={{ display: 'flex', gap: 16, flexWrap: 'nowrap', justifyContent: 'center', width: '100%' }}>
           <AnimatedSelectBox 
             value={statusFilter} 
@@ -489,16 +626,6 @@ const Notifications = () => {
             value={sortOrder} 
             onChange={setSortOrder} 
             options={sortOptions} 
-          />
-          <AnimatedSelectBox 
-            value={categoryFilter} 
-            onChange={setCategoryFilter} 
-            options={categoryOptions} 
-          />
-          <AnimatedSelectBox 
-            value={courseFilter} 
-            onChange={setCourseFilter} 
-            options={courseOptions} 
           />
         </div>
 
@@ -512,14 +639,6 @@ const Notifications = () => {
               borderRadius: '12px',
               border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
             }}>
-              <FontAwesomeIcon 
-                icon={faBell} 
-                style={{ 
-                  fontSize: '3rem', 
-                  color: '#6c757d', 
-                  marginBottom: '20px' 
-                }} 
-              />
               <h3 style={{ 
                 fontSize: '1.3rem', 
                 fontWeight: '600', 
@@ -537,89 +656,14 @@ const Notifications = () => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {filteredNotifications.map((notification) => (
-                <div
+                <TranslatedNotificationItem 
                   key={notification.id}
-                  style={{
-                    background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
-                    padding: '20px',
-                    borderRadius: '12px',
-                    border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
-                    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                    opacity: notification.read ? 0.7 : 1,
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  <div style={{ 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
-                    gap: '15px' 
-                  }}>
-                    <FontAwesomeIcon 
-                      icon={getNotificationIcon(notification.type)} 
-                      style={{ 
-                        fontSize: '1.5rem', 
-                        color: getNotificationColor(notification.type),
-                        marginTop: '2px'
-                      }} 
-                    />
-                    
-                    <div style={{ flex: 1 }}>
-                      <h3 style={{ 
-                        fontSize: '1.1rem', 
-                        fontWeight: '600', 
-                        marginBottom: '8px',
-                        color: theme === 'dark' ? '#ffffff' : '#333333'
-                      }}>
-                        {notification.title}
-                      </h3>
-                      <p style={{ 
-                        color: theme === 'dark' ? '#cccccc' : '#666666',
-                        marginBottom: '10px',
-                        lineHeight: '1.5'
-                      }}>
-                        {notification.message}
-                      </p>
-                      <div style={{ 
-                        display: 'flex', 
-                        justifyContent: 'space-between', 
-                        alignItems: 'center',
-                        fontSize: '0.9rem',
-                        color: theme === 'dark' ? '#999999' : '#888888'
-                      }}>
-                        <span>
-                          {new Date(notification.createdAt).toLocaleDateString(currentLanguage === 'ru' ? 'ru-RU' : 
-                                                                               currentLanguage === 'de' ? 'de-DE' :
-                                                                               currentLanguage === 'es' ? 'es-ES' :
-                                                                               currentLanguage === 'pt' ? 'pt-BR' :
-                                                                               currentLanguage === 'uk' ? 'uk-UA' :
-                                                                               currentLanguage === 'zh' ? 'zh-CN' :
-                                                                               'en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                        {!notification.read && (
-                          <button
-                            onClick={() => markAsRead(notification.id)}
-                            style={{
-                              background: 'none',
-                              border: 'none',
-                              color: '#007bff',
-                              cursor: 'pointer',
-                              fontSize: '0.9rem',
-                              textDecoration: 'underline'
-                            }}
-                          >
-                            {t('notifications.mark_as_read')}
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  notification={notification}
+                  theme={theme}
+                  currentLanguage={currentLanguage}
+                  onMarkAsRead={markAsRead}
+                  t={t}
+                />
               ))}
             </div>
           )}

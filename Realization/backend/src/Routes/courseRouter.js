@@ -5,27 +5,17 @@ const { check } = require("express-validator");
 const roleMiddleware = require("../Middleware/roleMiddleware");
 const multer = require("multer");
 const path = require("path");
+const fs = require('fs');
 
-// Настройка multer для загрузки файлов
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, path.join(__dirname, '../../static/uploads'));
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname);
-    const base = path.basename(file.originalname, ext);
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, base + '-' + unique + ext);
-  }
-});
-
+// Настройка multer для временного хранения файлов в памяти
 const fileFilter = (req, file, cb) => {
   // Проверяем тип файла
   const allowedTypes = {
     logo: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
     intro: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/quicktime'],
     image: ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'],
-    video: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/ogg', 'video/quicktime']
+    video: ['video/mp4', 'video/avi', 'video/mov', 'video/wmv', 'video/webm', 'video/ogg', 'video/quicktime'],
+    file: [] // Пустой массив для типа 'file' - разрешаем все файлы
   };
   
   const fileType = req.query.type;
@@ -48,6 +38,12 @@ const fileFilter = (req, file, cb) => {
   if (!allowedTypes[fileType]) {
     console.log(`Unsupported file type requested: ${fileType}`);
     return cb(new Error(`Unsupported file type: ${fileType}`), false);
+  }
+  
+  // Для типа 'file' разрешаем все файлы
+  if (fileType === 'file') {
+    console.log(`File type 'file' allows all files. Accepting: ${file.originalname}`);
+    return cb(null, true);
   }
   
   // Проверяем MIME-тип
@@ -78,10 +74,22 @@ const fileFilter = (req, file, cb) => {
 };
 
 const upload = multer({ 
-  storage,
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      const uploadsDir = path.join(__dirname, '../../static/uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      cb(null, uploadsDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
   fileFilter,
   limits: {
-    fileSize: 15 * 1024 * 1024 * 1024 // 15GB для больших видеофайлов
+    fileSize: 50 * 1024 * 1024 * 1024 // 50GB для больших видеофайлов
   }
 });
 
@@ -109,6 +117,9 @@ router.post("/course/:id/lesson/:lessonId/step/:stepIndex/complete", courseContr
 router.post("/course/:id/lesson/:lessonId/progress", courseController.saveLessonProgress);
 router.post("/course/:id/progress", courseController.saveCourseProgress);
 router.post("/course/:id/modules", courseController.createCourseModule.bind(courseController));
+router.delete("/course/:id/modules/:moduleId", courseController.deleteCourseModule.bind(courseController));
+router.delete("/modules/:moduleId", courseController.deleteCourseModule.bind(courseController));
+//router.put("/course/:id/modules/:moduleId", courseController.updateCourseModule.bind(courseController));
 router.post("/course/:id/modules/:moduleId/lessons", courseController.addLessonToModule.bind(courseController));
 
 // Админский маршрут для обновления прогресса курсов без уроков
@@ -125,5 +136,7 @@ router.delete("/course/:id/clean-test-completions", courseController.cleanTestSt
 
 // Маршрут для принудительной очистки ВСЕХ stepCompletion записей
 router.delete("/course/:id/force-clean-all", courseController.forceCleanAllStepCompletions);
+
+router.post("/course/:courseId/lesson/:lessonId/step/:stepIndex/test-result", courseController.saveTestResult);
 
 module.exports = router;

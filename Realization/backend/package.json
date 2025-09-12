@@ -19,6 +19,7 @@
     "http-errors": "^2.0.0",
     "joi": "^17.8.3",
     "jsonwebtoken": "^9.0.0",
+    "minio": "^8.0.5",
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^7.0.3",
     "passport": "^0.6.0",
@@ -26,7 +27,9 @@
     "passport-facebook": "^3.0.0",
     "passport-google-oauth20": "^2.0.0",
     "passport-yandex": "^0.0.5",
-    "socket.io": "^4.6.1"
+    "socket.io": "^4.6.1",
+    "useragent": "^2.3.0",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.15",

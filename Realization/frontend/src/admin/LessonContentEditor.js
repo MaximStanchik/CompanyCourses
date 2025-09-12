@@ -18,6 +18,16 @@ export default function LessonContentEditor({ lessonId: propId }) {
   const { theme } = useTheme();
   const { id: routeId } = useParams();
   const history = useHistory();
+  
+  // Проверяем, что все зависимости загружены
+  useEffect(() => {
+    console.log('🎯 LessonContentEditor dependencies check:', {
+      hasData: !!data,
+      hasPicker: !!Picker,
+      hasToast: !!toast,
+      hasAxios: !!axios
+    });
+  }, []);
   // Universal back handler: returns to previous page or default lesson list
   const handleBack = () => {
     if (history.length > 1) {
@@ -51,6 +61,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
   const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
   const [imageSize, setImageSize] = useState({ width: 300, height: 200 });
   const [imageAlignment, setImageAlignment] = useState('center'); // left, center, right
+
+  // Состояние для модального окна вставки ссылки
+  const [linkModal, setLinkModal] = useState({ visible: false, stepId: null, url: '', text: '' });
 
   const stepTypes = [
     { id: 'text', name: t('lesson.text'), icon: '📝' },
@@ -91,6 +104,11 @@ export default function LessonContentEditor({ lessonId: propId }) {
   const parseContent = (step) => {
     console.log('parseContent called with step:', step);
     
+    // Проверяем, есть ли прямые поля fileUrl и filename
+    if (step.fileUrl || step.filename) {
+      console.log('Found direct fileUrl/filename fields:', { fileUrl: step.fileUrl, filename: step.filename });
+    }
+    
     if (!step || !step.content) {
       console.log('No step or content, returning empty object');
       return {};
@@ -106,7 +124,12 @@ export default function LessonContentEditor({ lessonId: propId }) {
           cleanObject[key] = step.content[key];
         }
       });
-      console.log('Cleaned object:', cleanObject);
+      
+      // Добавляем прямые поля fileUrl и filename, если они есть
+      if (step.fileUrl) cleanObject.fileUrl = step.fileUrl;
+      if (step.filename) cleanObject.filename = step.filename;
+      
+      console.log('Cleaned object with direct fields:', cleanObject);
       return cleanObject;
     }
     
@@ -125,26 +148,58 @@ export default function LessonContentEditor({ lessonId: propId }) {
               cleanParsed[key] = parsed[key];
             }
           });
-          console.log('Cleaned parsed object:', cleanParsed);
+          
+          // Добавляем прямые поля fileUrl и filename, если они есть
+          if (step.fileUrl) cleanParsed.fileUrl = step.fileUrl;
+          if (step.filename) cleanParsed.filename = step.filename;
+          
+          console.log('Cleaned parsed object with direct fields:', cleanParsed);
           return cleanParsed;
         }
         // Если распарсенный объект пустой, возвращаем пустой объект
-        console.log('Parsed object is empty, returning empty object');
-        return {};
+        console.log('Parsed object is empty, checking for direct fields');
+        const result = {};
+        
+        // Добавляем прямые поля fileUrl и filename, если они есть
+        if (step.fileUrl) result.fileUrl = step.fileUrl;
+        if (step.filename) result.filename = step.filename;
+        
+        console.log('Result with direct fields:', result);
+        return result;
       } catch { 
         // Если не JSON, возвращаем как обычный текст
         // Но только если строка не пустая и не содержит только пробелы
         if (step.content.trim() !== '') {
           console.log('Content is not JSON, treating as text:', step.content);
-          return { text: step.content }; 
+          const result = { text: step.content };
+          
+          // Добавляем прямые поля fileUrl и filename, если они есть
+          if (step.fileUrl) result.fileUrl = step.fileUrl;
+          if (step.filename) result.filename = step.filename;
+          
+          return result;
         }
-        console.log('Content is empty string, returning empty object');
-        return {};
+        console.log('Content is empty string, checking for direct fields');
+        const result = {};
+        
+        // Добавляем прямые поля fileUrl и filename, если они есть
+        if (step.fileUrl) result.fileUrl = step.fileUrl;
+        if (step.filename) result.filename = step.filename;
+        
+        console.log('Result with direct fields:', result);
+        return result;
       }
     }
     
-    console.log('Content type not recognized, returning empty object');
-    return {};
+    console.log('Content type not recognized, checking for direct fields');
+    const result = {};
+    
+    // Добавляем прямые поля fileUrl и filename, если они есть
+    if (step.fileUrl) result.fileUrl = step.fileUrl;
+    if (step.filename) result.filename = step.filename;
+    
+    console.log('Result with direct fields:', result);
+    return result;
   };
 
   const encodeContent = (type, payload) => {
@@ -236,13 +291,7 @@ export default function LessonContentEditor({ lessonId: propId }) {
     }
 
     const isLargeFile = file.size > 1024 * 1024 * 1024; // > 1GB
-    const maxSize = 15 * 1024 * 1024 * 1024; // 15GB
-    
-    if (file.size > maxSize) {
-      toast.error(`Файл слишком большой. Максимальный размер: ${(maxSize / (1024 * 1024 * 1024)).toFixed(1)} GB`);
-      return;
-    }
-    
+
     if (isLargeFile) {
       const confirmUpload = window.confirm(
         `Файл очень большой (${(file.size / (1024 * 1024 * 1024)).toFixed(2)} GB). Загрузка может занять много времени и быть нестабильной. Продолжить?`
@@ -298,11 +347,17 @@ export default function LessonContentEditor({ lessonId: propId }) {
       });
       
       const url = res.data.url;
-      console.log('Upload successful, received URL:', url);
+      const filename = res.data.filename;
+      console.log('Upload successful, received URL:', url, 'filename:', filename);
+      console.log('Filename encoding check:', {
+        original: filename,
+        encoded: filename ? encodeURIComponent(filename) : null,
+        decoded: filename ? decodeURIComponent(encodeURIComponent(filename)) : null
+      });
       
       if (url && typeof onUrl === 'function') {
-        console.log('Calling onUrl callback with URL:', url);
-        onUrl(url);
+        console.log('Calling onUrl callback with URL:', url, 'and filename:', filename);
+        onUrl(url, filename);
         
         setTimeout(() => {
           const currentStep = steps[currentStepIndex];
@@ -326,8 +381,8 @@ export default function LessonContentEditor({ lessonId: propId }) {
           });
         }
         
-        toast.success(t('lesson.file_uploaded_successfully'));
-      } else {
+      } 
+      else {
         console.warn('URL or onUrl callback not available:', { url, onUrl: typeof onUrl });
       }
       
@@ -373,13 +428,6 @@ export default function LessonContentEditor({ lessonId: propId }) {
       return;
     }
     
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      toast.error('Файл слишком большой. Максимальный размер: 10MB');
-      e.target.value = '';
-      return;
-    }
-    
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast.error('Неподдерживаемый тип файла. Разрешены только: JPEG, PNG, GIF, WebP');
@@ -415,9 +463,43 @@ export default function LessonContentEditor({ lessonId: propId }) {
           event.stopPropagation();
         };
         
-        const html = `<div contenteditable="false" style="display:inline-block; cursor:pointer; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none;" onclick="window.selectImage('${imageId}', event, '${stepId}')" onmousedown="event.preventDefault(); event.stopPropagation();"><img src="${imageUrl}" id="${imageId}" class="editable-image" style="max-width:100%; cursor:pointer !important; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; -webkit-user-modify:read-only; -moz-user-modify:read-only; -ms-user-modify:read-only; user-modify:read-only; pointer-events:auto;" data-image-url="${imageUrl}" onmouseover="this.style.cursor='pointer';" /></div>`;
-        const imageWithSpaces = `&nbsp;&nbsp;${html}&nbsp;&nbsp;`;
-        document.execCommand('insertHTML', false, imageWithSpaces);
+        // Создаем DOM элемент для изображения
+        const imageDiv = document.createElement('div');
+        imageDiv.contentEditable = false;
+        imageDiv.style.cssText = 'display:inline-block; cursor:pointer; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; margin: 0 8px;';
+        imageDiv.onclick = (event) => selectImage(imageId, event, stepId);
+        imageDiv.onmousedown = (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+        };
+        
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.id = imageId;
+        img.className = 'editable-image';
+        img.style.cssText = 'max-width:100%; cursor:pointer !important; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; -webkit-user-modify:read-only; -moz-user-modify:read-only; -ms-user-modify:read-only; user-modify:read-only; pointer-events:auto;';
+        img.setAttribute('data-image-url', imageUrl);
+        img.onmouseover = () => img.style.cursor = 'pointer';
+        
+        imageDiv.appendChild(img);
+        
+        // Вставляем изображение в текущую позицию курсора
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          range.insertNode(imageDiv);
+          
+          // Добавляем пробел после изображения
+          const space = document.createTextNode('\u00A0');
+          range.setStartAfter(imageDiv);
+          range.insertNode(space);
+          
+          // Обновляем курсор
+          range.setStartAfter(space);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
         
         const step = steps.find(s => s.id === stepId);
         if (step) {
@@ -429,13 +511,39 @@ export default function LessonContentEditor({ lessonId: propId }) {
             content: JSON.stringify(newContent)
           };
           
-          
-          axios.put(`/lessons/${lessonId}/steps/${stepId}`, updatedStep, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
-          }).catch(error => {
-            console.error('Error saving step:', error);
-            toast.error('Ошибка при сохранении изображения');
+          console.log('🖼️ Saving step after image insert:', {
+            stepId,
+            originalContent: step.content,
+            cleanedHtml,
+            newContent,
+            updatedStep
           });
+          
+          // Используем handleSaveStep для правильного сохранения
+          handleSaveStep(stepId, updatedStep, false, true);
+          
+          // Принудительно сохраняем содержимое редактора
+          setTimeout(() => {
+            if (textarea) {
+              const currentHtml = textarea.innerHTML;
+              const cleanedHtml = cleanHtml(currentHtml);
+              const c = parseContent(step);
+              const newContent = { ...c, text: cleanedHtml };
+              const finalStep = {
+                ...step,
+                content: JSON.stringify(newContent)
+              };
+              
+              console.log('🔄 Force saving step after image insert:', {
+                stepId,
+                currentHtml,
+                cleanedHtml,
+                finalContent: finalStep.content
+              });
+              
+              handleSaveStep(stepId, finalStep, false, true);
+            }
+          }, 100);
         }
       }
       
@@ -587,15 +695,21 @@ export default function LessonContentEditor({ lessonId: propId }) {
   const cleanHtml = (html) => {
     if (!html) return '';
     
-    let cleaned = html.replace(/\s+/g, ' ');
+    // Создаем временный div для работы с HTML
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
     
-    cleaned = cleaned.replace(/<[^>]*>\s*<\/[^>]*>/g, '');
+    // Удаляем пустые элементы, но сохраняем изображения
+    const emptyElements = tempDiv.querySelectorAll('div:empty, span:empty, p:empty');
+    emptyElements.forEach(el => el.remove());
     
-    cleaned = cleaned.replace(/<div[^>]*>\s*<\/div>/g, '');
+    // Удаляем лишние пробелы, но сохраняем структуру
+    let cleaned = tempDiv.innerHTML
+      .replace(/\s+/g, ' ')
+      .replace(/>\s+</g, '><')
+      .trim();
     
-    cleaned = cleaned.replace(/<span[^>]*>\s*<\/span>/g, '');
-    
-    return cleaned.trim();
+    return cleaned;
   };
 
 
@@ -683,6 +797,21 @@ export default function LessonContentEditor({ lessonId: propId }) {
       setTimeout(() => setEmojiAnim('in'), 200);
     }
   }, [emojiPicker.visible]);
+
+  // Очистка таймеров при размонтировании компонента
+  useEffect(() => {
+    return () => {
+      // Очищаем все таймеры автосохранения
+      Object.values(autoSaveTimers.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+      
+      // Очищаем все таймеры форматирования
+      Object.values(formatTimersRef.current).forEach(timer => {
+        if (timer) clearTimeout(timer);
+      });
+    };
+  }, []);
 
   // Обработка изображений в редакторе
   useEffect(() => {
@@ -1080,18 +1209,80 @@ export default function LessonContentEditor({ lessonId: propId }) {
   const handleSaveStep = async (stepId, stepData, showNotification = true, silent = false) => {
     try {
       if (!silent) setSaving(true);
+      
+      // Если создаем новый шаг, сначала сохраняем все существующие шаги
+      if (!stepId) {
+        // Сохраняем все существующие шаги
+        const existingSteps = steps.filter(s => s.id);
+        if (existingSteps.length > 0) {
+          try {
+            for (const step of existingSteps) {
+              const editorEl = textEditorRefs.current[step.id];
+              let contentStr = step.content;
+              if (editorEl && step.type === 'text') {
+                const cleaned = cleanHtml(editorEl.innerHTML);
+                const c = parseContent(step);
+                const newContent = { ...c, text: cleaned };
+                contentStr = JSON.stringify(newContent);
+              }
+              const payload = {
+                title: step.title,
+                type: step.type,
+                content: contentStr,
+                order: step.order
+              };
+              
+              await axios.put(`/lessons/${lessonId}/steps/${step.id}`, payload, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
+              });
+            }
+          } catch (err) {
+            console.error('Error saving existing steps before adding new one:', err);
+            toast.error(t('lesson.step_save_error'));
+            return;
+          }
+        }
+      }
+      
       if (stepId) {
         // Обновляем существующий шаг без перезагрузки
-        await axios.put(`/lessons/${lessonId}/steps/${stepId}`, stepData, {
+        let finalStepData = { ...stepData };
+        
+        // Если это текстовый шаг, обновляем содержимое из редактора
+        if (stepData.type === 'text') {
+          const editorEl = textEditorRefs.current[stepId];
+          if (editorEl) {
+            const cleaned = cleanHtml(editorEl.innerHTML);
+            const c = parseContent(stepData);
+            const newContent = { ...c, text: cleaned };
+            finalStepData = {
+              ...finalStepData,
+              content: JSON.stringify(newContent)
+            };
+            
+            console.log('💾 Saving text step:', {
+              stepId,
+              originalHTML: editorEl.innerHTML,
+              cleanedHTML: cleaned,
+              originalContent: stepData.content,
+              newContent,
+              finalContent: finalStepData.content
+            });
+          }
+        }
+        
+        await axios.put(`/lessons/${lessonId}/steps/${stepId}`, finalStepData, {
           headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
         });
+        
         // Обновляем локальное состояние шага
         setSteps(prev => {
           const next = [...prev];
           const idx = next.findIndex(s => s.id === stepId);
-          if (idx !== -1) next[idx] = { ...next[idx], ...stepData };
+          if (idx !== -1) next[idx] = { ...next[idx], ...finalStepData };
           return next;
         });
+        
         if (showNotification) {
           toast.success(t('lesson.step_saved'));
         }
@@ -1365,58 +1556,170 @@ export default function LessonContentEditor({ lessonId: propId }) {
   };
 
   // Функция для вставки эмодзи
-  const insertEmoji = (emoji, stepKey) => {
-    console.log('insertEmoji called:', { emoji, stepIndex: stepKey });
-    const textarea = textEditorRefs.current[stepKey];
-    if (!textarea) {
-      console.warn('Textarea not found for step:', stepKey);
+  const insertEmoji = async (emoji, stepKey) => {
+    console.log('🎯 insertEmoji called:', { emoji, stepIndex: stepKey, emojiType: typeof emoji });
+    
+    // Проверяем входные параметры
+    if (!stepKey && stepKey !== 0) {
+      console.error('❌ stepKey is invalid:', stepKey);
+      toast.error('Invalid step index for emoji insertion');
       return;
     }
     
-    // Проверяем, что emoji не undefined
     if (!emoji || typeof emoji !== 'string') {
-      console.warn('Invalid emoji:', emoji);
+      console.error('❌ Invalid emoji:', emoji);
+      toast.error('Invalid emoji data');
+      return;
+    }
+    
+    const editor = textEditorRefs.current[stepKey];
+    if (!editor) {
+      console.error('❌ Text editor not found for step:', stepKey);
+      toast.error('Text editor not found');
       return;
     }
     
     try {
+      console.log('📝 Starting emoji insertion process...');
+      
       // Восстанавливаем курсор туда, где был перед открытием пикера
       restoreSelectionForStep(stepKey);
-      textarea.focus();
+      console.log('✅ Cursor position restored');
+      
+      // Фокусируемся на редакторе
+      editor.focus();
+      console.log('✅ Editor focused');
+      
+      // Получаем текущее выделение
       const selection = window.getSelection();
+      let range;
+      
       if (!selection.rangeCount) {
-        const range = document.createRange();
-        range.selectNodeContents(textarea);
+        console.log('📍 No selection, creating new range at end');
+        // Если нет выделения, создаем новый диапазон в конце
+        range = document.createRange();
+        range.selectNodeContents(editor);
         range.collapse(false);
         selection.removeAllRanges();
         selection.addRange(range);
+      } else {
+        range = selection.getRangeAt(0);
+        console.log('📍 Using existing selection range');
       }
-      // Вставляем эмодзи как чистый текст
-      const range = selection.getRangeAt(0);
+      
+      // Используем более надежный способ вставки эмодзи
+      console.log('💾 Inserting emoji:', emoji);
+      
+      // Предотвращаем автоматическое копирование в буфер обмена
+      let originalClipboardData = '';
+      try {
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          originalClipboardData = await navigator.clipboard.readText();
+        }
+      } catch (error) {
+        console.warn('Failed to read clipboard:', error);
+      }
+      
+      // Создаем текстовый узел с эмодзи
+      const textNode = document.createTextNode(emoji);
+      
+      // Удаляем выделенное содержимое (если есть)
+      if (!range.collapsed) {
       range.deleteContents();
+      }
+      
+      // Вставляем эмодзи
+      range.insertNode(textNode);
+      
+      // Альтернативный способ вставки, если первый не сработал
+      if (!editor.textContent.includes(emoji)) {
+        console.log('🔄 First insertion method failed, trying alternative...');
+        
+        // Восстанавливаем выделение и фокус
+        editor.focus();
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        
+        // Пытаемся вставить через execCommand
+        if (document.queryCommandSupported('insertText')) {
+          document.execCommand('insertText', false, emoji);
+        } else {
+          // Если execCommand не поддерживается, используем paste
+          try {
+            const clipboardData = new DataTransfer();
+            clipboardData.setData('text/plain', emoji);
+            const pasteEvent = new ClipboardEvent('paste', {
+              clipboardData: clipboardData,
+              bubbles: true
+            });
+            editor.dispatchEvent(pasteEvent);
+          } catch (pasteError) {
+            console.warn('Paste method failed, trying direct DOM manipulation:', pasteError);
+            
+            // Последний способ - прямая манипуляция с DOM
       const textNode = document.createTextNode(emoji);
       range.insertNode(textNode);
+            
+            // Перемещаем курсор после вставленного эмодзи
+            const after = document.createRange();
+            after.setStart(textNode, textNode.length);
+            after.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(after);
+          }
+        }
+        
+        // Проверяем, что эмодзи действительно вставлен
+        if (!editor.textContent.includes(emoji)) {
+          console.error('❌ All insertion methods failed for emoji:', emoji);
+          toast.error('Failed to insert emoji. Please try again.');
+          return;
+        }
+      }
+      
+      // Очищаем буфер обмена от эмодзи, если он там появился
+      setTimeout(() => {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(originalClipboardData);
+        }
+      }, 100);
+      
+      // Перемещаем курсор после вставленного эмодзи
       const after = document.createRange();
       after.setStart(textNode, textNode.length);
       after.collapse(true);
       selection.removeAllRanges();
       selection.addRange(after);
-      // Помечаем редактор как непустой
-      textarea.setAttribute('data-empty', 'false');
       
-      // Сохраняем содержимое без перерендера
+      // Помечаем редактор как непустой
+      editor.setAttribute('data-empty', 'false');
+      
+      // Обновляем содержимое шага
       const step = steps.find(s => s.id === stepKey);
       if (step) {
+        console.log('💾 Updating step content...');
         const c = parseContent(step);
-        const newContent = { ...c, text: textarea.innerHTML };
+        const newContent = { ...c, text: editor.innerHTML };
         const updatedStep = { ...step, content: JSON.stringify(newContent) };
+        
+        // Сохраняем изменения
         handleSaveStep(step.id, updatedStep, false, true);
+        console.log('✅ Step content saved');
+      } else {
+        console.warn('⚠️ Step not found for saving:', stepKey);
       }
       
-      console.log('Emoji inserted successfully:', emoji);
+      // Триггерим событие input для обновления состояния
+      const inputEvent = new Event('input', { bubbles: true });
+      editor.dispatchEvent(inputEvent);
+      
+      console.log('🎉 Emoji inserted successfully:', emoji);
+      toast.success(`Emoji ${emoji} inserted successfully!`);
+      
     } catch (error) {
-      console.error('Failed to insert emoji:', error);
-      toast.error('Failed to insert emoji');
+      console.error('❌ Failed to insert emoji:', error);
+      toast.error(`Failed to insert emoji: ${error.message}`);
     }
   };
 
@@ -1527,7 +1830,6 @@ export default function LessonContentEditor({ lessonId: propId }) {
           if (direction.includes('s')) newHeight = startHeight + deltaY;
           if (direction.includes('n')) newHeight = startHeight - deltaY;
           
-          // Если зажат Shift, сохраняем пропорции
           if (moveEvent.shiftKey) {
             if (direction.includes('e') || direction.includes('w')) {
               newHeight = newWidth / startRatio;
@@ -1536,11 +1838,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
             }
           }
           
-          // Ограничиваем минимальный размер
           newWidth = Math.max(50, newWidth);
           newHeight = Math.max(50, newHeight);
           
-          // Применяем изменения
           img.style.width = newWidth + 'px';
           img.style.height = newHeight + 'px';
           img.style.maxWidth = 'none';
@@ -1597,7 +1897,7 @@ export default function LessonContentEditor({ lessonId: propId }) {
           
           const currentWidth = parseInt(img.style.width) || img.offsetWidth;
           const currentHeight = parseInt(img.style.height) || img.offsetHeight;
-          const scale = e.deltaY > 0 ? 0.95 : 1.05; // Уменьшение или увеличение
+          const scale = e.deltaY > 0 ? 0.95 : 1.05;
           
           const newWidth = Math.max(50, Math.round(currentWidth * scale));
           const newHeight = Math.max(50, Math.round(currentHeight * scale));
@@ -1660,26 +1960,51 @@ export default function LessonContentEditor({ lessonId: propId }) {
   };
 
   // Функция для вставки эмодзи
-  const handleSelectEmoji = (emojiObj) => {
-    console.log('handleSelectEmoji called:', { 
+  // Функция для выбора эмодзи - теперь копирует в буфер обмена
+  const handleSelectEmoji = async (emojiObj) => {
+    console.log('🎯 handleSelectEmoji called:', { 
       emojiObj, 
       stepIndex: emojiPicker.stepIndex,
       hasNative: !!emojiObj?.native,
-      nativeType: typeof emojiObj?.native
+      nativeType: typeof emojiObj?.native,
+      emojiPickerState: emojiPicker
     });
     
-    if (emojiPicker.stepIndex !== undefined && emojiObj && emojiObj.native && typeof emojiObj.native === 'string') {
-      console.log('Inserting emoji:', emojiObj.native, 'at step:', emojiPicker.stepIndex);
-      insertEmoji(emojiObj.native, emojiPicker.stepIndex);
-    } else {
-      console.warn('Invalid emoji object or step index:', { 
-        emojiObj, 
-        stepIndex: emojiPicker.stepIndex,
-        hasNative: !!emojiObj?.native,
-        nativeType: typeof emojiObj?.native
-      });
+    // Проверяем валидность данных
+    if (!emojiObj || !emojiObj.native || typeof emojiObj.native !== 'string') {
+      console.error('❌ Invalid emoji object:', emojiObj);
+      toast.error('Invalid emoji data received');
+      setEmojiPicker({ visible: false, x: 0, y: 0, stepIndex: undefined });
+      return;
     }
+    
+    console.log('✅ Valid data, copying emoji to clipboard:', emojiObj.native);
+    
+    try {
+      // Копируем эмодзи в буфер обмена
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(emojiObj.native);
+        toast.success(`Emoji ${emojiObj.native} copied to clipboard!`);
+        console.log('✅ Emoji copied to clipboard successfully');
+      } else {
+        // Fallback для старых браузеров
+        const textArea = document.createElement('textarea');
+        textArea.value = emojiObj.native;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        toast.success(`Emoji ${emojiObj.native} copied to clipboard!`);
+        console.log('✅ Emoji copied to clipboard using fallback method');
+      }
+    } catch (error) {
+      console.error('❌ Failed to copy emoji to clipboard:', error);
+      toast.error(`Failed to copy emoji: ${error.message}`);
+    }
+    
+    // Закрываем пикер
     setEmojiPicker({ visible: false, x: 0, y: 0, stepIndex: undefined });
+    console.log('🎯 Emoji picker closed');
   };
 
   // Helper to run document.execCommand in a specific text editor of a step
@@ -1698,8 +2023,16 @@ export default function LessonContentEditor({ lessonId: propId }) {
 
     // 1. Выполняем команду
     if (cmd === 'createLink') {
-      const url = val || window.prompt('Введите URL', 'https://');
-      if (url) document.execCommand('createLink', false, url);
+      // Показываем модальное окно для вставки ссылки
+      const selection = window.getSelection();
+      const selectedText = selection.toString();
+      setLinkModal({ 
+        visible: true, 
+        stepId: stepIdx, 
+        url: 'https://', 
+        text: selectedText || '' 
+      });
+      return; // Выходим, так как ссылка будет создана в модальном окне
     } else if (cmd === 'removeFormat') {
       // Для отмены форматирования используем более надежную логику
       const selection = window.getSelection();
@@ -1803,10 +2136,10 @@ export default function LessonContentEditor({ lessonId: propId }) {
         <div style={{ marginTop: 12 }}>
           {step.type === 'text' && (
             <div>
-              <div style={{ display:'flex', gap:8, marginBottom:8, padding:'8px 12px', background:'var(--teach-tile-bg)', borderRadius:'6px 6px 0 0', border:'1.5px solid var(--border-color)', borderBottom:'none' }}>
+              <div style={{ display:'flex', gap:8, marginBottom:8, padding:'8px 12px', background: theme === 'dark' ? '#2d3038' : '#fff', borderRadius:'6px 6px 0 0', border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`, borderBottom:'none' }}>
                 {/* --- New rich-text toolbar (similar to EditCourse) --- */}
-                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'undo'); updateFormatStateForStep(step.id);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1536px', backgroundSize:'auto', display:'inline-block' }}></span>
-                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'redo'); updateFormatStateForStep(step.id);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1488px', backgroundSize:'auto', display:'inline-block' }}></span>
+                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'undo'); updateFormatStateForStep(step.id);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1536px', backgroundSize:'auto', display:'inline-block', filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none' }}></span>
+                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'redo'); updateFormatStateForStep(step.id);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1488px', backgroundSize:'auto', display:'inline-block', filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none' }}></span>
                 <span 
                   onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} 
                   onClick={()=>{
@@ -1825,7 +2158,8 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     backgroundSize:'16px', 
                     display:'inline-block', 
                     backgroundColor: (formatByStep[step.id]?.bold ? 'rgba(68,133,237,0.18)' : 'transparent'), 
-                    borderRadius:4 
+                    borderRadius:4,
+                    filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none'
                   }}
                 ></span>
                 <span 
@@ -1846,7 +2180,8 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     backgroundSize:'16px', 
                     display:'inline-block', 
                     backgroundColor: (formatByStep[step.id]?.italic ? 'rgba(68,133,237,0.18)' : 'transparent'), 
-                    borderRadius:4 
+                    borderRadius:4,
+                    filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none'
                   }}
                 ></span>
                 <span 
@@ -1867,12 +2202,13 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     backgroundSize:'16px', 
                     display:'inline-block', 
                     backgroundColor: (formatByStep[step.id]?.underline ? 'rgba(68,133,237,0.18)' : 'transparent'), 
-                    borderRadius:4 
+                    borderRadius:4,
+                    filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none'
                   }}
                 ></span>
-                <span onMouseDown={(e)=>{e.preventDefault();}} onClick={()=>{toggleList(step.id, true);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1080px', backgroundSize:'auto', display:'inline-block' }}></span>
-                <span onMouseDown={(e)=>{e.preventDefault();}} onClick={()=>{toggleList(step.id, false);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1032px', backgroundSize:'auto', display:'inline-block' }}></span>
-                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'createLink');}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -960px', backgroundSize:'auto', display:'inline-block' }}></span>
+                <span onMouseDown={(e)=>{e.preventDefault();}} onClick={()=>{toggleList(step.id, true);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1080px', backgroundSize:'auto', display:'inline-block', filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none' }}></span>
+                <span onMouseDown={(e)=>{e.preventDefault();}} onClick={()=>{toggleList(step.id, false);}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -1032px', backgroundSize:'auto', display:'inline-block', filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none' }}></span>
+                <span onMouseDown={(e)=>{e.preventDefault(); restoreSelectionForStep(step.id);}} onClick={()=>{applyCommand(step.id,'createLink');}} style={{ cursor:'pointer', width:16, height:16, backgroundImage:"url('https://cdn.stepik.net/static/frontend-build/ckeditor/plugins/icons.png?t=M199')", backgroundPosition:'0 -960px', backgroundSize:'auto', display:'inline-block', filter: theme === 'dark' ? 'invert(1) brightness(1.5)' : 'none' }}></span>
                 
 
                 
@@ -1881,10 +2217,12 @@ export default function LessonContentEditor({ lessonId: propId }) {
                   type="button" 
                   onMouseDown={() => {
                     // Сохраняем позицию курсора ДО потери фокуса кнопкой
+                    console.log('🎯 Saving cursor position for step:', step.id);
                     saveSelectionForStep(step.id);
                   }}
                   onClick={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
+                    console.log('🎯 Opening emoji picker for step:', step.id, 'at position:', { x: rect.left, y: rect.bottom });
                     setEmojiPicker({ 
                       visible: true, 
                       x: rect.left, 
@@ -1895,9 +2233,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
                   style={{ 
                     padding:'6px 8px', 
                     borderRadius:4, 
-                    border:'1px solid var(--border-color)', 
-                    background:'var(--teach-bg)', 
-                    color:'var(--teach-fg)', 
+                    border: `1px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`, 
+                    background: theme === 'dark' ? '#23272f' : '#fff', 
+                    color: theme === 'dark' ? '#eaf4fd' : '#23272f', 
                     cursor:'pointer', 
                     transition:'all 0.2s',
                     fontSize: '16px'
@@ -1915,395 +2253,82 @@ export default function LessonContentEditor({ lessonId: propId }) {
                 contentEditable={true}
                 suppressContentEditableWarning={true}
                 dangerouslySetInnerHTML={{ __html: cleanC.text || '' }}
-                onInput={(e) => {
-                  const newContent = e.target.innerHTML;
-                  saveSelectionForStep(step.id);
-                }}
-                onKeyUp={() => saveSelectionForStep(step.id)}
-                onMouseUp={() => saveSelectionForStep(step.id)}
-                onFocus={() => {
+                onFocus={(e) => {
                   // Инициализируем состояние форматирования при фокусе
                   setTimeout(() => {
                     updateFormatStateForStep(step.id);
                   }, 100);
+                  
+                  // Убеждаемся, что редактор не пустой
+                  if (e.target) {
+                    const txt = (e.target.textContent || '').trim();
+                    if (txt === '' && (e.target.innerHTML || '') === '') {
+                      e.target.innerHTML = '<br>';
+                    }
+                  }
                 }}
-                onPaste={(e) => {
-                  e.preventDefault();
+                onInput={(e) => {
+                  const newContent = e.target.innerHTML;
+                  saveSelectionForStep(step.id);
                   
-                  // Обрабатываем вставку файлов из буфера обмена
-                  const items = e.clipboardData.items;
-                  let hasFile = false;
+                  // Обновляем состояние форматирования
+                  if (formatTimersRef.current[step.id]) clearTimeout(formatTimersRef.current[step.id]);
+                  formatTimersRef.current[step.id] = setTimeout(() => updateFormatStateForStep(step.id), 100);
                   
-                  for (let i = 0; i < items.length; i++) {
-                    const item = items[i];
-                    
-                    // Проверяем различные типы файлов
-                    if (item.type.indexOf('image') !== -1 || 
-                        item.type.indexOf('video') !== -1 || 
-                        item.type.indexOf('gif') !== -1 ||
-                        item.type.indexOf('application') !== -1) {
+                  // Автоматически сохраняем содержимое при изменении (с задержкой)
+                  if (autoSaveTimers.current[step.id]) clearTimeout(autoSaveTimers.current[step.id]);
+                  autoSaveTimers.current[step.id] = setTimeout(() => {
+                    const currentStep = steps.find(s => s.id === step.id);
+                    if (currentStep) {
+                      const c = parseContent(currentStep);
+                      const normalized = newContent.replace(/<div><br><\/div>/g, '<br>').replace(/<div><\/div>/g, '');
+                      const newContentObj = { ...c, text: normalized };
+                      const updatedStep = {
+                        ...currentStep,
+                        content: JSON.stringify(newContentObj)
+                      };
                       
-                      hasFile = true;
-                      const file = item.getAsFile();
-                      
-                      // Определяем тип файла
-                      let fileType = 'image';
-                      if (item.type.indexOf('video') !== -1) fileType = 'video';
-                      else if (item.type.indexOf('gif') !== -1) fileType = 'image'; // GIF обрабатываем как изображение
-                      else if (item.type.indexOf('application') !== -1) fileType = 'file';
-                      
-                      // Создаем FormData для загрузки файла
-                      const formData = new FormData();
-                      formData.append('file', file);
-                      
-                      // Загружаем файл на сервер
-                      const uploadUrl = `/courses/${lesson.course_id}/upload?type=${fileType}`;
-                      
-                      axios.post(uploadUrl, formData, {
-                        headers: {
-                          'Content-Type': 'multipart/form-data',
-                          Authorization: `Bearer ${localStorage.getItem('jwtToken')}`
-                        }
-                      }).then(response => {
-                        const fileUrl = response.data.url;
-                        const fileName = file.name;
-                        
-                        // Вставляем файл в редактор
-                        const selection = window.getSelection();
-                        const range = selection.getRangeAt(0);
-                        
-                        let element;
-                        
-                        if (fileType === 'image' || fileType === 'file' && file.type.startsWith('image/')) {
-                          // Создаем уникальный ID для изображения
-                          const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                          
-                          // Создаем элемент изображения с возможностью редактирования
-                          element = document.createElement('img');
-                          element.src = fileUrl;
-                          element.alt = fileName;
-                          element.id = imageId;
-                          element.className = 'editable-image';
-                          element.style.cssText = 'max-width:100%; cursor:pointer !important; user-select:none; -webkit-user-select:none; -moz-user-select:none; -ms-user-select:none; -webkit-user-modify:read-only; -moz-user-modify:read-only; -ms-user-modify:read-only; user-modify:read-only; pointer-events:auto;';
-                          element.setAttribute('data-image-url', fileUrl);
-                          element.onclick = (event) => selectImage(imageId, event, step.id);
-                          element.onmousedown = (event) => {
-                            event.preventDefault();
-                            event.stopPropagation();
-                          };
-                        } else if (fileType === 'video') {
-                          // Создаем элемент видео
-                          element = document.createElement('video');
-                          element.src = fileUrl;
-                          element.controls = true;
-                          element.style.maxWidth = '100%';
-                          element.style.height = 'auto';
-                          element.style.cursor = 'pointer';
-                          element.style.position = 'relative';
-                          element.className = 'resizable-video';
-                        } else {
-                          // Создаем ссылку на файл
-                          element = document.createElement('a');
-                          element.href = fileUrl;
-                          element.download = fileName;
-                          element.textContent = fileName;
-                          element.style.display = 'inline-block';
-                          element.style.padding = '8px 12px';
-                          element.style.background = '#f8f9fa';
-                          element.style.border = '1px solid #dee2e6';
-                          element.style.borderRadius = '4px';
-                          element.style.textDecoration = 'none';
-                          element.style.color = '#007bff';
-                          element.className = 'file-link';
-                        }
-                        
-                        // Добавляем возможность изменения размера только для видео (для изображений отключено, чтобы не вызывать мерцание)
-                        if (element.tagName === 'VIDEO') {
-                          element.style.position = 'relative';
-                          element.style.cursor = 'pointer';
-                          
-                          // Создаем маркеры для изменения размера
-                          const createResizeMarker = (position) => {
-                            const marker = document.createElement('div');
-                            marker.style.cssText = `
-                              position: absolute;
-                              width: 8px;
-                              height: 8px;
-                              background: #007bff;
-                              border: 1px solid white;
-                              border-radius: 50%;
-                              cursor: ${position.includes('n') ? 'n-resize' : position.includes('s') ? 's-resize' : ''}${position.includes('e') ? 'e-resize' : position.includes('w') ? 'w-resize' : ''};
-                              z-index: 1001;
-                              display: none;
-                            `;
-                            
-                            // Позиционирование маркеров
-                            if (position.includes('n')) marker.style.top = '-4px';
-                            if (position.includes('s')) marker.style.bottom = '-4px';
-                            if (position.includes('e')) marker.style.right = '-4px';
-                            if (position.includes('w')) marker.style.left = '-4px';
-                            if (position === 'ne') marker.style.top = '-4px';
-                            if (position === 'nw') marker.style.top = '-4px';
-                            if (position === 'se') marker.style.bottom = '-4px';
-                            if (position === 'sw') marker.style.bottom = '-4px';
-                            
-                            return marker;
-                          };
-                          
-                          // Создаем маркеры для всех углов и краев
-                          const markers = {
-                            n: createResizeMarker('n'),    // верхний край
-                            s: createResizeMarker('s'),    // нижний край
-                            e: createResizeMarker('e'),    // правый край
-                            w: createResizeMarker('w'),    // левый край
-                            ne: createResizeMarker('ne'),  // правый верхний угол
-                            nw: createResizeMarker('nw'),  // левый верхний угол
-                            se: createResizeMarker('se'),  // правый нижний угол
-                            sw: createResizeMarker('sw')   // левый нижний угол
-                          };
-                          
-                          // Добавляем маркеры к элементу
-                          Object.values(markers).forEach(marker => element.appendChild(marker));
-                          
-                          // Показываем/скрываем маркеры при наведении
-                          element.onmouseenter = () => {
-                            Object.values(markers).forEach(marker => marker.style.display = 'block');
-                          };
-                          element.onmouseleave = () => {
-                            Object.values(markers).forEach(marker => marker.style.display = 'none');
-                          };
-                          
-                          // Функция для изменения размера
-                          const startResize = (e, direction) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            
-                            const startX = e.clientX;
-                            const startY = e.clientY;
-                            const startWidth = element.offsetWidth;
-                            const startHeight = element.offsetHeight;
-                            const startRatio = startWidth / startHeight;
-                            
-                            const handleMouseMove = (moveEvent) => {
-                              const deltaX = moveEvent.clientX - startX;
-                              const deltaY = moveEvent.clientY - startY;
-                              
-                              let newWidth = startWidth;
-                              let newHeight = startHeight;
-                              
-                              // Изменяем размер в зависимости от направления
-                              if (direction.includes('e')) newWidth = startWidth + deltaX;
-                              if (direction.includes('w')) newWidth = startWidth - deltaX;
-                              if (direction.includes('s')) newHeight = startHeight + deltaY;
-                              if (direction.includes('n')) newHeight = startHeight - deltaY;
-                              
-                              if (moveEvent.shiftKey) {
-                                if (direction.includes('e') || direction.includes('w')) {
-                                  newHeight = newWidth / startRatio;
-                                } else if (direction.includes('s') || direction.includes('n')) {
-                                  newWidth = newHeight * startRatio;
-                                }
-                              }
-                              
-                              newWidth = Math.max(50, newWidth);
-                              newHeight = Math.max(50, newHeight);
-                              
-                              element.style.width = newWidth + 'px';
-                              element.style.height = newHeight + 'px';
-                              element.style.maxWidth = 'none';
-                              element.style.maxHeight = 'none';
-                            };
-                            
-                            const handleMouseUp = () => {
-                              document.removeEventListener('mousemove', handleMouseMove);
-                              document.removeEventListener('mouseup', handleMouseUp);
-                            };
-                            
-                            document.addEventListener('mousemove', handleMouseMove);
-                            document.addEventListener('mouseup', handleMouseUp);
-                          };
-                          
-                          Object.entries(markers).forEach(([direction, marker]) => {
-                            marker.addEventListener('mousedown', (e) => startResize(e, direction));
-                          });
-                          
-                          element.onclick = (e) => {
-                            if (e.target === element) {
-                              e.stopPropagation();
-                              
-                              if (element.classList.contains('selected-image')) {
-                                element.classList.remove('selected-image');
-                                element.style.outline = '';
-                                Object.values(markers).forEach(marker => marker.style.display = 'none');
-                                return;
-                              }
-                              
-                              document.querySelectorAll('.selected-image').forEach(el => {
-                                el.classList.remove('selected-image');
-                                el.style.outline = '';
-                              });
-                              
-                              element.classList.add('selected-image');
-                              element.style.outline = '2px solid #007bff';
-                              
-                              Object.values(markers).forEach(marker => marker.style.display = 'block');
-                            }
-                          };
-                          
-                          element.onwheel = (e) => {
-                            if (element.classList.contains('selected-image')) {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              
-                              const currentWidth = parseInt(element.style.width) || element.offsetWidth;
-                              const currentHeight = parseInt(element.style.height) || element.offsetHeight;
-                              const scale = e.deltaY > 0 ? 0.95 : 1.05; 
-                              
-                              const newWidth = Math.max(50, Math.round(currentWidth * scale));
-                              const newHeight = Math.max(50, Math.round(currentHeight * scale));
-                              
-                              element.style.width = newWidth + 'px';
-                              element.style.height = newHeight + 'px';
-                              element.style.maxWidth = 'none';
-                              element.style.maxHeight = 'none';
-                            }
-                          };
-                          
-                          document.addEventListener('click', (e) => {
-                            if (!element.contains(e.target) && !e.target.classList.contains('selected-image')) {
-                              element.classList.remove('selected-image');
-                              element.style.outline = '';
-                              Object.values(markers).forEach(marker => marker.style.display = 'none');
-                            }
-                          });
-                        }
-                        
-                        range.deleteContents();
-                        range.insertNode(element);
-                        
-                        const newRange = document.createRange();
-                        newRange.setStartAfter(element);
-                        newRange.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(newRange);
-                        
-                        const spaceNode = document.createTextNode('\u00A0');
-                        newRange.insertNode(spaceNode);
-                        newRange.setStartAfter(spaceNode);
-                        newRange.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(newRange);
-                        
-                        const textarea = textEditorRefs.current[step.id];
-                        if (textarea) {
-                          const stepObj = steps[stepIndex];
-                          if (stepObj) {
-                            const c = parseContent(stepObj);
-                            const cleanedHtml = cleanHtml(textarea.innerHTML);
-                            const newContent = { ...c, text: cleanedHtml };
-                            const updatedStep = {
-                              ...stepObj,
-                              content: JSON.stringify(newContent)
-                            };
-                            
-                            // Обновляем локальное состояние
-                            const newSteps = [...steps];
-                            const stepIndex = newSteps.findIndex(s => s.id === step.id);
-                            if (stepIndex !== -1) {
-                              newSteps[stepIndex] = updatedStep;
-                              setSteps(newSteps);
-                            }
-                            
-                            // Сохраняем на сервер без перезагрузки
-                            axios.put(`/lessons/${lessonId}/steps/${step.id}`, updatedStep, {
-                              headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
-                            }).catch(error => {
-                              console.error('Error saving step:', error);
-                            });
-                          }
-                        }
-
-                      }).catch(err => {
-                        console.error('Image paste upload failed', err);
+                      console.log('🔄 Auto-saving step on input:', {
+                        stepId: step.id,
+                        newContent: normalized,
+                        updatedStep
                       });
-                      break;
+                      
+                      handleSaveStep(step.id, updatedStep, false, true);
                     }
-                  }
-                  
-                  // Если не было файлов — вставляем обычный текст
-                  if (!hasFile) {
-                    const plain = e.clipboardData.getData('text/plain');
-                    if (plain && typeof plain === 'string') {
-                      // Восстанавливаем позицию курсора и вставляем текст без мерцания
-                      restoreSelectionForStep(step.id);
-                      const selection = window.getSelection();
-                      if (selection && selection.rangeCount) {
-                        const r = selection.getRangeAt(0);
-                        r.deleteContents();
-                        
-                        // Создаем текстовый узел и вставляем его
-                        const textNode = document.createTextNode(plain);
-                        r.insertNode(textNode);
-                        
-                        // Устанавливаем курсор после вставленного текста
-                        const after = document.createRange();
-                        after.setStart(textNode, textNode.length);
-                        after.collapse(true);
-                        selection.removeAllRanges();
-                        selection.addRange(after);
-                      }
-                      const textarea = textEditorRefs.current[step.id];
-                      if (textarea) {
-                        textarea.setAttribute('data-empty', 'false');
-                        const stepObj = steps[stepIndex];
-                        if (stepObj) {
-                          const c = parseContent(stepObj);
-                          const cleanedHtml = cleanHtml(textarea.innerHTML);
-                          const newContent = { ...c, text: cleanedHtml };
-                          const updatedStep = {
-                            ...stepObj,
-                            content: JSON.stringify(newContent)
-                          };
-                          
-                          // Пропускаем обновление локального состояния, чтобы избежать мерцания
-                          // Состояние обновится на onBlur/Save All
-                          
-                          // Сохраняем на сервер без перезагрузки
-                          axios.put(`/lessons/${lessonId}/steps/${step.id}`, updatedStep, {
-                            headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
-                          }).catch(error => {
-                            console.error('Error saving step:', error);
-                          });
-                        }
-                      }
-                      // Сохраняем позицию курсора
-                      saveSelectionForStep(step.id);
-                    }
-                  }
+                  }, 2000); // Сохраняем через 2 секунды после последнего изменения
                 }}
+                onKeyUp={() => saveSelectionForStep(step.id)}
+                onMouseUp={() => saveSelectionForStep(step.id)}
                 onBlur={(e) => {
-                  const cleanedHtml = cleanHtml(e.target.innerHTML);
-                  
-                  const newContentObj = { ...cleanC, text: cleanedHtml };
-                  const updatedStep = {
-                    ...step,
-                    content: JSON.stringify(newContentObj)
-                  };
-                  
-                  // Обновляем локальное состояние
-                  const newSteps = [...steps];
-                  newSteps[stepIndex] = {
-                    ...newSteps[stepIndex],
-                    content: updatedStep.content
-                  };
-                  setSteps(newSteps);
-                  
-                  // Сохраняем на сервер без перезагрузки
-                  axios.put(`/lessons/${lessonId}/steps/${step.id}`, updatedStep, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
-                  }).catch(error => {
-                    console.error('Error saving step:', error);
-                  });
+                  // Сохраняем содержимое при потере фокуса
+                  if (e.target) {
+                    const raw = e.target.innerHTML;
+                    // Нормализуем HTML содержимое
+                    const normalized = raw.replace(/<div><br><\/div>/g, '<br>').replace(/<div><\/div>/g, '');
+                    setContentPayload(stepIndex, { ...cleanC, text: normalized });
+                    
+                    // Автоматически сохраняем шаг при потере фокуса
+                    setTimeout(() => {
+                      const currentStep = steps.find(s => s.id === step.id);
+                      if (currentStep) {
+                        const c = parseContent(currentStep);
+                        const newContent = { ...c, text: normalized };
+                        const updatedStep = {
+                          ...currentStep,
+                          content: JSON.stringify(newContent)
+                        };
+                        
+                        console.log('💾 Auto-saving step on blur:', {
+                          stepId: step.id,
+                          normalizedText: normalized,
+                          updatedStep
+                        });
+                        
+                        handleSaveStep(step.id, updatedStep, false, true);
+                      }
+                    }, 500);
+                  }
                 }}
                 style={{ 
                   minHeight: 120, 
@@ -2520,12 +2545,16 @@ export default function LessonContentEditor({ lessonId: propId }) {
           )}
           {step.type === 'quiz' && (
             <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-              {(cleanC.questions || [{ question:'', options: [{text:'',correct:false}] }]).map((q, qi)=> (
+              {(cleanC.questions || [{ question:'', options: [{text:'',correct:false}] }]).map((q, qi)=> {
+                // Убеждаемся, что у каждого вопроса есть хотя бы один вариант ответа
+                const questionOptions = q.options && q.options.length > 0 ? q.options : [{text:'',correct:false}];
+                
+                return (
                 <div key={qi} style={{ border:'1px solid var(--border-color)', borderRadius:8, padding:12 }}>
                   <input type="text" value={q.question || ''} onChange={(e)=>{
                                           const qs=[...(cleanC.questions||[])]; qs[qi]={...qs[qi], question:e.target.value}; setContentPayload(stepIndex, { ...cleanC, questions: qs });
                   }} placeholder={`${t('lesson.question')} ${qi+1}`} style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:'1.5px solid var(--border-color)', background:'var(--teach-bg)', color:'var(--teach-fg)', marginBottom:8 }} />
-                  {(q.options||[{text:'',correct:false}]).map((opt, oi)=> (
+                  {questionOptions.map((opt, oi)=> (
                     <div key={oi} style={{ display:'flex', gap:8, alignItems:'center', marginBottom:6 }}>
                       <input type="text" value={opt.text || ''} onChange={(e)=>{
                         const qs=[...(cleanC.questions||[])]; const opts=[...(q.options||[])]; opts[oi]={...opts[oi], text:e.target.value}; qs[qi]={...qs[qi], options: opts}; setContentPayload(stepIndex, { ...cleanC, questions: qs });
@@ -2542,63 +2571,41 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     <button type="button" onClick={()=>{ const qs=[...(cleanC.questions||[])]; qs.splice(qi,1); setContentPayload(stepIndex, { ...cleanC, questions: qs }); }} style={{ padding:'8px 12px', borderRadius:6, border:'1.5px solid #e74c3c', background:'transparent', color:'#e74c3c' }}>{t('lesson.delete_question')}</button>
                   </div>
                 </div>
-              ))}
+              )})}
               <button type="button" onClick={()=> setContentPayload(stepIndex, { ...cleanC, questions:[...(cleanC.questions||[]), { question:'', options:[{text:'',correct:false}] }] })} style={{ padding:'8px 12px', borderRadius:6, border:'none', background:'#4485ed', color:'#fff', alignSelf:'flex-start' }}>{t('lesson.add_question')}</button>
             </div>
           )}
           {step.type === 'file' && (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-              <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:8 }}>
-                <label style={{ display:'flex', alignItems:'center', gap:6, color:'var(--text-color)' }}>
-                  <input 
-                    type="radio" 
-                    name={`file-source-${step.id}`} 
-                                          checked={!cleanC.fileUpload}
-                      onChange={() => setContentPayload(stepIndex, { ...cleanC, fileUpload: null, fileUrl: cleanC.fileUrl || '' })}
-                  />
-                  {t('lesson.file_url')}
-                </label>
-                <label style={{ display:'flex', alignItems:'center', gap:6, color:'var(--text-color)' }}>
-                  <input 
-                    type="radio" 
-                    name={`file-source-${step.id}`} 
-                                          checked={!!cleanC.fileUpload}
-                      onChange={() => setContentPayload(stepIndex, { ...cleanC, fileUpload: true, fileUrl: '' })}
-                  />
-                  {t('lesson.file_upload')}
-                </label>
-              </div>
+              {/* Убрали опцию URL файла, оставили только загрузку с компьютера */}
               
-                              {!cleanC.fileUpload ? (
-                <input 
-                  type="url" 
-                                        value={cleanC.fileUrl || ''}
-                      onChange={(e)=>setContentPayload(stepIndex, { ...cleanC, fileUrl: e.target.value })} 
-                  placeholder={t('lesson.file_url')} 
-                  style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:'1.5px solid var(--border-color)', background:'var(--teach-bg)', color:'var(--teach-fg)' }} 
-                />
-              ) : (
                 <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
                   <input 
                     type="file" 
-                                          onChange={(e)=> handleUpload('file', e.target.files[0], (url)=> setContentPayload(stepIndex, { ...cleanC, fileUrl: url }))} 
+                    onChange={(e)=> handleUpload('file', e.target.files[0], (url, filename)=> setContentPayload(stepIndex, { ...cleanC, fileUrl: url, filename: filename || e.target.files[0].name }))} 
                   />
                   {cleanC.fileUrl && (
                     <div style={{ padding:8, background:'var(--teach-tile-bg)', borderRadius:6, border:'1px solid var(--border-color)' }}>
                       <div style={{ fontSize:14, color:'var(--text-color)', marginBottom:4 }}>{t('lesson.uploaded_file')}:</div>
-                                              <div style={{ fontSize:12, color:'var(--text-color)', opacity:0.7, wordBreak:'break-all' }}>{cleanC.fileUrl}</div>
+                        <div style={{ fontSize:12, color:'var(--text-color)', opacity:0.7, wordBreak:'break-all' }}>
+                          {cleanC.filename || 'Файл загружен'}
+                        </div>
+                      <div style={{ fontSize:10, color:'var(--text-color)', opacity:0.5, wordBreak:'break-all', marginTop:2 }}>
+                        {cleanC.fileUrl}
+                      </div>
                     </div>
                   )}
                 </div>
-              )}
               
-              <input 
-                type="text" 
-                                value={cleanC.filename || ''}
-                onChange={(e)=>setContentPayload(stepIndex, { ...cleanC, filename: e.target.value })} 
-                placeholder={t('lesson.filename_optional')} 
-                style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:'1.5px solid var(--border-color)', background:'var(--teach-bg)', color:'var(--teach-fg)' }} 
-              />
+              {/* Показываем поле названия файла только если это загруженный файл (не внешняя ссылка) */}
+              {/* Упростили логику - всегда показываем поле названия файла */}
+                <input 
+                  type="text" 
+                  value={cleanC.filename || ''}
+                  onChange={(e)=>setContentPayload(stepIndex, { ...cleanC, filename: e.target.value })} 
+                  placeholder={cleanC.fileUrl ? 'Название файла (автоматически заполнено)' : t('lesson.filename_optional')} 
+                  style={{ width:'100%', padding:'10px 12px', borderRadius:6, border:'1.5px solid var(--border-color)', background:'var(--teach-bg)', color:'var(--teach-fg)' }} 
+                />
               <textarea 
                 rows={4} 
                                 value={cleanC.description || ''}
@@ -2776,6 +2783,62 @@ export default function LessonContentEditor({ lessonId: propId }) {
     updateFormatStateForStep(stepKey);
   };
 
+  // Функция для создания ссылки из модального окна
+  const handleCreateLink = () => {
+    if (!linkModal.url || !linkModal.stepId) return;
+    
+    const editor = textEditorRefs.current[linkModal.stepId];
+    if (!editor) return;
+    
+    // Сохраняем текущее выделение
+    saveSelectionForStep(linkModal.stepId);
+    
+    // Фокусируемся на редакторе
+    editor.focus();
+    
+    // Восстанавливаем выделение
+    restoreSelectionForStep(linkModal.stepId);
+    
+    // Создаем ссылку
+    const selection = window.getSelection();
+    const selectedText = selection.toString();
+    
+    if (selectedText && linkModal.text) {
+      // Если есть выделенный текст и введен текст ссылки, заменяем выделенный текст на текст ссылки
+      const linkHTML = `<a href="${linkModal.url}" target="_blank">${linkModal.text}</a>`;
+      document.execCommand('insertHTML', false, linkHTML);
+    } else if (selectedText) {
+      // Если есть выделенный текст, но нет текста ссылки, делаем выделенный текст ссылкой
+      document.execCommand('createLink', false, linkModal.url);
+    } else if (linkModal.text) {
+      // Если нет выделенного текста, но есть текст ссылки, вставляем ссылку с пользовательским текстом
+      const linkHTML = `<a href="${linkModal.url}" target="_blank">${linkModal.text}</a>`;
+      document.execCommand('insertHTML', false, linkHTML);
+    } else {
+      // Если ничего не выделено и нет текста ссылки, вставляем URL как ссылку
+      const linkHTML = `<a href="${linkModal.url}" target="_blank">${linkModal.url}</a>`;
+      document.execCommand('insertHTML', false, linkHTML);
+    }
+    
+    // Обновляем содержимое шага
+    try {
+      const step = steps.find(s => s.id === linkModal.stepId);
+      if (step) {
+        const c = parseContent(step);
+        const newContent = { ...c, text: editor.innerHTML };
+        step.content = JSON.stringify(newContent);
+        
+        // Немедленно сохраняем изменения
+        handleSaveStep(step.id, step, false);
+      }
+    } catch (err) {
+      console.warn('Failed to update content after link creation', err);
+    }
+    
+    // Закрываем модальное окно
+    setLinkModal({ visible: false, stepId: null, url: '', text: '' });
+  };
+
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--teach-bg)', color: 'var(--teach-fg)', display: 'flex', flexDirection: 'column' }}>
@@ -2903,9 +2966,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
                 style={{
                   padding: '10px 22px',
                   borderRadius: 6,
-                  background: 'var(--teach-btn-bg)',
-                  color: 'var(--teach-btn-fg)',
-                  border: '1.5px solid var(--border-color)',
+                  background: theme === 'dark' ? '#2d3038' : '#fff',
+                  color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                  border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
                   fontWeight: 600,
                   fontSize: 16,
                   cursor: 'pointer'
@@ -3076,7 +3139,7 @@ export default function LessonContentEditor({ lessonId: propId }) {
               zIndex: 1000
             }}>
               <div style={{
-                background: 'var(--teach-tile-bg)',
+                background: theme === 'dark' ? '#2d3038' : '#fff',
                 padding: '24px',
                 borderRadius: 8,
                 maxWidth: 500,
@@ -3084,12 +3147,12 @@ export default function LessonContentEditor({ lessonId: propId }) {
                 maxHeight: '80vh',
                 overflowY: 'auto'
               }}>
-                <h3 style={{ margin: '0 0 20px 0', fontWeight: 600 }}>
+                <h3 style={{ margin: '0 0 20px 0', fontWeight: 600, color: theme === 'dark' ? '#eaf4fd' : '#23272f' }}>
                 {t('lesson.add_step')}
                 </h3>
                 
                 <div style={{ marginBottom: 20 }}>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 8 }}>
+                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: theme === 'dark' ? '#eaf4fd' : '#23272f' }}>
                   {t('lesson.step_type')}
                   </label>
                   <select
@@ -3099,9 +3162,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
                       width: '100%',
                       padding: '10px 14px',
                       borderRadius: 8,
-                      border: '1.5px solid var(--border-color)',
-                      background: 'var(--field-bg)',
-                      color: 'var(--text-color)',
+                      border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
+                      background: theme === 'dark' ? '#23272f' : '#fff',
+                      color: theme === 'dark' ? '#eaf4fd' : '#23272f',
                       fontSize: 16
                     }}
                   >
@@ -3119,9 +3182,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     style={{
                       padding: '10px 20px',
                       borderRadius: 6,
-                      background: 'var(--form-bg)',
-                      color: 'var(--text-color)',
-                      border: '1.5px solid var(--border-color)',
+                      background: theme === 'dark' ? '#23272f' : '#fff',
+                      color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                      border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
                       cursor: 'pointer'
                     }}
                   >
@@ -3141,9 +3204,9 @@ export default function LessonContentEditor({ lessonId: propId }) {
                     style={{
                       padding: '10px 20px',
                       borderRadius: 6,
-                      background: 'var(--teach-btn-bg)',
-                      color: 'var(--teach-btn-fg)',
-                      border: '1.5px solid var(--border-color)',
+                      background: theme === 'dark' ? '#2d3038' : '#fff',
+                      color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                      border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
                       cursor: 'pointer'
                     }}
                   >
@@ -3174,11 +3237,19 @@ export default function LessonContentEditor({ lessonId: propId }) {
               border: `1px solid ${theme === 'dark' ? '#4a5568' : '#e2e8f0'}`
             }}
             onMouseDownCapture={(e)=>{ e.preventDefault(); if (emojiPicker.stepIndex !== undefined) restoreSelectionForStep(emojiPicker.stepIndex); }}
+
           >
             <Picker 
               data={data} 
               theme={theme === 'dark' ? 'dark' : 'light'} 
-              onEmojiSelect={handleSelectEmoji} 
+              onEmojiSelect={(emojiObj) => {
+                console.log('🎯 Picker onEmojiSelect called:', emojiObj);
+                console.log('🎯 Data loaded:', !!data);
+                
+                handleSelectEmoji(emojiObj).catch(error => {
+                  console.error('Failed to handle emoji selection:', error);
+                });
+              }} 
               searchPosition="top" 
               previewPosition="none" 
               skinTonePosition="search" 
@@ -3371,6 +3442,116 @@ export default function LessonContentEditor({ lessonId: propId }) {
           </div>
         </div>
       )}
+
+      {/* Модальное окно для вставки ссылки */}
+      {linkModal.visible && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: theme === 'dark' ? '#2d3038' : '#fff',
+            padding: '24px',
+            borderRadius: 8,
+            maxWidth: 400,
+            width: '90%'
+          }}>
+            <h3 style={{ margin: '0 0 20px 0', fontWeight: 600, color: theme === 'dark' ? '#eaf4fd' : '#23272f' }}>
+              {t('lesson.insert_link')}
+            </h3>
+            
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: theme === 'dark' ? '#eaf4fd' : '#23272f' }}>
+                {t('lesson.link_text')}:
+              </label>
+              <input
+                type="text"
+                value={linkModal.text}
+                onChange={(e) => setLinkModal({ ...linkModal, text: e.target.value })}
+                placeholder={t('lesson.link_text_placeholder')}
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
+                  background: theme === 'dark' ? '#23272f' : '#fff',
+                  color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                  fontSize: 16
+                }}
+              />
+              {linkModal.text && (
+                <div style={{ 
+                  fontSize: 12, 
+                  color: theme === 'dark' ? '#a0aec0' : '#718096', 
+                  marginTop: 4 
+                }}>
+                  {t('lesson.link_text_hint')}
+                </div>
+              )}
+            </div>
+            
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: theme === 'dark' ? '#eaf4fd' : '#23272f' }}>
+                {t('lesson.link_url')}:
+              </label>
+              <input
+                type="url"
+                value={linkModal.url}
+                onChange={(e) => setLinkModal({ ...linkModal, url: e.target.value })}
+                placeholder="https://example.com"
+                style={{
+                  width: '100%',
+                  padding: '10px 14px',
+                  borderRadius: 8,
+                  border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
+                  background: theme === 'dark' ? '#23272f' : '#fff',
+                  color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                  fontSize: 16
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setLinkModal({ visible: false, stepId: null, url: '', text: '' })}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  background: theme === 'dark' ? '#23272f' : '#fff',
+                  color: theme === 'dark' ? '#eaf4fd' : '#23272f',
+                  border: `1.5px solid ${theme === 'dark' ? '#404040' : '#eaeaea'}`,
+                  cursor: 'pointer'
+                }}
+              >
+                {t('common.cancel')}
+              </button>
+              
+              <button
+                onClick={handleCreateLink}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: 6,
+                  background: '#54ad54',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('common.insert')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </div>
   );
 } 

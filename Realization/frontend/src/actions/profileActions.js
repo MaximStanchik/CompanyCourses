@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios from "../utils/axios";
 
 import {
   GET_PROFILE,
@@ -16,7 +16,7 @@ export const getCurrentProfile = () => (dispatch) => {
   console.log("Token being sent:", token);
   
   axios
-    .get("https://localhost:9000/profile", {
+    .get("/profile", {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -29,10 +29,21 @@ export const getCurrentProfile = () => (dispatch) => {
     )
     .catch((err) => {
       console.error("Error fetching profile:", err.response?.data || err.message);
-      dispatch({
-        type: GET_PROFILE,
-        payload: {},
-      });
+      
+      // Если профиль не найден (404), это нормально - пользователь может его создать
+      if (err.response?.status === 404) {
+        console.log("Profile not found - user can create one");
+        dispatch({
+          type: GET_PROFILE,
+          payload: {},
+        });
+      } else {
+        // Для других ошибок показываем пустой профиль
+        dispatch({
+          type: GET_PROFILE,
+          payload: {},
+        });
+      }
     });
 };
 
@@ -41,7 +52,7 @@ export const getCurrentProfile = () => (dispatch) => {
 export const getProfileByHandle = (handle) => (dispatch) => {
   dispatch(setProfileLoading());
   axios
-    .get(`https://localhost:9000/profile/handle/${handle}`)
+    .get(`/profile/handle/${handle}`)
     .then((res) =>
       dispatch({
         type: GET_PROFILE,
@@ -58,7 +69,7 @@ export const getProfileByHandle = (handle) => (dispatch) => {
 
 // Create Profile
 export const createProfile = (profileData, history) => dispatch => {
-  axios.post("https://localhost:9000/profile", profileData, {
+  axios.post("/profile", profileData, {
     headers: {
       Authorization: `Bearer ${localStorage.getItem("jwtToken")}`
     }
@@ -89,11 +100,7 @@ export const createProfile = (profileData, history) => dispatch => {
 export const getProfiles = () => (dispatch) => {
   dispatch(setProfileLoading());
   axios
-    .get("https://localhost:9000/profile/all", {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("jwtToken")}`,
-      },
-    })
+    .get("/profile/all")
     .then((res) =>
       dispatch({
         type: GET_PROFILES,
@@ -106,30 +113,6 @@ export const getProfiles = () => (dispatch) => {
         payload: null,
       })
     );
-};
-
-// Delete account & profile
-export const deleteAccount = () => (dispatch) => {
-  if (window.confirm("Are you sure? This action cannot be undone")) {
-    axios
-      .delete("https://localhost:9000/profile", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("jwtToken")}`,
-        },
-      })
-      .then((res) =>
-        dispatch({
-          type: SET_CURRENT_USER,
-          payload: {},
-        })
-      )
-      .catch((err) =>
-        dispatch({
-          type: GET_ERRORS,
-          payload: err.response.data,
-        })
-      );
-  }
 };
 
 // Profile loading

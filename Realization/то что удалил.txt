@@ -1,0 +1,384 @@
+  // Завершить урок
+  async completeLesson(req, res) {
+    try {
+      const courseId = Number(req.params.id);
+      const lessonId = Number(req.params.lessonId);
+      
+      if (!courseId || isNaN(courseId) || !lessonId || isNaN(lessonId)) {
+        return res.status(400).json({ message: 'Invalid course ID or lesson ID' });
+      }
+
+      // Проверяем авторизацию
+      const authorizationHeader = req.headers.authorization;
+      if (!authorizationHeader) {
+        return res.status(401).json({ message: "Authorization header missing" });
+      }
+      
+      const tokenArray = authorizationHeader.split(" ");
+      if (tokenArray.length !== 2) {
+        return res.status(401).json({ message: "Invalid authorization format" });
+      }
+      
+      const token = tokenArray[1];
+      let decodedToken;
+      try {
+        decodedToken = jwt.verify(token, process.env.SECRET);
+      } catch (err) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      // Проверяем, что курс существует
+      const course = await DbClient.course.findUnique({
+        where: { id: courseId }
+      });
+
+      if (!course) {
+        return res.status(404).json({ message: 'Course not found' });
+      }
+
+      // Проверяем, что урок существует и принадлежит курсу
+      const lesson = await DbClient.lecture.findFirst({
+        where: {
+          id: lessonId,
+          course_id: courseId
+        }
+      });
+
+      if (!lesson) {
+        return res.status(404).json({ message: 'Lesson not found' });
+      }
+
+      // Проверяем, что пользователь записан на курс
+      const enrollment = await DbClient.enrollment.findFirst({
+        where: {
+          course_id: courseId,
+          user_id: decodedToken.id
+          // Убираем проверку approved
+        }
+      });
+
+      if (!enrollment) {
+        return res.status(403).json({ message: 'User is not enrolled in this course' });
+      }
+
+      // Фиксируем завершение урока в БД (идемпотентно)
+      await DbClient.lessonCompletion.upsert({
+        where: {
+          user_id_lecture_id: {
+            user_id: decodedToken.id,
+            lecture_id: lessonId,
+          }
+        },
+        update: { completedAt: new Date() },
+        create: {
+          user_id: decodedToken.id,
+          course_id: courseId,
+          lecture_id: lessonId,
+          completedAt: new Date(),
+        }
+      });
+
+      // Опционально: обновляем прогресс модуля, если клиент прислал moduleKey и moduleProgress
+      const { moduleKey, moduleProgress } = req.body || {};
+      if (moduleKey && typeof moduleProgress === 'number') {
+        await DbClient.moduleProgress.upsert({
+          where: {
+            user_id_course_id_module_key: {
+              user_id: decodedToken.id,
+              course_id: courseId,
+              module_key: String(moduleKey),
+            }
+          },
+          update: { progress: Math.max(0, Math.min(100, Math.round(moduleProgress))) },
+          create: {
+            user_id: decodedToken.id,
+            course_id: courseId,
+            module_key: String(moduleKey),
+            progress: Math.max(0, Math.min(100, Math.round(moduleProgress)))
+          }
+        });
+      }
+
+      // ===== Пересчитываем прогресс курса и сохраняем в Enrollment =====
+      // Читаем модули курса из JSON файла
+      const meta = readSyllabusMeta(courseId);
+      console.log(`Мета данные для курса ${courseId} (completeLesson):`, meta);
+      const modules = Array.isArray(meta.syllabus) ? meta.syllabus : [];
+      
+      // Считаем общее количество уроков в модулях
+      let totalLessons = 0;
+      let lessonIds = [];
+      
+      for (const module of modules) {
+        console.log(`Модуль ${module.id} (${module.title}) в completeLesson:`, module);
+        if (Array.isArray(module.lessons)) {
+          totalLessons += module.lessons.length;
+          lessonIds.push(...module.lessons.map(lesson => lesson.id));
+          console.log(`  Уроки в модуле (completeLesson):`, module.lessons);
+        }
+      }
+      
+      let updatedProgress = 0;
+      
+      // Если нет уроков в модулях, считаем прогресс 100%
+      if (totalLessons === 0) {
+        updatedProgress = 100;
+        console.log(`Курс ${courseId} не имеет уроков в модулях, устанавливаем прогресс 100%`);
+      } else {
+        // Получаем завершенные уроки пользователя (только те, которые есть в модулях)
+        const completions = await DbClient.lessonCompletion.findMany({
+          where: {
+            course_id: courseId,
+            user_id: decodedToken.id,
+          },
+          select: { lecture_id: true }
+        });
+        
+        // Фильтруем только те завершения, которые соответствуют урокам в модулях
+        const completedLessonIds = completions
+          .map(c => c.lecture_id)
+          .filter(id => lessonIds.includes(id));
+        
+        const doneCount = completedLessonIds.length;
+        updatedProgress = Math.round((doneCount / totalLessons) * 100);
+        
+        console.log(`Курс ${courseId}: завершено ${doneCount}/${totalLessons} уроков из модулей`);
+      }
+      
+      // Если прогресс достиг 100%, автоматически одобряем запись
+      const shouldAutoApprove = updatedProgress >= 100 && !enrollment.approved;
+      
+      await DbClient.enrollment.update({
+        where: { id: enrollment.id },
+        data: { 
+          progress: updatedProgress,
+          ...(shouldAutoApprove && { approved: true })
+        }
+      });
+      
+      console.log(`Обновлен прогресс enrollment ${enrollment.id} для курса ${courseId}, пользователя ${decodedToken.id}: ${updatedProgress}%`);
+      
+      if (shouldAutoApprove) {
+        console.log(`Запись ${enrollment.id} автоматически одобрена (прогресс 100%)`);
+      }
+
+      res.json({ 
+        message: 'Lesson completed successfully',
+        lessonId: lessonId,
+        totalProgress: updatedProgress
+      });
+    } catch (error) {
+      console.error('Error completing lesson:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+
+  // Завершить шаг урока
+  async completeStep(req, res) {
+    try {
+      const { courseId, lessonId, stepIndex } = req.params;
+      const decodedToken = jwt.verify(req.headers.authorization.replace('Bearer ', ''), process.env.SECRET);
+      const userId = decodedToken.id;
+  
+      console.log('=== ЗАВЕРШЕНИЕ ШАГА ===');
+      console.log('Данные:', { courseId, lessonId, stepIndex, userId });
+  
+      // Получаем урок
+      const targetLesson = await DbClient.lecture.findUnique({
+        where: { id: parseInt(lessonId) },
+        include: { steps: true }
+      });
+  
+      if (!targetLesson) {
+        return res.status(404).json({ message: 'Lesson not found' });
+      }
+  
+      // Если это тестовый шаг, фиксируем попытку
+      try {
+        const testResult = req.body && req.body.testResult;
+        console.log('Processing test result:', { testResult, lessonId, stepIndex, userId });
+        
+        if (testResult && typeof testResult === 'object') {
+          try {
+            const prev = await DbClient.testAttempt.findUnique({
+              where: {
+                user_id_lesson_id_step_index: {
+                  user_id: userId,
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex)
+                }
+              }
+            });
+  
+            console.log('Previous attempt found:', prev);
+            const attempts = (prev?.attempts || 0) + 1;
+            
+            console.log('Saving test attempt:', {
+              userId,
+              lessonId: parseInt(lessonId),
+              stepIndex: parseInt(stepIndex),
+              attempts,
+              lastScore: Math.max(0, Math.min(100, Number(testResult.score) || 0)),
+              lastPassed: !!testResult.isPassed,
+              lastAnswers: testResult.answers || {}
+            });
+            
+            // Проверяем, есть ли уже попытка для этого шага
+            const existingAttempt = await DbClient.testAttempt.findUnique({
+              where: {
+                user_id_lesson_id_step_index: {
+                  user_id: userId,
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex)
+                }
+              }
+            });
+  
+            if (existingAttempt) {
+              console.log(`Обновляем существующую попытку для шага ${stepIndex} урока ${lessonId}`);
+              await DbClient.testAttempt.update({
+                where: {
+                  user_id_lesson_id_step_index: {
+                    user_id: userId,
+                    lesson_id: parseInt(lessonId),
+                    step_index: parseInt(stepIndex)
+                  }
+                },
+                data: {
+                  attempts,
+                  lastScore: Math.max(0, Math.min(100, Number(testResult.score) || 0)),
+                  lastPassed: !!testResult.isPassed,
+                  lastAnswers: testResult.answers || {}
+                }
+              });
+            } else {
+              console.log(`Создаем новую попытку для шага ${stepIndex} урока ${lessonId}`);
+              await DbClient.testAttempt.create({
+                data: {
+                  user_id: userId,
+                  course_id: parseInt(courseId),
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex),
+                  attempts,
+                  lastScore: Math.max(0, Math.min(100, Number(testResult.score) || 0)),
+                  lastPassed: !!testResult.isPassed,
+                  lastAnswers: testResult.answers || {}
+                }
+              });
+            }
+  
+            // Для тестов возвращаем результат без завершения шага
+            console.log(`=== РЕЗУЛЬТАТ ТЕСТА СОХРАНЕН ===`);
+            console.log(`Тест пройден на ${testResult.score}%`);
+            
+            return res.json({ 
+              lessonId: parseInt(lessonId), 
+              lessonProgress: 0, 
+              totalProgress: 0, 
+              testAttempt: { attempts },
+              message: 'Test result saved successfully',
+              testResult: testResult
+            });
+            
+          } catch (innerError) {
+            console.warn('Failed to save test attempt:', innerError?.message);
+            return res.status(500).json({ message: 'Failed to save test result', error: innerError.message });
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to record test attempt', e?.message);
+        return res.status(500).json({ message: 'Failed to process test result', error: e.message });
+      }
+  
+      // Если это не тест, возвращаем успех без сохранения прогресса
+      res.json({ 
+        lessonId: parseInt(lessonId), 
+        lessonProgress: 0, 
+        totalProgress: 0, 
+        message: 'Step processed successfully'
+      });
+  
+    } catch (error) {
+      console.error('Ошибка в completeStep:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  }
+
+  // Обновить прогресс курсов без уроков
+  async updateEmptyCoursesProgress(req, res) {
+    try {
+      // Проверяем авторизацию
+      const authorizationHeader = req.headers.authorization;
+      if (!authorizationHeader) {
+        return res.status(401).json({ message: "Authorization header missing" });
+      }
+      
+      const tokenArray = authorizationHeader.split(" ");
+      if (tokenArray.length !== 2) {
+        return res.status(401).json({ message: "Invalid authorization format" });
+      }
+      
+      const token = tokenArray[1];
+      let decodedToken;
+      try {
+        decodedToken = jwt.verify(token, process.env.SECRET);
+      } catch (err) {
+        return res.status(401).json({ message: "Invalid token" });
+      }
+
+      const roles = decodedToken.roles;
+      if (!roles || !roles.includes("ADMIN")) {
+        return res.status(403).json({ message: "You don't have enough rights" });
+      }
+
+      // Находим все курсы без уроков в модулях
+      const allCourses = await DbClient.course.findMany({
+        select: { id: true, name: true }
+      });
+
+      const coursesWithoutLessons = [];
+      
+      for (const course of allCourses) {
+        const meta = readSyllabusMeta(course.id);
+        const modules = Array.isArray(meta.syllabus) ? meta.syllabus : [];
+        
+        let totalLessons = 0;
+        for (const module of modules) {
+          if (Array.isArray(module.lessons)) {
+            totalLessons += module.lessons.length;
+          }
+        }
+        
+        if (totalLessons === 0) {
+          coursesWithoutLessons.push(course);
+        }
+      }
+
+      console.log(`Найдено ${coursesWithoutLessons.length} курсов без уроков в модулях`);
+
+      // Обновляем прогресс для всех записей на эти курсы
+      let updatedCount = 0;
+      for (const course of coursesWithoutLessons) {
+        const updated = await DbClient.enrollment.updateMany({
+          where: {
+            course_id: course.id
+          },
+          data: {
+            progress: 100
+          }
+        });
+        updatedCount += updated.count;
+        console.log(`Обновлен прогресс для курса ${course.id} (${course.name}): ${updated.count} записей`);
+      }
+
+      res.json({ 
+        message: `Updated progress for ${updatedCount} enrollments in ${coursesWithoutLessons.length} courses without lessons in modules`,
+        coursesUpdated: coursesWithoutLessons.length,
+        enrollmentsUpdated: updatedCount
+      });
+
+    } catch (error) {
+      console.error('Error updating empty courses progress:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  }

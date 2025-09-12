@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import i18n from '../i18n';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faQuestion } from '@fortawesome/free-solid-svg-icons';
+import NavBar from '../components/NavBar';
+import Footer from '../components/Footer';
 
 const langOptions = [
   { value: 'en', label: 'EN' },
@@ -27,6 +32,7 @@ function usePrefersDark() {
 }
 
 export default function Support() {
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const [lang, setLang] = useState(() => localStorage.getItem('language') || 'ru');
   const [theme, setTheme] = useState(null);
   const prefersDark = usePrefersDark();
@@ -102,7 +108,7 @@ export default function Support() {
     setError(null);
     try {
       const token = localStorage.getItem('jwtToken');
-      const res = await fetch('/api/send-email', {
+      const res = await fetch('https://localhost:9000/api/send-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -124,6 +130,125 @@ export default function Support() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Authentication check
+  if (!isAuthenticated) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        background: dark ? '#1a1a1a' : '#f8f9fa',
+        color: dark ? '#ffffff' : '#333333'
+      }}>
+        <NavBar />
+        
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto', 
+          padding: '40px 20px',
+          minHeight: 'calc(100vh - 200px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {/* Заголовок страницы */}
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '40px' 
+          }}>
+            <h1 style={{ 
+              fontSize: '2.5rem', 
+              fontWeight: '700', 
+              marginBottom: '10px',
+              color: dark ? '#ffffff' : '#333333'
+            }}>
+              {t('support.title')}
+            </h1>
+          </div>
+
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '60px 20px',
+            background: dark ? '#2d2d2d' : '#ffffff',
+            borderRadius: '12px',
+            border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+            maxWidth: '500px'
+          }}>
+            <FontAwesomeIcon 
+              icon={faQuestion} 
+              style={{ 
+                fontSize: '3rem', 
+                color: '#6c757d', 
+                marginBottom: '20px' 
+              }} 
+            />
+            <h3 style={{ 
+              fontSize: '1.3rem', 
+              fontWeight: '600', 
+              marginBottom: '10px',
+              color: dark ? '#ffffff' : '#333333'
+            }}>
+              {t('auth.login_required')}
+            </h3>
+            <p style={{ 
+              color: dark ? '#cccccc' : '#666666',
+              marginBottom: '30px',
+              fontSize: '1rem',
+              lineHeight: '1.6',
+              maxWidth: '400px'
+            }}>
+              {t('support.login_to_contact_description')}
+            </p>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '15px',
+              flexWrap: 'wrap'
+            }}>
+              <button
+                onClick={() => history.push('/login')}
+                style={{
+                  padding: '12px 24px',
+                  background: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                onMouseOut={(e) => e.target.style.background = '#007bff'}
+              >
+                {t('auth.login')}
+              </button>
+              <button
+                onClick={() => history.push('/register')}
+                style={{
+                  padding: '12px 24px',
+                  background: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#218838'}
+                onMouseOut={(e) => e.target.style.background = '#28a745'}
+              >
+                {t('auth.register')}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <Footer />
+      </div>
+    );
   }
 
   return (

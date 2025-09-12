@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Lecture" ALTER COLUMN "moduleId" SET DATA TYPE BIGINT;

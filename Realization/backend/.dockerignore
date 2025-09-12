@@ -1,0 +1,20 @@
+npm-debug.log
+.git
+.gitignore
+README.md
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.DS_Store
+*.log
+coverage
+.nyc_output
+.vscode
+.idea
+*.swp
+*.swo
+*~
+# Убираем node_modules из исключений, чтобы использовать локально установленные
+# node_modules 

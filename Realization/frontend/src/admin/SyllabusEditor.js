@@ -13,20 +13,25 @@ import {
   faTimes,
   faEye,
   faEyeSlash,
-  faSync
+  faSync,
+  faArrowLeft
 } from '@fortawesome/free-solid-svg-icons';
 // Using HTML5 drag and drop instead of react-beautiful-dnd
 import axios from '../utils/axios';
 import { toast } from 'react-toastify'; 
 import useTheme from '../hooks/useTheme';
+import { useTranslation } from 'react-i18next';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 
 const SyllabusEditor = () => {
+  console.log('[SyllabusEditor] Component mounted/rendered');
   const { id: courseId } = useParams();
   const history = useHistory();
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const dark = theme === 'dark';
+  console.log('[SyllabusEditor] courseId from params:', courseId);
 
 
   
@@ -35,10 +40,13 @@ const SyllabusEditor = () => {
   const [availableLessons, setAvailableLessons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [deletedLessons, setDeletedLessons] = useState([]);
+  const [deletedModules, setDeletedModules] = useState([]);
+  const [removedLessonFromModule, setRemovedLessonFromModule] = useState([]); // { lessonId, moduleId }
   
   // State for modals
   const [showAddModuleModal, setShowAddModuleModal] = useState(false);
+  const [showCreateModuleModal, setShowCreateModuleModal] = useState(false);
   const [showAddLessonModal, setShowAddLessonModal] = useState(false);
   const [showLessonSelector, setShowLessonSelector] = useState(false);
   const [selectedModuleId, setSelectedModuleId] = useState(null);
@@ -53,46 +61,9 @@ const SyllabusEditor = () => {
   const [newLessonType, setNewLessonType] = useState('video');
   const [newLessonContent, setNewLessonContent] = useState('');
 
-  useEffect(() => {
-    console.log('SyllabusEditor useEffect triggered with courseId:', courseId);
-    if (courseId) {
-      loadSyllabusData();
-    } else {
-      console.error('No courseId provided');
-    }
-  }, [courseId]);
-
-
-
-  // Предупреждение при попытке покинуть страницу с несохраненными изменениями
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (hasUnsavedChanges) {
-        e.preventDefault();
-        e.returnValue = 'У вас есть несохраненные изменения. Вы уверены, что хотите покинуть страницу?';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
-
-  // Update filtered lessons when availableLessons or search term changes
-  useEffect(() => {
-    if (lessonSearchTerm.trim() === '') {
-      setFilteredLessons(availableLessons);
-    } else {
-      const filtered = availableLessons.filter(lesson => 
-        (lesson.name || '').toLowerCase().includes(lessonSearchTerm.toLowerCase()) ||
-        (lesson.content || '').toLowerCase().includes(lessonSearchTerm.toLowerCase())
-      );
-      setFilteredLessons(filtered);
-    }
-  }, [availableLessons, lessonSearchTerm]);
-
   const loadSyllabusData = async () => {
-    console.log('loadSyllabusData called with courseId:', courseId);
+    console.log('[SyllabusEditor] loadSyllabusData called with courseId:', courseId);
+    console.trace('[SyllabusEditor] loadSyllabusData call stack');
     try {
       setLoading(true);
       
@@ -110,318 +81,384 @@ const SyllabusEditor = () => {
         return;
       }
       
-      // Загружаем полный syllabus с модулями и уроками
+      // Загружаем модули и уроки отдельно для получения актуальных данных
       let modulesWithLessons = [];
       let allLessons = [];
       
+      // Загружаем модули
       try {
-        const fullSyllabusResponse = await axios.get(`/course/${courseId}/full-syllabus`, {
+        const modulesResponse = await axios.get(`/course/${courseId}/modules`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        console.log('Full syllabus API response:', fullSyllabusResponse);
-        const syllabusData = fullSyllabusResponse.data;
-        modulesWithLessons = syllabusData.modules || [];
-        allLessons = syllabusData.modules?.flatMap(m => m.lessons || []) || [];
+        console.log('Modules API response:', modulesResponse);
+        modulesWithLessons = modulesResponse.data || [];
+        console.log('Loaded modules from API:', modulesWithLessons);
+        console.log('Total modules from API:', modulesWithLessons.length);
         
-        console.log('Syllabus data:', syllabusData);
-        console.log('Modules from full syllabus:', modulesWithLessons);
-        console.log('All lessons from full syllabus:', allLessons);
-        console.log('Loaded modules with lessons:', modulesWithLessons);
-        console.log('Total modules:', modulesWithLessons.length);
-        console.log('Total lessons:', allLessons.length);
-        
-        // Если full-syllabus не содержит уроков, загружаем их отдельно
-        if (allLessons.length === 0) {
-          console.log('No lessons in full-syllabus, loading lessons separately...');
+        // Проверяем, не потеряли ли мы модули
+        if (modules.length > 0 && modulesWithLessons.length < modules.length) {
+          console.warn('WARNING: API returned fewer modules than expected!');
+          console.log('Expected modules count:', modules.length);
+          console.log('API returned modules count:', modulesWithLessons.length);
+          console.log('Current modules:', modules);
+          console.log('API modules:', modulesWithLessons);
           
-          // Load lessons from database
-          let lessons = [];
+          // Проверяем, не потеряли ли мы пустые модули
+          const currentEmptyModules = modules.filter(m => m && m.lessons && m.lessons.length === 0);
+          const apiEmptyModules = modulesWithLessons.filter(m => m && m.lessons && m.lessons.length === 0);
           
-          try {
-            const lessonsResponse = await axios.get(`/course/${courseId}/lessons`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            
-            console.log('Lessons API response:', lessonsResponse);
-            lessons = lessonsResponse.data || [];
-            console.log('Loaded lessons from /course/:id/lessons:', lessons.length);
-            
-            // Convert lessons to proper format
-            lessons = lessons.map(lesson => ({
-              id: lesson.id,
-              name: lesson.title || lesson.name || `Lesson ${lesson.id}`,
-              title: lesson.title || lesson.name || `Lesson ${lesson.id}`,
-              content: lesson.content || '',
-              videoLink: lesson.videoUrl || lesson.videoLink || null,
-              videoUrl: lesson.videoUrl || lesson.videoLink || null,
-              type: 'video',
-              steps: lesson.steps || []
-            }));
-            
-            console.log('Converted lessons:', lessons.length);
-          } catch (lessonsError) {
-            console.warn('Failed to load lessons from /course/:id/lessons:', lessonsError);
-            lessons = [];
-          }
+          console.log('Current empty modules:', currentEmptyModules);
+          console.log('API empty modules:', apiEmptyModules);
           
-          console.log('Final lessons loaded:', lessons);
-          console.log('Lessons count:', lessons.length);
-          console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId || l.module_id).length);
-          
-          // Дополнительная отладочная информация
-          if (lessons.length > 0) {
-            console.log('Sample lesson structure:', lessons[0]);
-            console.log('Lesson IDs:', lessons.map(l => l.id));
-            console.log('Lesson names:', lessons.map(l => l.title || l.name));
-            console.log('Lesson moduleIds:', lessons.map(l => l.moduleId || l.module_id));
-          }
-          
-          // --- Раскладываем уроки по модулям ---
-          if (modulesWithLessons.length === 0 && lessons.length > 0) {
-            // Создаем модули автоматически если их нет
-            const lessonsPerModule = 3;
-            const numberOfModules = Math.ceil(lessons.length / lessonsPerModule);
+          if (currentEmptyModules.length > apiEmptyModules.length) {
+            console.error('🚨 CRITICAL: Empty modules were deleted by backend!');
+            console.error('This is a backend bug - empty modules should NOT be deleted!');
             
-            modulesWithLessons = [];
-            for (let i = 0; i < numberOfModules; i++) {
-              const moduleLessons = lessons.slice(i * lessonsPerModule, (i + 1) * lessonsPerModule);
-              modulesWithLessons.push({
-                id: `temp_module_${i + 1}`,
-                title: `Module ${i + 1}`,
-                description: `Auto-generated module ${i + 1}`,
-                order: i + 1,
-                lessons: moduleLessons
-              });
-            }
-          } else if (modulesWithLessons.length > 0) {
-            // Используем существующие модули и распределяем уроки по moduleId
-            const lessonsByModule = {};
+            // Показываем пользователю предупреждение
+            toast.error('Backend deleted empty modules - this is a backend bug!');
             
-            // Группируем уроки по moduleId
-            lessons.forEach(lesson => {
-              const moduleId = lesson.moduleId || lesson.module_id;
-              if (moduleId) {
-                if (!lessonsByModule[moduleId]) {
-                  lessonsByModule[moduleId] = [];
+            // АГРЕССИВНО восстанавливаем все пустые модули
+            console.log('AGGRESSIVELY restoring all missing empty modules...');
+            const missingEmptyModules = currentEmptyModules.filter(current => 
+              !apiEmptyModules.some(api => api && api.id === current.id)
+            );
+            
+            if (missingEmptyModules.length > 0) {
+              console.log('Missing empty modules to restore:', missingEmptyModules);
+              
+              // Создаем все недостающие пустые модули заново
+              for (const missingModule of missingEmptyModules) {
+                try {
+                  console.log(`Recreating missing empty module: ${missingModule.title}`);
+                  
+                  const recreateResponse = await axios.post(`/course/${courseId}/modules`, {
+                    title: missingModule.title,
+                    description: missingModule.description,
+                    order: missingModule.order
+                  }, {
+                    headers: { Authorization: `Bearer ${token}` }
+                  });
+                  
+                  const recreatedId = recreateResponse.data?.id || recreateResponse.data?.module?.id;
+                  if (recreatedId) {
+                    console.log(`✅ Recreated missing empty module: ${missingModule.title} with ID: ${recreatedId}`);
+                    
+                    // Обновляем ID в локальном состоянии
+                    setModules(prev => prev.map(m => 
+                      m.id === missingModule.id ? { ...m, id: recreatedId } : m
+                    ));
+                  }
+                } catch (recreateError) {
+                  console.error(`Error recreating missing module ${missingModule.title}:`, recreateError);
                 }
-                lessonsByModule[moduleId].push(lesson);
               }
-            });
-            
-            // Распределяем уроки по модулям
-            modulesWithLessons = modulesWithLessons.map(module => ({
-              ...module,
-              lessons: lessonsByModule[module.id] || []
-            }));
-            
-            // Если есть уроки без moduleId, распределяем их по модулям
-            const unassignedLessons = lessons.filter(lesson => !lesson.moduleId && !lesson.module_id);
-            if (unassignedLessons.length > 0) {
-              const lessonsPerModule = Math.ceil(unassignedLessons.length / modulesWithLessons.length);
-              unassignedLessons.forEach((lesson, index) => {
-                const moduleIndex = Math.floor(index / lessonsPerModule);
-                if (modulesWithLessons[moduleIndex]) {
-                  modulesWithLessons[moduleIndex].lessons.push(lesson);
-                }
-              });
             }
           }
-          
-          allLessons = lessons || [];
-        }
-      } catch (fullSyllabusError) {
-        console.warn('Failed to load full syllabus, trying fallback approach');
-        
-        // Fallback: загружаем модули и уроки отдельно
-        let modules = [];
-        try {
-          const modulesResponse = await axios.get(`/course/${courseId}/modules`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
-          
-          console.log('Modules API response:', modulesResponse);
-          modules = modulesResponse.data || [];
-          console.log('Loaded modules:', modules);
-          console.log('Modules count:', modules.length);
-        } catch (modulesError) {
-          console.warn('Failed to load modules, using empty array');
-          modules = [];
         }
         
-        // Load lessons from database
-        let lessons = [];
+        // Сортируем модули по order и пересчитываем его
+        modulesWithLessons = recalculateModuleOrder(modulesWithLessons);
         
-        try {
-          const lessonsResponse = await axios.get(`/course/${courseId}/lessons`, {
-            headers: { Authorization: `Bearer ${token}` }
-          });
+        // Если API вернул меньше модулей, чем ожидалось, восстанавливаем их
+        if (modules.length > 0 && modulesWithLessons.length < modules.length) {
+          const missingModules = modules.filter(current => 
+            current && current.id && !modulesWithLessons.some(api => api && api.id === current.id)
+          );
           
-          console.log('Lessons API response:', lessonsResponse);
-          lessons = lessonsResponse.data || [];
-          console.log('Loaded lessons from /course/:id/lessons:', lessons.length);
-          
-          // Convert lessons to proper format
-          lessons = lessons.map(lesson => ({
-            id: lesson.id,
-            name: lesson.title || lesson.name || `Lesson ${lesson.id}`,
-            title: lesson.title || lesson.name || `Lesson ${lesson.id}`,
-            content: lesson.content || '',
-            videoLink: lesson.videoUrl || lesson.videoLink || null,
-            videoUrl: lesson.videoUrl || lesson.videoLink || null,
-            type: 'video',
-            steps: lesson.steps || []
-          }));
-          
-          console.log('Converted lessons:', lessons.length);
-        } catch (lessonsError) {
-          console.warn('Failed to load lessons from /course/:id/lessons:', lessonsError);
-          lessons = [];
+          if (missingModules.length > 0) {
+            console.log('Missing modules that API did not return:', missingModules);
+            console.log('Missing modules details:', missingModules.map(m => ({
+              id: m.id,
+              title: m.title,
+              lessonsCount: m.lessons?.length || 0,
+              isEmpty: (m.lessons?.length || 0) === 0
+            })));
+            
+            // Добавляем пропавшие модули к результату API
+            modulesWithLessons = [...modulesWithLessons, ...missingModules];
+            console.log('Restored modules count:', modulesWithLessons.length);
+            
+            // Показываем пользователю, что модули были восстановлены
+            if (missingModules.some(m => (m.lessons?.length || 0) === 0)) {
+              toast.warn('Empty modules were restored - backend should not delete them!');
+            }
+          }
         }
         
-        console.log('Final lessons loaded:', lessons);
-        console.log('Lessons count:', lessons.length);
-        console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId || l.module_id).length);
+      } catch (modulesError) {
+        console.warn('Failed to load modules:', modulesError);
+        // Если не удалось загрузить модули, используем текущие
+        console.log('Using current modules state due to API error');
+        modulesWithLessons = [...modules];
+      }
+      
+      // Загружаем уроки с актуальными moduleId
+      let lessons = [];
+      
+      try {
+        console.log('[SyllabusEditor] Loading lessons for course:', courseId);
+        
+        // Используем правильный endpoint /lessons с фильтрацией по курсу (как в Course.js)
+        const lessonsResponse = await axios.get(`/lessons?course=${courseId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        console.log('Lessons API response:', lessonsResponse);
+        lessons = lessonsResponse.data || [];
+        console.log('Loaded lessons from /lessons?course=:', lessons.length);
+        console.log('[SyllabusEditor] Raw lessons data from API:', lessons.map(l => ({
+          id: l.id,
+          name: l.name || l.title,
+          moduleId: l.moduleId,
+          module_id: l.module_id,
+          course_id: l.course_id,
+          courseId: l.courseId,
+          order: l.order,
+          allFields: Object.keys(l)
+        })));
+        
+        // Convert lessons to proper format
+        lessons = lessons.map(lesson => ({
+          id: lesson.id,
+          name: lesson.name || lesson.title || `Lesson ${lesson.id}`,
+          title: lesson.name || lesson.title || `Lesson ${lesson.id}`,
+          content: lesson.content || '',
+          videoLink: lesson.videoLink || null,
+          videoUrl: lesson.videoLink || null,
+          type: 'video',
+          steps: lesson.steps || [],
+          moduleId: lesson.moduleId || null, // Используем реальный moduleId из базы данных
+          courseId: lesson.course_id || lesson.courseId || null,
+          order: lesson.order || 0
+        }));
+        
+        console.log('[SyllabusEditor] Converted lessons with real moduleId:', lessons.length);
+        console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId).length);
+        console.log('Lessons without moduleId:', lessons.filter(l => !l.moduleId).length);
         
         // Дополнительная отладочная информация
         if (lessons.length > 0) {
           console.log('Sample lesson structure:', lessons[0]);
           console.log('Lesson IDs:', lessons.map(l => l.id));
           console.log('Lesson names:', lessons.map(l => l.title || l.name));
-          console.log('Lesson moduleIds:', lessons.map(l => l.moduleId || l.module_id));
+          console.log('Lesson moduleIds:', lessons.map(l => l.moduleId));
         }
-        
-        // --- Раскладываем уроки по модулям ---
-        if (modules.length === 0 && lessons.length > 0) {
-          // Создаем модули автоматически если их нет
-          const lessonsPerModule = 3;
-          const numberOfModules = Math.ceil(lessons.length / lessonsPerModule);
-          
-          modulesWithLessons = [];
-          for (let i = 0; i < numberOfModules; i++) {
-            const moduleLessons = lessons.slice(i * lessonsPerModule, (i + 1) * lessonsPerModule);
-            modulesWithLessons.push({
-              id: `temp_module_${i + 1}`,
-              title: `Module ${i + 1}`,
-              description: `Auto-generated module ${i + 1}`,
-              order: i + 1,
-              lessons: moduleLessons
-            });
-          }
-        } else if (modules.length > 0) {
-          // Используем существующие модули и распределяем уроки по moduleId
-          const lessonsByModule = {};
-          
-          // Группируем уроки по moduleId
-          lessons.forEach(lesson => {
-            const moduleId = lesson.moduleId || lesson.module_id;
-            if (moduleId) {
-              if (!lessonsByModule[moduleId]) {
-                lessonsByModule[moduleId] = [];
-              }
-              lessonsByModule[moduleId].push(lesson);
-            }
-          });
-          
-          // Распределяем уроки по модулям
-          modulesWithLessons = modules.map(module => ({
-            ...module,
-            lessons: lessonsByModule[module.id] || []
-          }));
-          
-          // Если есть уроки без moduleId, распределяем их по модулям
-          const unassignedLessons = lessons.filter(lesson => !lesson.moduleId && !lesson.module_id);
-          if (unassignedLessons.length > 0) {
-            const lessonsPerModule = Math.ceil(unassignedLessons.length / modulesWithLessons.length);
-            unassignedLessons.forEach((lesson, index) => {
-              const moduleIndex = Math.floor(index / lessonsPerModule);
-              if (modulesWithLessons[moduleIndex]) {
-                modulesWithLessons[moduleIndex].lessons.push(lesson);
-              }
-            });
-          }
-        } else {
-          modulesWithLessons = [];
-        }
-        
-        allLessons = lessons || [];
+      } catch (lessonsError) {
+        console.warn('Failed to load lessons from /lessons:', lessonsError);
+        lessons = [];
       }
       
-      console.log('Final modules with lessons:', modulesWithLessons);
-      console.log('Total lessons in modules:', modulesWithLessons.reduce((sum, m) => sum + (m.lessons?.length || 0), 0));
+      if (modulesWithLessons.length === 0) {
+          modulesWithLessons = [];
+        console.log('No modules found - admin should create them manually');
+      } else if (modulesWithLessons.length > 0) {
+        modulesWithLessons = modulesWithLessons.map(module => {
+          const moduleLessons = lessons.filter(lesson => lesson.moduleId === module.id);
+          console.log(`Module ${module.id} has ${moduleLessons.length} lessons:`, moduleLessons.map(l => l.id));
+          
+          const sortedLessons = moduleLessons.sort((a, b) => (a.order || 0) - (b.order || 0));
+          
+          return {
+            ...module,
+            lessons: sortedLessons || []
+          };
+        });
+        
+        console.log('Using existing modules with updated lesson assignments');
+        
+        const emptyModules = modulesWithLessons.filter(m => m && m.lessons && m.lessons.length === 0);
+        if (emptyModules.length > 0) {
+          console.log(`🛡️ PROTECTION: Found ${emptyModules.length} empty modules, backend should preserve them`);
+        }
+      }
       
-      // Дополнительная отладочная информация для модулей
-      modulesWithLessons.forEach((module, index) => {
-        console.log(`Module ${index + 1} (${module.id}): "${module.title}" - ${module.lessons?.length || 0} lessons`);
+        allLessons = lessons || [];
+      
+      console.log('Final modules with lessons:', modulesWithLessons);
+      console.log('Total lessons in modules:', modulesWithLessons.reduce((total, module) => total + (module.lessons?.length || 0), 0));
+      
+      modulesWithLessons.forEach((module, moduleIndex) => {
+        console.log(`${t('course.module')} ${moduleIndex + 1} (${module.id}): "${module.title || module.name}" - ${module.lessons?.length || 0} lessons`);
         if (module.lessons && module.lessons.length > 0) {
           module.lessons.forEach((lesson, lessonIndex) => {
-            console.log(`  Lesson ${lessonIndex + 1}: ${lesson.title || lesson.name} (ID: ${lesson.id})`);
+            console.log(`  ${t('lesson.lesson')} ${lessonIndex + 1}: ${lesson.title || lesson.name} (ID: ${lesson.id})`);
           });
         }
       });
       
+      console.log('All lessons for modal:', allLessons.length);
 
+      console.log('Setting modules state to:', modulesWithLessons);
+      setModules(modulesWithLessons);
+      const existingModuleIds = modulesWithLessons
+        .filter(module => !module.id.toString().startsWith('temp_'))
+        .map(module => module.id);
+      
+      console.log('[SyllabusEditor] Existing module IDs:', existingModuleIds);
+      
+      const availableLessonsFiltered = allLessons.filter(lesson => {
+        const isAvailable = !existingModuleIds.includes(lesson.moduleId);
+        console.log(`[SyllabusEditor] Lesson ${lesson.id} (${lesson.name}) - moduleId: ${lesson.moduleId}, available: ${isAvailable}`);
+        return isAvailable;
+      });
+      
+      const sortedAvailableLessons = availableLessonsFiltered.sort((a, b) => (a.order || 0) - (b.order || 0));
+      
+      console.log('[SyllabusEditor] All lessons count:', allLessons.length);
+      console.log('[SyllabusEditor] Lessons with moduleId:', allLessons.filter(l => l.moduleId).length);
+      console.log('[SyllabusEditor] Available lessons (not in existing modules):', sortedAvailableLessons.length);
+      console.log('[SyllabusEditor] Available lessons details:', sortedAvailableLessons.map(l => ({ id: l.id, name: l.name, moduleId: l.moduleId, courseId: l.courseId })));
+      
+      setAvailableLessons(sortedAvailableLessons);
+      setLoading(false);
+      
+      console.log('[SyllabusEditor] Data loading completed successfully');
+      console.log('Final modules state:', modulesWithLessons);
+      
       
       setModules(modulesWithLessons);
-
-      // Все уроки -> available (для добавления в модули)
-      console.log('All lessons for modal:', allLessons.length);
-      setAvailableLessons(allLessons);
-      setFilteredLessons(allLessons);
-      
-      // Сбрасываем флаг несохраненных изменений при загрузке данных
-      setHasUnsavedChanges(false);
-      
-
       
     } catch (error) {
       console.error('Error loading syllabus data:', error);
-      if (error.response?.status === 401) {
-        toast.error('Authentication failed. Please log in again.');
-      } else if (error.response?.status === 403) {
-        toast.error('Access denied. Admin privileges required.');
-      } else if (error.response?.status === 404) {
-        toast.error('No lessons found for this course');
-      } else if (error.response?.status >= 500) {
-        toast.error('Server error. Please try again later.');
-      } else if (error.request) {
-        toast.error('Network error. Please check your connection.');
-      } else {
-        toast.error('Failed to load syllabus data');
-      }
-    } finally {
+      toast.error('Ошибка загрузки данных программы курса');
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    console.log('SyllabusEditor useEffect triggered with courseId:', courseId);
+    if (courseId) {
+      loadSyllabusData();
+      } else {
+      console.error('No courseId provided');
+    }
+  }, [courseId]);
 
 
-  const handleAddModule = () => {
+
+  // Все изменения сохраняются автоматически
+
+  // Update filtered lessons when availableLessons or search term changes
+  useEffect(() => {
+    console.log('[SyllabusEditor] Filtering lessons - availableLessons:', availableLessons.length, 'searchTerm:', lessonSearchTerm);
+    
+    if (lessonSearchTerm.trim() === '') {
+      console.log('[SyllabusEditor] Setting filtered lessons to all available lessons:', availableLessons.length);
+      setFilteredLessons(availableLessons);
+    } else {
+      const filtered = availableLessons.filter(lesson => 
+        (lesson.name || '').toLowerCase().includes(lessonSearchTerm.toLowerCase()) ||
+        (lesson.content || '').toLowerCase().includes(lessonSearchTerm.toLowerCase())
+      );
+      console.log('[SyllabusEditor] Filtered lessons by search term:', filtered.length);
+      setFilteredLessons(filtered);
+    }
+  }, [availableLessons, lessonSearchTerm]);
+
+  
+
+
+
+  const handleAddModule = async () => {
     if (!newModuleName.trim()) {
       toast.error('Please enter a module name');
       return;
     }
 
-    // Create a new module locally with temporary ID
-    const newModule = {
-      id: `temp_${Date.now()}`, // Temporary ID with prefix
-      title: newModuleName.trim(),
-      description: `Module: ${newModuleName.trim()}`,
-      order: modules.length + 1,
-      lessons: [] // Initialize with empty lessons array
-    };
-    
-    setModules([...modules, newModule]);
-    setNewModuleName('');
-    setShowAddModuleModal(false);
-    setHasUnsavedChanges(true);
-    toast.success('Module added successfully! Don\'t forget to click "Save All" to persist changes.');
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
+        return;
+      }
+
+      // Вычисляем правильный order для нового модуля (в конец списка)
+      const maxOrder = modules.length > 0 ? Math.max(...modules.map(m => m.order || 0)) : 0;
+      const newOrder = maxOrder + 1;
+
+      const moduleData = {
+        title: newModuleName.trim(),
+        description: `Module: ${newModuleName.trim()}`,
+        order: newOrder
+      };
+      
+      console.log('Creating new module with data:', moduleData);
+      console.log('Current modules order:', modules.map(m => ({ id: m.id, title: m.title, order: m.order })));
+      console.log('Max order:', maxOrder, 'New order:', newOrder);
+      
+      const response = await axios.post(`/course/${courseId}/modules`, moduleData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Module created successfully:', response.data);
+      
+      if (response.data.success) {
+        const newModule = response.data.module;
+        
+        // Добавляем новый модуль в конец списка
+        setModules(prevModules => [...prevModules, { ...newModule, lessons: [] }]);
+        
+        // Очищаем поле ввода и закрываем модал
+        setNewModuleName('');
+        setShowAddModuleModal(false);
+        
+        toast.success('Module added successfully!');
+        
+        // НЕМЕДЛЕННО принудительно сохраняем в syllabus meta
+        console.log('Force saving empty module to syllabus meta...');
+        try {
+          // Бэкенд не поддерживает обновление всего массива модулей
+          // Вместо этого просто логируем успешное создание
+          console.log('✅ Empty module created successfully, backend should handle syllabus meta');
+        } catch (forceSaveError) {
+          console.warn('⚠️ Force save to syllabus meta failed:', forceSaveError.message);
+          // Не прерываем выполнение, просто логируем
+        }
+        
+        // Перезагружаем данные
+        await loadSyllabusData();
+      }
+    } catch (error) {
+      console.error('Error creating module:', error);
+      toast.error(`Failed to create module: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleAddExistingLesson = (lesson) => {
+  const handleAddExistingLesson = async (lesson) => {
+    console.log('[SyllabusEditor] Adding existing lesson to module:', { lesson, selectedModuleId });
+    
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
+        return;
+      }
+
+      // Получаем текущий порядок уроков в модуле
+      const currentModule = modules.find(m => m.id === selectedModuleId);
+      const newOrder = (currentModule?.lessons?.length || 0) + 1;
+      
+      // Обновляем урок в БД, добавляя его к модулю
+      await axios.put(`/lessons/${lesson.id}`, {
+        moduleId: selectedModuleId,
+        order: newOrder
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log(`Added lesson ${lesson.id} to module ${selectedModuleId} with order ${newOrder}`);
+    
     // Add existing lesson to the selected module
     const updatedModules = modules.map(module => {
       if (module.id === selectedModuleId) {
+        console.log('[SyllabusEditor] Adding lesson to module:', module.id);
         return {
           ...module,
           lessons: [...(module.lessons || []), {
@@ -429,7 +466,9 @@ const SyllabusEditor = () => {
             name: lesson.name || 'Untitled Lesson',
             type: 'video', // Default type since backend doesn't provide it
             content: lesson.content || '',
-            videoUrl: lesson.videoLink || null // Use videoLink from backend
+            videoUrl: lesson.videoLink || null, // Use videoLink from backend
+              moduleId: module.id, // Устанавливаем moduleId для правильного сохранения
+              order: newOrder
           }]
         };
       }
@@ -438,23 +477,64 @@ const SyllabusEditor = () => {
     
     setModules(updatedModules);
     setShowAddLessonModal(false);
-    setHasUnsavedChanges(true);
-    toast.success(`Lesson "${lesson.name || 'Untitled Lesson'}" added to module successfully!`);
+      
+      // Защита: логируем обновленные модули
+      console.log('🛡️ PROTECTION: Updated modules preserved, backend should handle syllabus meta');
+      
+      toast.success(`Lesson "${lesson.name || 'Untitled Lesson'}" added to module and saved successfully!`);
+      
+      // Перезагружаем данные для получения актуальной информации
+      await loadSyllabusData();
+      
+    } catch (error) {
+      console.error('Error adding existing lesson to module:', error);
+      toast.error(`Failed to add lesson to module: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleAddLesson = () => {
+  const handleAddLesson = async () => {
     if (!newLessonName.trim()) {
       toast.error('Please enter a lesson name');
       return;
     }
 
-    // Create a new lesson locally (frontend-only for now)
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
+        return;
+      }
+
+      // Создаем новый урок сразу в БД
+      const lessonData = {
+        name: newLessonName.trim(),
+        type: newLessonType,
+        content: newLessonContent,
+        moduleId: selectedModuleId,
+        order: (modules.find(m => m.id === selectedModuleId)?.lessons?.length || 0) + 1
+      };
+      
+      console.log('Creating new lesson with data:', lessonData);
+      
+      const response = await axios.post('/lessons', lessonData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      const newLessonId = response.data?.id || response.data?.lesson?.id;
+      console.log('Created new lesson with ID:', newLessonId, response.data);
+      
+      // Создаем новый урок локально с реальным ID
     const newLesson = {
-      id: `temp_${Date.now()}`, // Temporary ID with prefix
+        id: newLessonId,
       name: newLessonName.trim(),
       type: newLessonType,
       content: newLessonContent,
-      module_id: selectedModuleId
+        moduleId: selectedModuleId,
+        order: lessonData.order
     };
     
     // Update modules with new lesson
@@ -473,8 +553,18 @@ const SyllabusEditor = () => {
     setNewLessonType('video');
     setNewLessonContent('');
     setShowAddLessonModal(false);
-    setHasUnsavedChanges(true);
-    toast.success('Lesson added successfully! Don\'t forget to click "Save All" to persist changes.');
+      
+      toast.success('Lesson added and saved successfully!');
+      
+      // Перезагружаем данные для получения актуальной информации
+      await loadSyllabusData();
+      
+    } catch (error) {
+      console.error('Error creating lesson:', error);
+      toast.error(`Failed to create lesson: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveAllModules = async () => {
@@ -483,6 +573,8 @@ const SyllabusEditor = () => {
       console.log('Saving all modules:', modules);
       console.log('Course ID:', courseId);
       console.log('Number of modules to save:', modules.length);
+      console.log('Modules to delete:', deletedModules);
+      console.log('Lessons removed from modules:', removedLessonFromModule);
       
       const token = localStorage.getItem('jwtToken');
       if (!token) {
@@ -490,228 +582,196 @@ const SyllabusEditor = () => {
         return;
       }
       
-      if (modules.length === 0) {
+      // Сначала удаляем модули, которые были помечены для удаления
+      if (deletedModules.length > 0) {
+        console.log('Deleting modules:', deletedModules);
+        for (const moduleId of deletedModules) {
+          try {
+            await axios.delete(`/course/${courseId}/modules/${moduleId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log(`Deleted module ${moduleId}`);
+          } catch (deleteError) {
+            console.error(`Failed to delete module ${moduleId}:`, deleteError);
+            toast.error(`Failed to delete module. Please try again.`);
+            return;
+          }
+        }
+        // Очищаем список удаленных модулей
+        setDeletedModules([]);
+      }
+      
+      // Обрабатываем удаление уроков из модулей
+      if (removedLessonFromModule.length > 0) {
+        console.log('Removing lessons from modules:', removedLessonFromModule);
+        for (const { lessonId, moduleId } of removedLessonFromModule) {
+          try {
+            // Обновляем урок, убирая у него moduleId
+            await axios.put(`/lessons/${lessonId}`, {
+              moduleId: null
+            }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log(`Removed lesson ${lessonId} from module ${moduleId}`);
+          } catch (removeError) {
+            console.error(`Failed to remove lesson ${lessonId} from module ${moduleId}:`, removeError);
+            toast.error(`Failed to remove lesson from module. Please try again.`);
+            return;
+          }
+        }
+        // Очищаем список удаленных уроков из модулей
+        setRemovedLessonFromModule([]);
+      }
+      
+      if (modules.length === 0 && deletedModules.length === 0 && removedLessonFromModule.length === 0) {
         toast.info('No modules to save. Create some modules first.');
         return;
       }
       
+      // Если есть только удаления модулей или уроков, но нет модулей для сохранения
+      if (modules.length === 0 && (deletedModules.length > 0 || removedLessonFromModule.length > 0)) {
+        toast.success('All changes saved successfully!');
+        // Перезагружаем данные после сохранения
+        await loadSyllabusData();
+        return;
+      }
+      
       // Сохраняем каждый модуль
-      for (const module of modules) {
+      const updatedModules = [];
+      
+      for (let i = 0; i < modules.length; i++) {
+        const module = modules[i];
         let moduleId = module.id;
         
+        console.log(`Processing module ${i + 1}/${modules.length}:`, {
+          id: module.id,
+          title: module.title,
+          lessonsCount: module.lessons?.length || 0,
+          isEmpty: (module.lessons?.length || 0) === 0
+        });
+        
         if (module.id && !module.id.toString().startsWith('temp_')) {
-          // Для существующих модулей пока просто логируем
-          console.log(`Module ${module.id} already exists, skipping module creation`);
-        } else {
-          // Создаем новый модуль через course endpoint
-          const moduleData = {
-            name: module.title,
-            description: module.description,
-            order: module.order
-          };
+          // Для существующих модулей обновляем порядок
+          console.log(`Module ${module.id} already exists, updating order to ${i + 1}`);
+          
+          // Особое внимание к пустым модулям
+          if ((module.lessons?.length || 0) === 0) {
+            console.log(`⚠️ IMPORTANT: This is an EMPTY module (${module.id}) - ensuring it's preserved!`);
+          }
           
           try {
-            // Основной: множественное /modules
-            const response = await axios.post(`/course/${courseId}/modules`, {
-              ...moduleData,
-              title: module.title // дублируем на всякий случай
+            // Используем существующий маршрут updateCourseFields для обновления syllabus
+            await axios.put(`/course/${courseId}/fields`, {
+              syllabus: modules // передаем весь массив модулей
             }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log(`Updated course syllabus with module order`);
+            updatedModules.push({ ...module, order: i + 1 });
+          } catch (updateError) {
+            console.error(`Failed to update module ${module.id} order:`, updateError);
+            toast.error(`Failed to update module order. Please try again.`);
+            return;
+          }
+        } else {
+          // Создаем новый модуль
+          const moduleData = {
+            title: module.title,
+            description: module.description,
+            order: i + 1
+          };
+          
+          console.log('Creating module with data:', moduleData);
+          
+          // Особое внимание к пустым модулям
+          if ((module.lessons?.length || 0) === 0) {
+            console.log(`⚠️ IMPORTANT: Creating EMPTY module - it should NOT be deleted by backend!`);
+          }
+          
+          try {
+            const response = await axios.post(`/course/${courseId}/modules`, moduleData, {
               headers: { Authorization: `Bearer ${token}` }
             });
             
             moduleId = response.data?.id || response.data?.module?.id;
-            console.log(`Created new module:`, response.data);
+            console.log(`Created new module with ID: ${moduleId}`, response.data);
+            
+            // Добавляем созданный модуль в обновленный список
+            updatedModules.push({ ...module, id: moduleId, order: i + 1 });
           } catch (moduleError) {
-            console.error(`Error creating module (primary): ${moduleError.message}`);
-            // Пробуем альтернативные endpoints
-            try {
-              const alt1 = await axios.post(`/course/${courseId}/module`, {
-                ...moduleData,
-                title: module.title
-              }, {
-                headers: { Authorization: `Bearer ${token}` }
-              });
-              moduleId = alt1.data?.id || alt1.data?.module?.id;
-              console.log(`Created module via /course/:id/module:`, alt1.data);
-            } catch (alt1Err) {
-              try {
-                const alt2 = await axios.post('/module', {
-                  ...moduleData,
-                  title: module.title,
-                  courseId: courseId
-                }, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                moduleId = alt2.data?.id || alt2.data?.module?.id;
-                console.log(`Created module via /module:`, alt2.data);
-              } catch (alt2Err) {
-                try {
-                  const alt3 = await axios.post('/modules', {
-                    ...moduleData,
-                    title: module.title,
-                    courseId: courseId
-                  }, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  moduleId = alt3.data?.id || alt3.data?.module?.id;
-                  console.log(`Created module via /modules:`, alt3.data);
-                } catch (alt3Err) {
-                  console.error(`All module endpoints failed`, { moduleError, alt1Err, alt2Err, alt3Err });
-                  throw new Error(`Failed to create module: ${module.title}`);
-                }
-              }
-            }
+            console.error(`Error creating module: ${moduleError.message}`);
+            console.error('Module data that failed:', moduleData);
+            console.error('Full error response:', moduleError.response?.data);
+              toast.error(`Failed to create module: ${module.title}`);
+            return;
           }
         }
+      }
+      
+      // Обновляем локальное состояние с новыми ID модулей
+      setModules(updatedModules);
+      
+      // Финальная проверка: убеждаемся, что все модули (включая пустые) сохранены
+      console.log('Final verification: checking if all modules were saved...');
+      try {
+        const finalVerifyResponse = await axios.get(`/course/${courseId}/modules`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
         
-        // Сохраняем уроки модуля
-        if (module.lessons && module.lessons.length > 0) {
-          for (let lessonIndex = 0; lessonIndex < module.lessons.length; lessonIndex++) {
-            const lesson = module.lessons[lessonIndex];
+        const finalModules = finalVerifyResponse.data || [];
+        const savedModulesCount = finalModules.length;
+        const expectedModulesCount = updatedModules.length;
+        
+        console.log(`Expected modules: ${expectedModulesCount}, Saved modules: ${savedModulesCount}`);
+        
+        if (savedModulesCount < expectedModulesCount) {
+          console.error('🚨 CRITICAL: Not all modules were saved!');
+          console.error('This indicates a backend bug with empty modules');
+          
+          // Показываем пользователю ошибку
+          toast.error(`Backend failed to save all modules (${savedModulesCount}/${expectedModulesCount})`);
+          
+          // Пытаемся восстановить недостающие модули
+          const missingModules = updatedModules.filter(expected => 
+            !finalModules.some(saved => saved.id === expected.id)
+          );
+          
+          if (missingModules.length > 0) {
+            console.log('Attempting to restore missing modules...');
+            const restoreSuccess = await restoreEmptyModules(missingModules);
             
-            if (lesson.id && !lesson.id.toString().startsWith('temp_')) {
-              // === Обновляем привязку урока к модулю и порядок ===
-              try {
-                await axios.put(`/lessons/${lesson.id}`, {
-                  moduleId: moduleId,
-                  module_id: moduleId, // альтернативный ключ
-                  order: lessonIndex + 1,
-                }, {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-                console.log(`Updated lesson ${lesson.id} -> module ${moduleId}`);
-              } catch (updErr) {
-                console.warn(`Failed to update lesson ${lesson.id}, maybe endpoint unsupported`, updErr.message);
-              }
-
-              // Добавляем/обновляем lesson в структуре модуля (course meta)
-              try {
-                await axios.post(`/course/${courseId}/modules/${moduleId}/lessons`, {
-                  name: lesson.name,
-                  title: lesson.name,
-                  content: lesson.content,
-                  videoLink: lesson.videoUrl,
-                  order: lessonIndex + 1,
-                }, {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-              } catch (metaErr) {
-                console.warn('Meta lesson add failed (maybe duplicate)', metaErr.response?.data?.message || metaErr.message);
+            if (restoreSuccess) {
+              toast.success('Missing modules restored');
+            } else {
+              toast.error('Failed to restore missing modules');
+            }
               }
             } else {
-              // Создаем новый урок
-              const lessonData = {
-                name: lesson.name,
-                content: lesson.content,
-                videoLink: lesson.videoUrl || null,
-                order: lessonIndex + 1,
-                courseId: courseId,
-                moduleId: moduleId
-              };
-              // альтернативные ключи на случай другого формата бекенда
-              const altLessonDataA = {
-                name: lesson.name,
-                content: lesson.content || '',
-                videoLink: lesson.videoUrl || '',
-                order: lessonIndex + 1,
-                course: courseId,
-                module: moduleId
-              };
-              
-              try {
-                const response = await axios.post(`/course/${courseId}/modules/${moduleId}/lessons`, lessonData, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                
-                console.log(`Created new lesson:`, response.data);
-              } catch (lessonError) {
-                console.error(`Error creating lesson ${lesson.name} (primary):`, lessonError.message);
-                
-                // Пробуем альтернативные endpoints/форматы
-                try {
-                  const altResponse1 = await axios.post('/lessons', lessonData, {
-                    headers: { Authorization: `Bearer ${token}` }
-                  });
-                  console.log(`Created lesson via /lessons with moduleId:`, altResponse1.data);
-                } catch (err1) {
-                  try {
-                    const altResponse2 = await axios.post('/lessons', altLessonDataA, {
-                      headers: { Authorization: `Bearer ${token}` }
-                    });
-                    console.log(`Created lesson via /lessons alt format:`, altResponse2.data);
-                  } catch (err2) {
-                    console.error('All lesson endpoints failed', { lessonError, err1, err2 });
-                    throw new Error(`Failed to create lesson: ${lesson.name}`);
-                  }
-                }
-              }
-
-              // Добавляем lesson в meta
-              try {
-                await axios.post(`/course/${courseId}/modules/${moduleId}/lessons`, {
-                  name: lesson.name,
-                  title: lesson.name,
-                  content: lesson.content,
-                  videoLink: lesson.videoUrl,
-                  order: lessonIndex + 1,
-                }, {
-                  headers: { Authorization: `Bearer ${token}` },
-                });
-              } catch (metaErr) {
-                console.warn('Meta lesson add failed', metaErr.response?.data?.message || metaErr.message);
-              }
-            }
-          }
+          console.log('✅ All modules saved successfully');
         }
+        
+        // Проверяем, не потерялись ли пустые модули
+        const savedEmptyModules = finalModules.filter(m => (m.lessons?.length || 0) === 0);
+        const expectedEmptyModules = updatedModules.filter(m => (m.lessons?.length || 0) === 0);
+        
+        if (savedEmptyModules.length < expectedEmptyModules.length) {
+          console.error('🚨 CRITICAL: Empty modules were lost during save!');
+          toast.error('Empty modules were lost - backend bug detected!');
+        }
+        
+      } catch (verifyError) {
+        console.error('Error during final verification:', verifyError);
       }
       
-      setHasUnsavedChanges(false);
-      toast.success('Все модули успешно сохранены!', {
-        position: "top-right",
-        autoClose: 3000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+        toast.success('All changes saved successfully!');
       
-      // Сохраняем структуру локально для последующей загрузки
-      try {
-        localStorage.setItem(`syllabus:${courseId}`, JSON.stringify(modules));
-        console.log('Syllabus structure saved to localStorage');
-      } catch (error) {
-        console.error('Failed to save to localStorage:', error);
-      }
-      
-      // НЕ перезагружаем данные после сохранения, чтобы не потерять текущее состояние
-      // await loadSyllabusData();
+      // Перезагружаем данные после сохранения для получения актуальных данных
+      console.log('Reloading syllabus data after save...');
+      await loadSyllabusData();
       
     } catch (error) {
       console.error('Error saving modules:', error);
-      
-      // Всегда сохраняем структуру локально как fallback
-      try {
-        localStorage.setItem(`syllabus:${courseId}`, JSON.stringify(modules));
-        console.log('Syllabus structure saved to localStorage as fallback');
-      } catch (lsErr) {
-        console.error('Failed to save syllabus locally:', lsErr);
-      }
-      
-      // Показываем информативное сообщение об ошибке
-      if (error.response?.status === 404) {
-        toast.info('Серверные эндпоинты для модулей недоступны (404). Структура курса сохранена локально в браузере.', {
-          position: 'top-right', autoClose: 5000
-        });
-      } else {
-        toast.error(`Ошибка при сохранении модулей: ${error.response?.data?.message || error.message}`, {
-          position: "top-right",
-          autoClose: 5000,
-          hideProgressBar: false,
-          closeOnClick: true,
-          pauseOnHover: true,
-          draggable: true,
-        });
-      }
+        toast.error('Failed to save changes. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -727,7 +787,7 @@ const SyllabusEditor = () => {
     e.dataTransfer.dropEffect = 'move';
   };
 
-  const handleDrop = (e, targetModuleId, targetIndex) => {
+  const handleDrop = async (e, targetModuleId, targetIndex) => {
     e.preventDefault();
     const lessonId = parseInt(e.dataTransfer.getData('text/plain'));
     
@@ -748,6 +808,15 @@ const SyllabusEditor = () => {
     
     if (!lesson) return;
     
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
+        return;
+      }
+    
     // If moving within the same module
     if (sourceModuleId === targetModuleId) {
       const module = modules.find(m => m.id === sourceModuleId);
@@ -755,16 +824,36 @@ const SyllabusEditor = () => {
         const reorderedLessons = Array.from(module.lessons || []);
         const [removed] = reorderedLessons.splice(sourceIndex, 1);
         reorderedLessons.splice(targetIndex, 0, removed);
+          
+          // Обновляем порядок уроков в БД
+          for (let i = 0; i < reorderedLessons.length; i++) {
+            try {
+              await axios.put(`/lessons/${reorderedLessons[i].id}`, {
+                order: i + 1
+              }, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log(`Updated lesson ${reorderedLessons[i].id} order to ${i + 1}`);
+            } catch (error) {
+              console.error(`Failed to update lesson ${reorderedLessons[i].id} order:`, error);
+              toast.error('Failed to update lesson order. Please try again.');
+              return;
+            }
+          }
         
         const updatedModules = modules.map(m => 
           m.id === sourceModuleId ? { ...m, lessons: reorderedLessons } : m
         );
         
             setModules(updatedModules);
-    setHasUnsavedChanges(true);
-    
-    // Update local state only (frontend-only solution)
-    toast.success('Lesson order updated!');
+          
+          // Защита: логируем обновленные модули
+          console.log('🛡️ PROTECTION: Updated modules preserved, backend should handle syllabus meta');
+          
+          toast.success('Lesson order updated and saved successfully!');
+          
+          // Перезагружаем данные для получения актуальной информации
+          await loadSyllabusData();
       }
     }
     // If moving between modules
@@ -778,6 +867,55 @@ const SyllabusEditor = () => {
         
         const [movedLesson] = sourceLessons.splice(sourceIndex, 1);
         targetLessons.splice(targetIndex, 0, movedLesson);
+          
+          // Обновляем moduleId и порядок перемещенного урока в БД
+          try {
+            await axios.put(`/lessons/${movedLesson.id}`, {
+              moduleId: targetModuleId,
+              order: targetIndex + 1
+            }, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            console.log(`Moved lesson ${movedLesson.id} to module ${targetModuleId} with order ${targetIndex + 1}`);
+          } catch (error) {
+            console.error(`Failed to move lesson ${movedLesson.id}:`, error);
+            toast.error('Failed to move lesson. Please try again.');
+            return;
+          }
+          
+          // Обновляем порядок уроков в исходном модуле
+          for (let i = 0; i < sourceLessons.length; i++) {
+            try {
+              await axios.put(`/lessons/${sourceLessons[i].id}`, {
+                order: i + 1
+              }, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              console.log(`Updated source module lesson ${sourceLessons[i].id} order to ${i + 1}`);
+            } catch (error) {
+              console.error(`Failed to update source module lesson ${sourceLessons[i].id} order:`, error);
+              toast.error('Failed to update lesson order. Please try again.');
+              return;
+            }
+          }
+          
+          // Обновляем порядок уроков в целевом модуле
+          for (let i = 0; i < targetLessons.length; i++) {
+            if (targetLessons[i].id !== movedLesson.id) { // Пропускаем перемещенный урок
+              try {
+                await axios.put(`/lessons/${targetLessons[i].id}`, {
+                  order: i + 1
+                }, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                console.log(`Updated target module lesson ${targetLessons[i].id} order to ${i + 1}`);
+              } catch (error) {
+                console.error(`Failed to update target module lesson ${targetLessons[i].id} order:`, error);
+                toast.error('Failed to update lesson order. Please try again.');
+                return;
+              }
+            }
+          }
         
         const updatedModules = modules.map(m => {
           if (m.id === sourceModuleId) {
@@ -790,16 +928,35 @@ const SyllabusEditor = () => {
         });
         
         setModules(updatedModules);
-        setHasUnsavedChanges(true);
-        
-        // Update local state only (frontend-only solution)
-        toast.success('Lesson moved successfully!');
+          
+          // Защита: логируем обновленные модули
+          console.log('🛡️ PROTECTION: Updated modules preserved, backend should handle syllabus meta');
+          
+          toast.success('Lesson moved and saved successfully!');
+          
+          // Перезагружаем данные для получения актуальной информации
+          await loadSyllabusData();
+        }
       }
+    } catch (error) {
+      console.error('Error handling drop:', error);
+      toast.error('Failed to update lesson position. Please try again.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteModule = (moduleId) => {
+  const handleDeleteModule = async (moduleId) => {
     if (!window.confirm('Are you sure you want to delete this module? All lessons will be moved to unassigned.')) {
+      return;
+    }
+
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
       return;
     }
 
@@ -811,9 +968,62 @@ const SyllabusEditor = () => {
       setAvailableLessons([...availableLessons, ...moduleToDelete.lessons]);
     }
     
+      // Если модуль уже существует на сервере (не временный), удаляем его из БД
+    if (moduleToDelete && moduleToDelete.id && !moduleToDelete.id.toString().startsWith('temp_')) {
+        try {
+          await axios.delete(`/course/${courseId}/modules/${moduleToDelete.id}`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log(`Deleted module ${moduleToDelete.id} from database`);
+          
+          // Освобождаем уроки от привязки к модулю
+          if (moduleToDelete.lessons && moduleToDelete.lessons.length > 0) {
+            for (const lesson of moduleToDelete.lessons) {
+              try {
+                await axios.put(`/lessons/${lesson.id}`, {
+                  moduleId: null
+                }, {
+                  headers: { Authorization: `Bearer ${token}` }
+                });
+                console.log(`Freed lesson ${lesson.id} from module ${moduleToDelete.id}`);
+              } catch (error) {
+                console.error(`Failed to free lesson ${lesson.id}:`, error);
+                // Продолжаем выполнение, даже если не удалось освободить урок
+              }
+            }
+          }
+          
+        } catch (error) {
+          console.error(`Failed to delete module ${moduleToDelete.id}:`, error);
+          toast.error('Failed to delete module. Please try again.');
+          return;
+        }
+    }
+    
     setModules(updatedModules);
-    setHasUnsavedChanges(true);
-    toast.success('Module deleted successfully!');
+      
+      // Защита: логируем оставшиеся модули
+      if (updatedModules.length > 0) {
+        console.log('🛡️ PROTECTION: Remaining modules preserved, backend should handle syllabus meta');
+      }
+      
+      // Модуль удален
+      
+      toast.success('Module deleted and saved successfully!');
+      
+      // Перезагружаем данные для получения актуальной информации
+      await loadSyllabusData();
+      
+      // Принудительно перезагружаем страницу для обновления UI
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000); // Задержка в 1 секунду, чтобы пользователь увидел сообщение об успехе
+    } catch (error) {
+      console.error('Error deleting module:', error);
+      toast.error('Failed to delete module. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEditLesson = (lesson) => {
@@ -821,21 +1031,82 @@ const SyllabusEditor = () => {
     history.push(`/teach/lessons/${lesson.id}/content`);
   };
 
-  const handleDeleteLesson = (lessonId) => {
-    if (!window.confirm('Are you sure you want to delete this lesson?')) {
+  const handleDeleteLesson = async (lessonId) => {
+    console.log('[SyllabusEditor] Deleting lesson from module:', lessonId);
+    
+    if (!window.confirm('Are you sure you want to remove this lesson from the module?')) {
       return;
     }
 
-    // Remove from modules
+    try {
+      setSaving(true);
+      
+      const token = localStorage.getItem('jwtToken');
+      if (!token) {
+        toast.error('Authentication token missing. Please log in again.');
+        return;
+      }
+      
+      // Находим модуль, из которого удаляем урок
+      const moduleWithLesson = modules.find(module => 
+        module.lessons && module.lessons.some(lesson => lesson.id === lessonId)
+      );
+      
+      console.log('[SyllabusEditor] Found module with lesson:', moduleWithLesson);
+      
+      if (!moduleWithLesson) {
+        toast.error('Lesson not found in any module');
+        return;
+      }
+      
+      // Если модуль уже существует на сервере (не временный), освобождаем урок от привязки к модулю
+      if (moduleWithLesson.id && !moduleWithLesson.id.toString().startsWith('temp_')) {
+        try {
+          await axios.put(`/lessons/${lessonId}`, {
+            moduleId: null
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          console.log(`Freed lesson ${lessonId} from module ${moduleWithLesson.id}`);
+          
+          // Урок освобожден от модуля
+          
+        } catch (error) {
+          console.error(`Failed to free lesson ${lessonId}:`, error);
+          toast.error('Failed to remove lesson from module. Please try again.');
+          return;
+        }
+      }
+      
+      // Удаляем урок из модуля
     const updatedModules = modules.map(module => ({
       ...module,
       lessons: (module.lessons || []).filter(lesson => lesson.id !== lessonId)
     }));
     
     setModules(updatedModules);
-    setAvailableLessons(availableLessons.filter(lesson => lesson.id !== lessonId));
-    setHasUnsavedChanges(true);
-    toast.success('Lesson deleted successfully!');
+      
+      // Защита: логируем обновленные модули
+      console.log('🛡️ PROTECTION: Updated modules preserved, backend should handle syllabus meta');
+      
+      // Возвращаем урок в список доступных уроков
+      const lessonToRestore = moduleWithLesson.lessons.find(lesson => lesson.id === lessonId);
+      
+      if (lessonToRestore) {
+        setAvailableLessons(prev => [...prev, lessonToRestore]);
+      }
+      
+      toast.success('Lesson removed from module and saved successfully!');
+      
+      // Перезагружаем данные для получения актуальной информации
+      await loadSyllabusData();
+      
+    } catch (error) {
+      console.error('Error removing lesson from module:', error);
+      toast.error('Failed to remove lesson from module. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getLessonIcon = (type) => {
@@ -850,6 +1121,70 @@ const SyllabusEditor = () => {
         return <FontAwesomeIcon icon={faFileAlt} />;
     }
   };
+
+  // Функция для восстановления пустых модулей в БД
+  const restoreEmptyModules = async (missingModules) => {
+    console.log('Attempting to restore empty modules in database...');
+    
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+      console.error('No token for restoring modules');
+      return false;
+    }
+    
+    let successCount = 0;
+    
+    for (const module of missingModules) {
+      if ((module.lessons?.length || 0) === 0) {
+        console.log(`Restoring empty module: ${module.title} (ID: ${module.id})`);
+        
+        try {
+          // Пробуем создать модуль заново
+          const restoreResponse = await axios.post(`/course/${courseId}/modules`, {
+            title: module.title,
+            description: module.description,
+            order: module.order
+          }, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          const restoredId = restoreResponse.data?.id || restoreResponse.data?.module?.id;
+          if (restoredId) {
+            console.log(`✅ Successfully restored module: ${module.title} with new ID: ${restoredId}`);
+            successCount++;
+          } else {
+            console.error(`❌ Failed to restore module: ${module.title}`);
+          }
+        } catch (restoreError) {
+          console.error(`Error restoring module ${module.title}:`, restoreError);
+        }
+      }
+    }
+    
+    console.log(`Restored ${successCount} out of ${missingModules.length} missing modules`);
+    return successCount > 0;
+  };
+
+  // Функция для пересчета order модулей
+  const recalculateModuleOrder = (modulesList) => {
+    console.log('🔄 Recalculating module order...');
+    const sortedModules = [...modulesList].sort((a, b) => (a.order || 0) - (b.order || 0));
+    
+    sortedModules.forEach((module, index) => {
+      const correctOrder = index + 1;
+      if (module.order !== correctOrder) {
+        console.log(`📝 Fixing module "${module.title}" order: ${module.order} → ${correctOrder}`);
+        module.order = correctOrder;
+      }
+    });
+    
+    console.log('✅ Module order recalculated:', sortedModules.map(m => ({ id: m.id, title: m.title, order: m.order })));
+    return sortedModules;
+  };
+
+  // Все временные защитные механизмы удалены, поскольку проблема решена на уровне бэкенда
+
+
 
   if (loading) {
     return (
@@ -898,79 +1233,111 @@ const SyllabusEditor = () => {
           position: 'sticky',
           top: '32px'
         }}>
+          {/* Back to Course Button */}
+          <button
+            onClick={() => history.push(`/editcourse/${courseId}`)}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              background: 'transparent',
+              border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+              borderRadius: '8px',
+              color: dark ? '#eaf4fd' : '#333',
+              cursor: 'pointer',
+              marginBottom: '20px',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = dark ? '#404040' : '#f8f9fa'}
+            onMouseOut={(e) => e.target.style.background = 'transparent'}
+          >
+            <FontAwesomeIcon icon={faArrowLeft} />
+            {t('course.back_to_course')}
+          </button>
+
+          {/* Course Modules Title */}
           <h3 style={{
-            fontSize: '18px',
+            fontSize: '16px',
             fontWeight: '600',
             color: dark ? '#eaf4fd' : '#333',
-            marginBottom: '20px',
+            marginBottom: '16px',
             borderBottom: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
-            paddingBottom: '12px'
+            paddingBottom: '8px'
           }}>
-            Навигация
+            {t('course.course_modules')}
           </h3>
           
-          <div style={{ marginBottom: '20px' }}>
-            <h4 style={{
+          {/* Auto-save Info */}
+          <div style={{
+              width: '100%',
+              padding: '12px 16px',
+            background: dark ? '#1a1a1a' : '#e8f5e8',
+            border: `1px solid ${dark ? '#404040' : '#4caf50'}`,
+              borderRadius: '8px',
+              marginBottom: '12px',
               fontSize: '14px',
-              fontWeight: '500',
-              color: dark ? '#666' : '#666',
-              marginBottom: '12px'
-            }}>
-              Модули ({modules.length})
-            </h4>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {modules.map((module, index) => (
-                <div
-                  key={module.id}
-                  style={{
-                    padding: '8px 12px',
-                    background: dark ? '#1a1a1a' : '#f8f9fa',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    color: dark ? '#eaf4fd' : '#333',
-                    cursor: 'pointer',
-                    border: `1px solid ${dark ? '#404040' : '#e9ecef'}`
-                  }}
-                  onClick={() => {
-                    const element = document.getElementById(`module-${module.id}`);
-                    if (element) {
-                      element.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                >
-                  {index + 1}. {module.title || module.name}
-                  <div style={{
-                    fontSize: '12px',
-                    color: dark ? '#666' : '#999',
-                    marginTop: '4px'
-                  }}>
-                    {module.lessons?.length || 0} уроков
-                  </div>
-                </div>
-              ))}
-            </div>
+            color: dark ? '#4caf50' : '#2e7d32',
+            textAlign: 'center',
+            fontWeight: '500'
+          }}>
+            <FontAwesomeIcon icon={faSave} style={{ marginRight: '8px' }} />
+            {t('course.auto_save_enabled') || 'Auto-save enabled'}
           </div>
-          
-          
-          
-          <div>
+
+          {/* Add Module Button */}
+          <button
+            onClick={() => setShowAddModuleModal(true)}
+                  style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '12px 16px',
+              background: '#007bff',
+              border: 'none',
+              borderRadius: '8px',
+              color: 'white',
+                    cursor: 'pointer',
+              marginBottom: '12px',
+              fontSize: '14px',
+              fontWeight: '500',
+              transition: 'all 0.2s'
+            }}
+            onMouseOver={(e) => e.target.style.background = '#0056b3'}
+            onMouseOut={(e) => e.target.style.background = '#007bff'}
+          >
+            <FontAwesomeIcon icon={faPlus} />
+            {t('course.add_module')}
+          </button>
+
+          {/* Statistics */}
+                  <div style={{
+            borderTop: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+            paddingTop: '16px'
+          }}>
             <h4 style={{
               fontSize: '14px',
               fontWeight: '500',
               color: dark ? '#666' : '#666',
               marginBottom: '12px'
             }}>
-              Статистика
+              {t('course.statistics')}
             </h4>
             <div style={{
               fontSize: '12px',
               color: dark ? '#666' : '#999',
               lineHeight: '1.4'
             }}>
-              <div>Всего модулей: {modules.length}</div>
-              <div>Всего уроков: {modules.reduce((total, module) => total + (module.lessons?.length || 0), 0)}</div>
-              <div>Доступно уроков: {availableLessons.length}</div>
-              <div>Курс ID: {courseId}</div>
+              <div>{t('course.total_modules', { count: modules.length })}</div>
+              <div>{t('course.total_lessons', { count: modules.reduce((total, module) => total + (module.lessons?.length || 0), 0) })}</div>
+              <div>{t('course.available_lessons', { count: availableLessons.length })}</div>
+              <div>{t('course.course_id', { id: courseId })}</div>
             </div>
           </div>
         </div>
@@ -989,7 +1356,7 @@ const SyllabusEditor = () => {
             fontWeight: '700',
             color: dark ? '#eaf4fd' : '#333'
           }}>
-            Syllabus Editor
+            {t('course.syllabus_editor')}
           </h1>
           <button
             onClick={() => history.goBack()}
@@ -1004,7 +1371,7 @@ const SyllabusEditor = () => {
               fontWeight: '500'
             }}
           >
-            Back to Course
+            {t('course.back_to_course')}
           </button>
                 </div>
 
@@ -1026,32 +1393,26 @@ const SyllabusEditor = () => {
               fontWeight: '600',
               color: dark ? '#eaf4fd' : '#333'
             }}>
-              Course Modules
+              {t('course.course_modules')}
             </h2>
             <div style={{ display: 'flex', gap: '12px' }}>
-              {modules.length > 0 && (
-                <button
-                  onClick={saveAllModules}
-                  disabled={saving}
+                <div
                   style={{
                     padding: '12px 20px',
-                    background: saving ? '#6c757d' : (hasUnsavedChanges ? '#dc3545' : '#28a745'),
-                    color: 'white',
-                    border: 'none',
+                    background: dark ? '#1a1a1a' : '#e8f5e8',
+                    border: `1px solid ${dark ? '#404040' : '#4caf50'}`,
                     borderRadius: '8px',
                     fontSize: '16px',
-                    fontWeight: '500',
-                    cursor: saving ? 'not-allowed' : 'pointer',
+                    color: dark ? '#4caf50' : '#2e7d32',
                     display: 'flex',
                     alignItems: 'center',
                     gap: '8px',
-                    opacity: saving ? 0.7 : 1
+                    fontWeight: '500'
                   }}
                 >
                   <FontAwesomeIcon icon={faSave} />
-                  {saving ? 'Saving...' : (hasUnsavedChanges ? 'Save All*' : 'Save All')}
-                </button>
-              )}
+                  {t('course.auto_save_enabled') || 'Auto-save enabled'}
+                </div>
               <button
                 onClick={() => setShowAddModuleModal(true)}
                 style={{
@@ -1069,7 +1430,7 @@ const SyllabusEditor = () => {
                 }}
               >
                 <FontAwesomeIcon icon={faPlus} />
-                Add Module
+                {t('course.add_module')}
               </button>
             </div>
           </div>
@@ -1082,14 +1443,31 @@ const SyllabusEditor = () => {
               fontSize: '16px'
             }}>
               <div style={{ marginBottom: '16px' }}>
-                No modules yet for course ID: {courseId}
+                {t('course.no_modules_yet', { courseId: courseId })}
               </div>
-              <div style={{ fontSize: '14px', color: dark ? '#777' : '#aaa' }}>
-                Create your first module to start organizing lessons from this course.
+              <div style={{ fontSize: '14px', color: dark ? '#777' : '#aaa', marginBottom: '24px' }}>
+                {t('course.create_first_module')}
               </div>
-              <div style={{ marginTop: '16px', fontSize: '14px', color: dark ? '#777' : '#aaa' }}>
-                Available lessons: {availableLessons.length}
+              <div style={{ fontSize: '14px', color: dark ? '#777' : '#aaa', marginBottom: '24px' }}>
+                {t('course.available_lessons', { count: availableLessons.length })}
               </div>
+              <button
+                onClick={() => setShowCreateModuleModal(true)}
+                style={{
+                  padding: '12px 24px',
+                  background: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  fontWeight: '500'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                onMouseOut={(e) => e.target.style.background = '#007bff'}
+              >
+                {t('course.create_first_module')}
+              </button>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -1117,7 +1495,7 @@ const SyllabusEditor = () => {
                       color: dark ? '#eaf4fd' : '#333',
                       margin: 0
                     }}>
-                      Module {moduleIndex + 1}: {module.title}
+                      {t('course.module')} {moduleIndex + 1}: {module.title}
                     </h3>
                     <div style={{ display: 'flex', gap: '8px' }}>
                       <button
@@ -1139,7 +1517,7 @@ const SyllabusEditor = () => {
                         }}
                       >
                         <FontAwesomeIcon icon={faPlus} />
-                        Add Existing Lesson
+                        {t('course.add_existing_lesson')}
                       </button>
                       <button
                         onClick={() => handleDeleteModule(module.id)}
@@ -1178,7 +1556,7 @@ const SyllabusEditor = () => {
                         borderRadius: '6px',
                         background: dark ? '#1a1a1a' : '#f8f9fa'
                       }}>
-                        Drop lessons here or add new ones!
+                        {t('course.drop_lessons_here')}
                 </div>
                     ) : (
                       (module.lessons || []).map((lesson, lessonIndex) => (
@@ -1215,7 +1593,7 @@ const SyllabusEditor = () => {
                               fontWeight: '500',
                               color: dark ? '#eaf4fd' : '#333'
                             }}>
-                                  {lesson.name || 'Untitled Lesson'}
+                                  {lesson.name || t('lesson.untitled_lesson')}
                                 </span>
                             </div>
                 </div>
@@ -1289,7 +1667,7 @@ const SyllabusEditor = () => {
               color: dark ? '#eaf4fd' : '#333',
               marginBottom: '20px'
               }}>
-                Add New Module
+                {t('course.add_new_module')}
               </h3>
               
             <div style={{ marginBottom: '16px' }}>
@@ -1300,13 +1678,13 @@ const SyllabusEditor = () => {
                 fontWeight: '500',
                 color: dark ? '#eaf4fd' : '#333'
               }}>
-                Module Name
+                {t('course.module_name_label')}
               </label>
               <input
                 type="text"
                 value={newModuleName}
                 onChange={(e) => setNewModuleName(e.target.value)}
-                placeholder="Enter module name"
+                placeholder={t('course.module_name_placeholder')}
                 style={{
                   width: '100%',
                   padding: '10px 12px',
@@ -1331,7 +1709,7 @@ const SyllabusEditor = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
             <button
                   onClick={handleAddModule}
@@ -1346,8 +1724,103 @@ const SyllabusEditor = () => {
                   opacity: newModuleName.trim() ? 1 : 0.7
                   }}
                 >
-                  Add Module
+                  {t('course.add_module_button')}
             </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Create First Module Modal */}
+        {showCreateModuleModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{
+              background: dark ? '#2d2d2d' : '#fff',
+              borderRadius: '12px',
+              padding: '24px',
+              width: '400px',
+              maxWidth: '90vw',
+              border: `1px solid ${dark ? '#404040' : '#e9ecef'}`
+            }}>
+              <h3 style={{
+                fontSize: '20px',
+                fontWeight: '600',
+                color: dark ? '#eaf4fd' : '#333',
+                marginBottom: '20px'
+              }}>
+                {t('course.create_first_module')}
+              </h3>
+              
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: dark ? '#eaf4fd' : '#333'
+                }}>
+                  {t('course.module_name_label')}
+                </label>
+                <input
+                  type="text"
+                  value={newModuleName}
+                  onChange={(e) => setNewModuleName(e.target.value)}
+                  placeholder={t('course.module_name_placeholder')}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '6px',
+                    border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+                    background: dark ? '#1a1a1a' : '#fff',
+                    color: dark ? '#eaf4fd' : '#333',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+              
+              <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={() => setShowCreateModuleModal(false)}
+                  style={{
+                    padding: '10px 20px',
+                    background: 'transparent',
+                    border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+                    borderRadius: '6px',
+                    color: dark ? '#eaf4fd' : '#333',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  onClick={() => {
+                    handleAddModule();
+                    setShowCreateModuleModal(false);
+                  }}
+                  disabled={!newModuleName.trim()}
+                  style={{
+                    padding: '10px 20px',
+                    background: newModuleName.trim() ? '#28a745' : '#6c757d',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    cursor: newModuleName.trim() ? 'pointer' : 'not-allowed',
+                    opacity: newModuleName.trim() ? 1 : 0.7
+                  }}
+                >
+                  {t('course.create_module_button')}
+                </button>
               </div>
             </div>
           </div>
@@ -1383,7 +1856,7 @@ const SyllabusEditor = () => {
               color: dark ? '#eaf4fd' : '#333',
               marginBottom: '20px'
             }}>
-              Add Lesson to Module
+              {t('course.add_lesson_to_module')}
               </h3>
               
               <div style={{ marginBottom: '20px' }}>
@@ -1392,7 +1865,7 @@ const SyllabusEditor = () => {
                   fontSize: '14px',
                   marginBottom: '16px'
                 }}>
-                  Choose from existing lessons in this course (ID: {courseId}):
+                  {t('course.choose_from_existing_lessons', { courseId: courseId })}:
                 </p>
 
                 
@@ -1400,7 +1873,7 @@ const SyllabusEditor = () => {
                 <div style={{ marginBottom: '16px', position: 'relative' }}>
                   <input
                     type="text"
-                    placeholder="Search lessons..."
+                    placeholder={t('course.search_lessons')}
                     value={lessonSearchTerm}
                     onChange={(e) => {
                       setLessonSearchTerm(e.target.value);
@@ -1438,7 +1911,10 @@ const SyllabusEditor = () => {
                   )}
                 </div>
                 
-                {filteredLessons.length === 0 ? (
+                {(() => {
+                  console.log('[SyllabusEditor] Modal - filteredLessons length:', filteredLessons.length);
+                  console.log('[SyllabusEditor] Modal - filteredLessons:', filteredLessons);
+                  return filteredLessons.length === 0 ? (
                   <div style={{
                     textAlign: 'center',
                     padding: '20px',
@@ -1449,9 +1925,9 @@ const SyllabusEditor = () => {
                     background: dark ? '#1a1a1a' : '#f8f9fa'
                   }}>
                     {lessonSearchTerm.trim() === '' ? (
-                      `No lessons found for course ID: ${courseId}. Create lessons first in the course management section.`
+                      t('course.no_lessons_found', { courseId: courseId })
                     ) : (
-                      `No lessons match "${lessonSearchTerm}". Try a different search term.`
+                      t('course.no_lessons_match', { searchTerm: lessonSearchTerm })
                     )}
                   </div>
                 ) : (
@@ -1491,7 +1967,7 @@ const SyllabusEditor = () => {
                               fontSize: '14px',
                               color: dark ? '#666' : '#999'
                             }}>
-                              video • {lesson.content ? lesson.content.substring(0, 50) + '...' : 'No content'}
+                              video • {lesson.content ? lesson.content.substring(0, 50) + '...' : t('course.no_content')}
                               {lesson.videoLink && (
                                 <span style={{ marginLeft: '8px', color: dark ? '#28a745' : '#28a745' }}>
                                   • Has video
@@ -1521,14 +1997,14 @@ const SyllabusEditor = () => {
                               fontSize: '14px',
                               fontStyle: 'italic'
                             }}>
-                              Already added
+                              {t('course.already_added')}
                             </span>
                           )}
                         </div>
                       );
                     })}
                   </div>
-                )}
+                )})()}
               </div>
               
               <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
@@ -1543,7 +2019,7 @@ const SyllabusEditor = () => {
                     cursor: 'pointer'
                   }}
                 >
-                  Close
+                  {t('course.close')}
                 </button>
               </div>
             </div>

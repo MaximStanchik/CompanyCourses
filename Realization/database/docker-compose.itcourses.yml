@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  itcourses-db:
+    build: .
+    container_name: itcourses-postgres
+    environment:
+      - POSTGRES_DB=ItCourses
+      - POSTGRES_USER=admin12345
+      - POSTGRES_PASSWORD=admin12345
+    ports:
+      - "5433:5433"
+    volumes:
+      - itcourses_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./Scripts/:/docker-entrypoint-initdb.d/scripts/
+    restart: unless-stopped
+    command: ["postgres", "-p", "5433"]
+
+volumes:
+  itcourses_data: 

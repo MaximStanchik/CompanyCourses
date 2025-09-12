@@ -14,6 +14,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import axios from '../utils/axios';
 import useTheme from '../hooks/useTheme';
+import { getAvatarUrl } from '../utils/minioUtils';
 
 const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
   const { t, i18n, currentLanguage } = useLanguage();
@@ -22,6 +23,18 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
   
   // Force re-render when language changes
   const key = `comments-${currentLanguage}`;
+  
+  // Функция для проверки роли администратора
+  const isAdmin = () => {
+    try {
+      const token = localStorage.getItem('jwtToken');
+      if (!token) return false;
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      return decoded.roles && decoded.roles.some(r => String(r).toUpperCase().includes('ADMIN'));
+    } catch (e) {
+      return false;
+    }
+  };
   
   // Add effect to force re-render when language changes
   useEffect(() => {
@@ -50,30 +63,32 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
       window.removeEventListener('languageChanged', handleLanguageChange);
       i18n.off('languageChanged', handleI18nLanguageChange);
     };
-  }, [i18n]);
-  
+  }, [i18n, currentLanguage]);
+
   const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [newComment, setNewComment] = useState('');
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [myReactions, setMyReactions] = useState({});
   const [reactionLoading, setReactionLoading] = useState({});
-  const [myReactions, setMyReactions] = useState({}); // commentId -> 'like' | 'dislike' | undefined
-  const [profileModalUser, setProfileModalUser] = useState(null);
-  const [profileModalProfile, setProfileModalProfile] = useState(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
 
   useEffect(() => {
-    loadComments();
-  }, [courseId]);
-
-  // Update comments when user rating changes
-  useEffect(() => {
-    if (currentUserRating > 0) {
-      // Refresh comments to show updated rating
+    if (!isAdmin()) {
       loadComments();
     }
-  }, [currentUserRating]);
+  }, [courseId]);
+
+  useEffect(() => {
+    if (!isAdmin()) {
+      loadComments();
+    }
+  }, [currentLanguage]);
 
   const loadComments = async (opts = {}) => {
+    if (isAdmin()) return; // Не загружаем комментарии для администраторов
+    
     const silent = !!opts.silent;
     try {
       if (!silent) setLoading(true);
@@ -83,6 +98,24 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
       });
       const list = response.data.comments || [];
       setComments(list);
+      
+      // Отладочная информация для понимания структуры данных
+      console.log('=== КОММЕНТАРИИ ЗАГРУЖЕНЫ ===');
+      list.forEach((comment, index) => {
+        console.log(`Комментарий ${index + 1}:`, {
+          id: comment.id,
+          content: comment.content?.substring(0, 50) + '...',
+          user: {
+            id: comment.user?.id,
+            username: comment.user?.username,
+            email: comment.user?.email,
+            avatar: comment.user?.avatar,
+            profileAvatar: comment.user?.Profile?.avatar
+          }
+        });
+      });
+      console.log('=== КОНЕЦ КОММЕНТАРИЕВ ===');
+      
       // init myReactions from payload
       const map = {};
       list.forEach(c => { if (c.myReaction) map[c.id] = c.myReaction; });
@@ -175,20 +208,20 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
       const token = localStorage.getItem('jwtToken');
       const res = await axios.get(`/profile/user/${userId}`, { headers: { Authorization: `Bearer ${token}` } });
       const payload = res.data || {};
-      setProfileModalUser({ id: userId, username: payload.user?.username || payload.user?.email || 'User', email: payload.user?.email });
-      setProfileModalProfile(payload.profile || payload || {});
+      setSelectedUser({ id: userId, username: payload.user?.username || payload.user?.email || 'User', email: payload.user?.email });
+      setShowProfileModal(true);
     } catch {
-      setProfileModalUser({ id: userId, username: 'User' });
-      setProfileModalProfile({});
+      setSelectedUser({ id: userId, username: 'User' });
+      setShowProfileModal(true);
     }
   };
 
   const ProfileModalWrapper = () => (
     <UserProfileModal
-      open={!!profileModalUser}
-      onClose={() => setProfileModalUser(null)}
-      user={profileModalUser}
-      profile={profileModalProfile}
+      open={showProfileModal}
+      onClose={() => setShowProfileModal(false)}
+      user={selectedUser}
+      profile={null} // No profile data for now, as it's not fetched here
       dark={theme === 'dark'}
     />
   );
@@ -241,6 +274,54 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
         color: theme === 'dark' ? '#ffffff' : '#333333'
       }}>
         {t('comments.loading')}
+      </div>
+    );
+  }
+
+  // Если пользователь - администратор, показываем заглушку
+  if (isAdmin()) {
+    return (
+      <div key={key} style={{ 
+        background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
+        borderRadius: '12px',
+        border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+        overflow: 'hidden'
+      }}>
+        <div style={{ 
+          padding: '24px'
+        }}>
+          <h3 style={{ 
+            fontSize: '1.3rem',
+            fontWeight: '600',
+            marginBottom: '20px',
+            color: theme === 'dark' ? '#ffffff' : '#333333'
+          }}>
+            {t('comments.add_comment')}
+          </h3>
+          
+          <div style={{
+            padding: '20px',
+            background: theme === 'dark' ? '#1a1a1a' : '#f8f9fa',
+            borderRadius: '8px',
+            border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+            textAlign: 'center',
+            color: theme === 'dark' ? '#cccccc' : '#666666'
+          }}>
+            {t('comments.admin_cannot_comment')}
+          </div>
+
+          <div style={{
+            marginTop: '20px',
+            padding: '20px',
+            background: theme === 'dark' ? '#1a1a1a' : '#f8f9fa',
+            borderRadius: '8px',
+            border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+            textAlign: 'center',
+            color: theme === 'dark' ? '#cccccc' : '#666666'
+          }}>
+            {t('comments.comments_hidden_for_admin')}
+          </div>
+        </div>
       </div>
     );
   }
@@ -376,7 +457,16 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {comments.map((comment) => (
+            {comments.map((comment) => {
+              // Отладочная информация для аватарки
+              console.log(`Рендер комментария ${comment.id}:`, {
+                userAvatar: comment.user?.avatar,
+                profileAvatar: comment.user?.Profile?.avatar,
+                finalAvatar: comment.user?.avatar || comment.user?.Profile?.avatar,
+                avatarUrl: getAvatarUrl(comment.user?.avatar || comment.user?.Profile?.avatar)
+              });
+              
+              return (
               <div
                 key={comment.id}
                 style={{
@@ -393,18 +483,39 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
                   marginBottom: '12px'
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{ 
-                      width: '40px', 
-                      height: '40px', 
-                      borderRadius: '50%', 
-                      background: 'var(--accent-color, #4485ed)', 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      color: 'white',
-                      fontWeight: '600',
-                      fontSize: '16px'
-                    }}>
+                    {/* Аватарка пользователя */}
+                    {comment.user?.avatar || comment.user?.Profile?.avatar ? (
+                      <img 
+                        src={getAvatarUrl(comment.user.avatar || comment.user.Profile.avatar)} 
+                        alt="User avatar"
+                        style={{ 
+                          width: '40px', 
+                          height: '40px', 
+                          borderRadius: '50%',
+                          objectFit: 'cover'
+                        }}
+                        onError={(e) => {
+                          // Fallback на первую букву имени, если изображение не загрузилось
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'flex';
+                        }}
+                      />
+                    ) : null}
+                    {/* Fallback аватарка с первой буквой имени */}
+                    <div 
+                      style={{ 
+                        width: '40px', 
+                        height: '40px', 
+                        borderRadius: '50%', 
+                        background: 'var(--accent-color, #4485ed)', 
+                        display: comment.user?.avatar || comment.user?.Profile?.avatar ? 'none' : 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: '600',
+                        fontSize: '16px'
+                      }}
+                    >
                       {(comment.user?.username || comment.user?.email || 'A').charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -512,7 +623,8 @@ const CourseComments = ({ courseId, onRatingChange, currentUserRating }) => {
                   </div>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

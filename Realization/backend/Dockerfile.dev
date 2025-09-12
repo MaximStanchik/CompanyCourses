@@ -1,0 +1,30 @@
+# Use Node.js 18 as base image
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install system dependencies for Prisma
+RUN apk add --no-cache openssl
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including dev dependencies)
+RUN npm install
+
+# Copy Prisma schema and generate client
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# Copy source code
+COPY . .
+
+# Create uploads directory
+RUN mkdir -p static/uploads
+
+# Expose port 9000
+EXPOSE 9000
+
+# Start development server with nodemon
+CMD ["npm", "run", "dev"] 

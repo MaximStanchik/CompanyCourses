@@ -2,30 +2,38 @@ import React, { Component } from 'react';
 import PropTypes from 'prop-types';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import axios from 'axios';
+import axios from '../../utils/axios';
 import _ from 'lodash'; 
 import TextFieldGroup from '../common/TextFieldGroup';
 import SelectListGroup from '../common/SelectListGroup';
 import { GET_ERRORS } from "../../actions/types";
-import { createProfile, getCurrentProfile, clearCurrentProfile, deleteAccount } from '../../actions/profileActions';
+import { createProfile, getCurrentProfile, clearCurrentProfile } from '../../actions/profileActions';
 import Cropper from 'react-easy-crop';
 import { FaUpload } from 'react-icons/fa';
 import Footer from '../Footer';
 import NavBar from '../NavBar';
 import i18n from '../../i18n';
 import useTheme from '../../hooks/useTheme';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faUserEdit } from '@fortawesome/free-solid-svg-icons';
+import { getAvatarUrl } from '../../utils/minioUtils';
+import { useTranslation } from 'react-i18next';
+
 const t = i18n.t.bind(i18n);
 
 async function sendExternalIpToBackend(ip) {
-  const token = localStorage.getItem('jwtToken');
-  await fetch('/profile/update-ip', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({ ip }),
-  });
+  try {
+    const token = localStorage.getItem('jwtToken');
+    await axios.post('https://localhost:9000/profile/update-ip', { ip }, {
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      }
+    });
+  } catch (error) {
+    console.error('Error updating IP:', error);
+    // Не блокируем выполнение приложения при ошибке обновления IP
+  }
 }
 
 class EditProfile extends Component {
@@ -68,11 +76,13 @@ class EditProfile extends Component {
       avatar: null,
       passwordStrength: '',
       isAuthenticated: false,
+      showNotification: false,
+      notificationMessage: '',
+      notificationType: 'success', // 'success' или 'error'
     };
 
     this.onChange = this.onChange.bind(this);
     this.onSubmit = this.onSubmit.bind(this);
-    this.handleDelete = this.handleDelete.bind(this);
     this.onAvatarClick = this.onAvatarClick.bind(this);
     this.onAvatarClose = this.onAvatarClose.bind(this);
     this.onCropChange = this.onCropChange.bind(this);
@@ -90,6 +100,48 @@ class EditProfile extends Component {
     this.handleSavePassword = this.handleSavePassword.bind(this);
     this.handleDragOver = this.handleDragOver.bind(this);
     this.handleDrop = this.handleDrop.bind(this);
+    this.showNotification = this.showNotification.bind(this);
+    this.hideNotification = this.hideNotification.bind(this);
+  }
+
+  // Функция для показа уведомлений
+  showNotification(message, type = 'success') {
+    this.setState({
+      showNotification: true,
+      notificationMessage: message,
+      notificationType: type
+    });
+    
+    // Автоматически скрываем уведомление через 5 секунд
+    setTimeout(() => {
+      this.hideNotification();
+    }, 5000);
+  }
+
+  // Функция для скрытия уведомлений
+  hideNotification() {
+    this.setState({
+      showNotification: false,
+      notificationMessage: '',
+      notificationType: 'success'
+    });
+  }
+
+  // Функция для определения темной темы
+  isDarkTheme() {
+    return typeof document !== 'undefined' && (document.body.getAttribute('data-theme') === 'dark' || localStorage.getItem('theme') === 'dark');
+  }
+
+  // Функция для получения времени "назад"
+  getTimeAgo(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'только что';
+    if (diff < 3600) return `${Math.floor(diff/60)} мин назад`;
+    if (diff < 86400) return `${Math.floor(diff/3600)} ч назад`;
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
   }
 
   async componentDidMount() {
@@ -113,6 +165,7 @@ class EditProfile extends Component {
     if (this.props.location.state && this.props.location.state.username) {
       this.setState({ username: this.props.location.state.username });
     }
+    
     // Получаем внешний IP и отправляем на backend
     try {
       const res = await fetch('https://api.ipify.org?format=json');
@@ -123,17 +176,55 @@ class EditProfile extends Component {
     } catch (e) {
       // ignore
     }
+    
+    // Загружаем аватарку пользователя
+    try {
+      const userResponse = await axios.get('https://localhost:9000/auth/currentUser', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      console.log('User response:', userResponse.data);
+      if (userResponse.data && userResponse.data.avatar) {
+        const avatarUrl = getAvatarUrl(userResponse.data.avatar);
+        console.log('Setting avatar:', avatarUrl);
+        this.setState({
+          avatar: avatarUrl
+        });
+      } else {
+        console.log('No avatar found in user data');
+      }
+    } catch (error) {
+      console.error('Error loading user avatar:', error);
+    }
+    
     this.setState({ zoom: 2 });
+
+    // Добавляем слушатель изменения языка для перезагрузки страницы
+    this.languageChangeHandler = () => {
+      window.location.reload();
+    };
+    window.addEventListener('languageChanged', this.languageChangeHandler);
   }
 
   componentWillUnmount() {
     this.props.clearCurrentProfile();
     this.props.clearErrors && this.props.clearErrors(); 
+    
+    // Удаляем слушатель изменения языка
+    if (this.languageChangeHandler) {
+      window.removeEventListener('languageChanged', this.languageChangeHandler);
+    }
   }
 
   componentDidUpdate(prevProps) {
     if (prevProps.errors !== this.props.errors && this.props.errors) {
       this.setState({ errors: this.props.errors });
+      
+      // Если есть ошибки, показываем уведомление об ошибке
+      if (Object.keys(this.props.errors).length > 0) {
+        this.showNotification(t('profile.error_saving'), 'error');
+      }
     }
 
     if (prevProps.profile.profile !== this.props.profile.profile && this.props.profile.profile) {
@@ -147,11 +238,17 @@ class EditProfile extends Component {
         ip: user.lastIP,
         country: user.lastCountry,
         browser: user.lastBrowser,
-        time: getTimeAgo(user.lastActivityTime),
+        time: this.getTimeAgo(user.lastActivityTime),
         deviceType: user.lastDevice,
         osType: user.lastOS,
         browserType: user.lastBrowser,
       } : null;
+      
+      // Если профиль был обновлен и это не первая загрузка, показываем уведомление об успехе
+      if (prevProps.profile.profile && this.state.showNotification && this.state.notificationMessage === (t('profile.saving_changes') || 'Сохранение изменений...')) {
+        this.showNotification(t('profile.changes_saved') || 'Изменения успешно сохранены!', 'success');
+      }
+      
       this.setState({
         handle: profile.handle || "",
         username: user.username || "",
@@ -169,7 +266,7 @@ class EditProfile extends Component {
         position: profile.position || "",
         status: profile.status || "",
         lastActivity,
-        avatar: typeof user.avatar === 'string' ? user.avatar : null,
+        avatar: typeof user.avatar === 'string' ? getAvatarUrl(user.avatar) : null,
       });
     }
   }
@@ -179,7 +276,7 @@ class EditProfile extends Component {
 
     try {
       const token = localStorage.getItem("jwtToken");
-      const res = await axios.get(`/profile/check-username/${username}`, {
+      const res = await axios.get(`https://localhost:9000/profile/check-username/${username}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -232,11 +329,10 @@ class EditProfile extends Component {
       status: this.state.status,
     };
 
+    // Показываем уведомление о сохранении
+    this.showNotification(t('profile.saving_changes') || 'Сохранение изменений...', 'info');
+    
     this.props.createProfile(profileData, this.props.history);
-  }
-
-  handleDelete() {
-    this.props.deleteAccount();
   }
 
   onAvatarClick() {
@@ -244,7 +340,18 @@ class EditProfile extends Component {
   }
 
   onAvatarClose() {
+    // Добавляем анимацию закрытия
+    const modal = this.avatarModalRef.current;
+    if (modal) {
+      modal.classList.add('closing');
+      
+      setTimeout(() => {
+        this.setState({ showAvatarModal: false, avatarSrc: null, crop: { x: 0, y: 0 }, zoom: 1 });
+        modal.classList.remove('closing');
+      }, 300);
+    } else {
     this.setState({ showAvatarModal: false, avatarSrc: null, crop: { x: 0, y: 0 }, zoom: 1 });
+    }
   }
 
   onCropChange(crop) {
@@ -263,15 +370,15 @@ class EditProfile extends Component {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       
-      // Проверяем размер файла (максимум 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Файл слишком большой. Максимальный размер: 5MB');
-        return;
-      }
+      // Убираем ограничение по размеру файла
+      // if (file.size > 5 * 1024 * 1024) {
+      //   alert(t('profile.file_too_large', 'Файл слишком большой. Максимальный размер: 5MB'));
+      //   return;
+      // }
       
-      // Проверяем тип файла
+      // Проверяем тип файла - разрешаем любые изображения
       if (!file.type.startsWith('image/')) {
-        alert('Пожалуйста, выберите изображение');
+        alert(t('profile.please_select_image', 'Пожалуйста, выберите изображение'));
         return;
       }
       
@@ -291,7 +398,7 @@ class EditProfile extends Component {
 
   handleModalClick(e) {
     if (this.avatarModalRef.current && !this.avatarModalRef.current.contains(e.target)) {
-      this.setState({ showAvatarModal: false });
+      this.onAvatarClose();
     }
   }
 
@@ -308,15 +415,15 @@ class EditProfile extends Component {
     if (files && files.length > 0) {
       const file = files[0];
       
-      // Проверяем размер файла (максимум 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Файл слишком большой. Максимальный размер: 5MB');
-        return;
-      }
+      // Убираем ограничение по размеру файла
+      // if (file.size > 5 * 1024 * 1024) {
+      //   alert(t('profile.file_too_large', 'Файл слишком большой. Максимальный размер: 5MB'));
+      //   return;
+      // }
       
-      // Проверяем тип файла
+      // Проверяем тип файла - разрешаем любые изображения
       if (!file.type.startsWith('image/')) {
-        alert('Пожалуйста, выберите изображение');
+        alert(t('profile.please_select_image', 'Пожалуйста, выберите изображение'));
         return;
       }
       
@@ -347,7 +454,7 @@ class EditProfile extends Component {
       formData.append('avatar', blob, 'avatar.jpg');
       
       const token = localStorage.getItem('jwtToken');
-      const res = await fetch('/profile/avatar-user', {
+      const res = await fetch('https://localhost:9000/profile/avatar-user', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
@@ -357,6 +464,8 @@ class EditProfile extends Component {
       if (data.avatar && typeof data.avatar === 'string') {
         this.setState({ avatar: data.avatar, showAvatarModal: false, avatarSrc: null });
         alert('Аватарка успешно загружена!');
+        // Перезагружаем страницу после успешной загрузки аватарки
+        window.location.reload();
       } else {
         alert('Ошибка при загрузке аватарки');
       }
@@ -403,7 +512,7 @@ class EditProfile extends Component {
     // 2. Проверка: правильный ли текущий пароль (отправляем только current)
     try {
       const token = localStorage.getItem('jwtToken');
-      await axios.post('/profile/change-password', {
+      await axios.post('https://localhost:9000/profile/change-password', {
         currentPassword: current,
         newPassword: '___dummy___' // dummy, не используется
       }, {
@@ -448,9 +557,9 @@ class EditProfile extends Component {
     // Всё ок — меняем пароль
     try {
       const token = localStorage.getItem('jwtToken');
-      const res = await axios.post('/profile/change-password', {
+      const res = await axios.post('https://localhost:9000/profile/change-password', {
         currentPassword: current,
-        newPassword: newPassword
+        newPassword: newPassword,
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -475,6 +584,10 @@ class EditProfile extends Component {
       'username', 'name', 'surname', 'additionalName', 'bio', 'city', 'country', 'company', 'position', 'status', 'githubusername', 'skills'
     ];
     const hasProfanity = profanityFields.some(f => errors[f] && errors[f].toLowerCase().includes('недопустим') || errors[f] && errors[f].toLowerCase().includes('profan'));
+    
+    // Используем метод класса для определения темной темы
+    const isDark = this.isDarkTheme();
+    
     return (
       <>
         {hasProfanity && (
@@ -509,6 +622,8 @@ class EditProfile extends Component {
               const isValidImg = v => typeof v === 'string' && (v.startsWith('data:image') || v.startsWith('http') || v.startsWith('/'));
               const avatar = this.state.avatar;
               const avatarSrc = this.state.avatarSrc;
+              
+              console.log('Avatar state:', { avatar, avatarSrc, isValidAvatar: isValidImg(avatar), isValidAvatarSrc: isValidImg(avatarSrc) });
               
               if (isValidImg(avatar)) {
                 return (
@@ -546,11 +661,16 @@ class EditProfile extends Component {
               padding: '4px 0',
               fontWeight: '500'
             }}>
-              {this.state.avatar ? 'Изменить' : 'Добавить'}
+              {this.state.avatar ? t('profile.change') : t('profile.add')}
             </div>
           </div>
-          <h4 className="mb-0" style={{ fontWeight: 600 }}>{this.state.username || 'Anonymous'}</h4>
-          <small className="text-muted">{t('profile.profile_settings')}</small>
+          <h4 className="mb-0" style={{ 
+            fontWeight: 600,
+            color: isDark ? '#fff' : '#000'
+          }}>{this.state.username || 'Anonymous'}</h4>
+          <small className="text-muted" style={{
+            color: isDark ? '#fff' : '#6c757d'
+          }}>{t('profile.profile_settings')}</small>
         </div>
         <form onSubmit={this.onSubmit}>
           <div className="row">
@@ -697,9 +817,6 @@ class EditProfile extends Component {
           </div>
           <div className="d-flex flex-column flex-md-row justify-content-center align-items-center mt-4 action-btns" style={{ flexWrap: 'wrap', gap: 16, width: '100%', alignItems: 'center' }}>
             <input type="submit" value={t('profile.save_changes')} className="btn btn-primary btn-lg action-btn" style={{ minWidth: 160, height: 48, margin: 0 }} />
-            <button type="button" className="btn btn-danger btn-lg action-btn" style={{ minWidth: 160, height: 48, margin: 0 }} onClick={this.handleDelete}>
-              {t('profile.delete_profile')}
-            </button>
           </div>
         </form>
       </>
@@ -711,7 +828,7 @@ class EditProfile extends Component {
     const isPasswordValid = passwordFields.new && passwordFields.new.length >= 6 && passwordFields.new === passwordFields.repeat && !passwordError;
     let lastActivity = this.state.lastActivity;
     let isOnline = false;
-    let time = lastActivity.time;
+    let time = lastActivity?.time || '';
     if (this.state.lastActivity && this.props.profile && this.props.profile.profile && this.props.profile.profile.user && this.props.profile.profile.user.lastActivityTime) {
       const last = new Date(this.props.profile.profile.user.lastActivityTime);
       const now = new Date();
@@ -720,41 +837,61 @@ class EditProfile extends Component {
         time = t('profile.just_now');
       } else {
         isOnline = false;
-        time = getTimeAgo(this.props.profile.profile.user.lastActivityTime);
+        time = this.getTimeAgo(this.props.profile.profile.user.lastActivityTime);
       }
     }
     if (lastActivity) {
       lastActivity = { ...lastActivity, isOnline, time };
     }
+    
+    // Определяем темную тему
+    const isDark = this.isDarkTheme();
+    
+    // Стили для темной темы
+    const cardStyle = {
+      borderRadius: 18,
+      background: isDark ? '#2d2d2d' : '#f8fafc',
+      marginBottom: 32,
+      border: isDark ? '1px solid #444' : 'none',
+      boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.4)' : '0 4px 16px rgba(0,0,0,0.1)'
+    };
+    
+    const textColor = isDark ? '#fff' : '#222';
+    const labelColor = isDark ? '#ccc' : '#333';
+    const secondaryTextColor = isDark ? '#aaa' : '#888';
+    const changeButtonColor = isDark ? '#64b5f6' : 'rgb(0, 123, 255)';
+    const disabledButtonColor = isDark ? '#666' : 'rgb(0, 123, 255)';
+    
     return (
       <>
-        <div className="card shadow p-4 mb-4" style={{ borderRadius: 18, background: '#f8fafc', marginBottom: 32 }}>
-          <h5 className="mb-4">{t('profile.security')}</h5>
+        <div className="card shadow p-4 mb-4" style={cardStyle}>
+          <h5 className="mb-4" style={{ color: textColor }}>{t('profile.security')}</h5>
           <div className="row mb-3 align-items-center">
             <div className="col-4">
-              <label>{t('profile.email')}</label>
+              <label style={{ color: labelColor, fontWeight: 500 }}>{t('profile.email')}</label>
             </div>
             <div className="col-8 d-flex align-items-center">
-              <input type="email" className="form-control-plaintext" value={this.props.profile?.profile?.user?.email || ''} disabled style={{ fontWeight: 500, color: '#222' }} />
-              <span style={{ color: 'rgb(0, 123, 255)', cursor: 'not-allowed', fontWeight: 500, opacity: 0.7, whiteSpace: 'nowrap', zIndex: 20, position: 'relative', marginLeft: 10 }}>{t('profile.change')}</span>
-            </div>
-          </div>
-          <div className="row mb-3 align-items-center">
-            <div className="col-4">
-              <label>{t('profile.password')}</label>
-            </div>
-            <div className="col-8 d-flex align-items-center">
-              <input type="password" className="form-control-plaintext" value={"••••••••"} disabled style={{ fontWeight: 500, letterSpacing: 2, color: '#222' }} />
-              <span style={{ color: 'rgb(0, 123, 255)', cursor: 'pointer', fontWeight: 500, whiteSpace: 'nowrap', zIndex: 20, position: 'relative', marginLeft: 10 }} onClick={this.openPasswordModal}>{t('profile.change')}</span>
+              <input 
+                type="email" 
+                className="form-control-plaintext" 
+                value={this.props.profile?.profile?.user?.email || ''} 
+                disabled 
+                style={{ 
+                  fontWeight: 500, 
+                  color: textColor,
+                  background: 'transparent',
+                  border: 'none'
+                }} 
+              />
             </div>
           </div>
         </div>
         {lastActivity && (
-          <div className="card shadow p-4" style={{ borderRadius: 18, background: '#f8fafc', marginBottom: 0 }}>
-            <h5 className="mb-4">{t('profile.last_activity')}</h5>
+          <div className="card shadow p-4" style={cardStyle}>
+            <h5 className="mb-4" style={{ color: textColor }}>{t('profile.last_activity')}</h5>
             <div>
-              <div style={{ fontWeight: 500 }}>{lastActivity.os} · {lastActivity.ip} {lastActivity.country}</div>
-              <div style={{ color: '#888', fontSize: 15 }}>
+              <div style={{ fontWeight: 500, color: textColor }}>{lastActivity.os} · {lastActivity.ip} {lastActivity.country}</div>
+              <div style={{ color: secondaryTextColor, fontSize: 15 }}>
                 {lastActivity.browser} · {lastActivity.isOnline ? t('profile.just_now') : lastActivity.time}
               </div>
             </div>
@@ -776,13 +913,13 @@ class EditProfile extends Component {
               pointerEvents: 'none',
             }}>
               <div style={{
-                background: '#fff',
+                background: this.isDarkTheme() ? '#2d2d2d' : '#fff',
                 borderRadius: 18,
                 padding: 32,
                 minWidth: 300,
                 maxWidth: 400,
                 width: '100%',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                boxShadow: this.isDarkTheme() ? '0 8px 32px rgba(0,0,0,0.6)' : '0 8px 32px rgba(0,0,0,0.18)',
                 position: 'relative',
                 zIndex: 99999,
                 display: 'flex',
@@ -790,17 +927,46 @@ class EditProfile extends Component {
                 alignItems: 'center',
                 pointerEvents: 'auto',
                 margin: 0,
+                border: this.isDarkTheme() ? '1px solid #444' : 'none',
               }}>
-                <h5 className="mb-4">{t('profile.change_password')}</h5>
+                <h5 className="mb-4" style={{ color: this.isDarkTheme() ? '#fff' : '#333' }}>{t('profile.change_password')}</h5>
                 <form onSubmit={this.handleSavePassword} autoComplete="off" style={{ width: '100%' }}>
                   <div className="mb-3">
-                    <label className="form-label">{t('profile.current_password')}</label>
-                    <input type="password" className="form-control" name="current" value={passwordFields.current} onChange={this.handlePasswordField} autoFocus />
-                    {this.state.currentError && <div className="text-danger mt-1" style={{ fontSize: 13 }}>{this.state.currentError}</div>}
+                    <label className="form-label" style={{ color: this.isDarkTheme() ? '#ccc' : '#333', fontWeight: 500 }}>{t('profile.current_password')}</label>
+                    <input 
+                      type="password" 
+                      className="form-control" 
+                      name="current" 
+                      value={passwordFields.current} 
+                      onChange={this.handlePasswordField} 
+                      autoFocus 
+                      style={{
+                        background: this.isDarkTheme() ? '#3a3a3a' : '#fff',
+                        border: this.isDarkTheme() ? '1px solid #555' : '1px solid #ced4da',
+                        color: this.isDarkTheme() ? '#fff' : '#333',
+                        borderRadius: 8
+                      }}
+                    />
+                    {this.state.currentError && <div className="text-danger mt-1" style={{ 
+                      fontSize: 13, 
+                      color: this.isDarkTheme() ? '#ff6b6b' : '#dc3545' 
+                    }}>{this.state.currentError}</div>}
                   </div>
                   <div className="mb-3">
-                    <label className="form-label">{t('profile.new_password')}</label>
-                    <input type="password" className="form-control" name="new" value={passwordFields.new} onChange={this.handlePasswordField} />
+                    <label className="form-label" style={{ color: this.isDarkTheme() ? '#ccc' : '#333', fontWeight: 500 }}>{t('profile.new_password')}</label>
+                    <input 
+                      type="password" 
+                      className="form-control" 
+                      name="new" 
+                      value={passwordFields.new} 
+                      onChange={this.handlePasswordField} 
+                      style={{
+                        background: this.isDarkTheme() ? '#3a3a3a' : '#fff',
+                        border: this.isDarkTheme() ? '1px solid #555' : '1px solid #ced4da',
+                        color: this.isDarkTheme() ? '#fff' : '#333',
+                        borderRadius: 8
+                      }}
+                    />
                     {/* Шкала сложности пароля */}
                     {passwordFields.new && (
                       <div className="mb-2">
@@ -809,7 +975,14 @@ class EditProfile extends Component {
                             'password-strength-bar ' +
                             (this.state.passwordStrength === 'Weak' ? 'weak' : this.state.passwordStrength === 'Moderate' ? 'moderate' : this.state.passwordStrength === 'Strong' ? 'strong' : '')
                           }
-                          style={{ height: 6, borderRadius: 4, marginTop: 4, marginBottom: 2, background: '#eee', width: '100%' }}
+                          style={{ 
+                            height: 6, 
+                            borderRadius: 4, 
+                            marginTop: 4, 
+                            marginBottom: 2, 
+                            background: this.isDarkTheme() ? '#444' : '#eee', 
+                            width: '100%' 
+                          }}
                         >
                           <div style={{
                             width: this.state.passwordStrength === 'Weak' ? '33%' : this.state.passwordStrength === 'Moderate' ? '66%' : this.state.passwordStrength === 'Strong' ? '100%' : '0%',
@@ -819,7 +992,10 @@ class EditProfile extends Component {
                             transition: 'width 0.3s'
                           }} />
                         </div>
-                        <small className="text-muted">
+                        <small style={{ 
+                          color: this.isDarkTheme() ? '#aaa' : '#6c757d',
+                          fontSize: '13px'
+                        }}>
                           {this.state.passwordStrength === 'Weak' && t('profile.password_strength_weak')}
                           {this.state.passwordStrength === 'Moderate' && t('profile.password_strength_moderate')}
                           {this.state.passwordStrength === 'Strong' && t('profile.password_strength_strong')}
@@ -827,22 +1003,57 @@ class EditProfile extends Component {
                         </small>
                       </div>
                     )}
-                    {this.state.newError && <div className="text-danger mt-1" style={{ fontSize: 13 }}>{this.state.newError}</div>}
+                    {this.state.newError && <div className="text-danger mt-1" style={{ 
+                      fontSize: 13, 
+                      color: this.isDarkTheme() ? '#ff6b6b' : '#dc3545' 
+                    }}>{this.state.newError}</div>}
                   </div>
                   <div className="mb-4">
-                    <label className="form-label">{t('profile.repeat_new_password')}</label>
-                    <input type="password" className="form-control" name="repeat" value={passwordFields.repeat} onChange={this.handlePasswordField} />
-                    {this.state.repeatError && <div className="text-danger mt-1" style={{ fontSize: 13 }}>{this.state.repeatError}</div>}
+                    <label className="form-label" style={{ color: this.isDarkTheme() ? '#ccc' : '#333', fontWeight: 500 }}>{t('profile.repeat_new_password')}</label>
+                    <input 
+                      type="password" 
+                      className="form-control" 
+                      name="repeat" 
+                      value={passwordFields.repeat} 
+                      onChange={this.handlePasswordField} 
+                      style={{
+                        background: this.isDarkTheme() ? '#3a3a3a' : '#fff',
+                        border: this.isDarkTheme() ? '1px solid #555' : '1px solid #ced4da',
+                        color: this.isDarkTheme() ? '#fff' : '#333',
+                        borderRadius: 8
+                      }}
+                    />
+                    {this.state.repeatError && <div className="text-danger mt-1" style={{ 
+                      fontSize: 13, 
+                      color: this.isDarkTheme() ? '#ff6b6b' : '#dc3545' 
+                    }}>{this.state.repeatError}</div>}
                   </div>
                   {this.state.passwordError &&
                     !/пароль неверный|password is incorrect|current password is wrong/i.test(this.state.passwordError) && (
-                      <div className="alert alert-danger py-2 mb-3">{this.state.passwordError}</div>
+                      <div className="alert alert-danger py-2 mb-3" style={{
+                        background: this.isDarkTheme() ? '#4a2c2a' : '#f8d7da',
+                        border: this.isDarkTheme() ? '1px solid #721c24' : '1px solid #f5c6cb',
+                        color: this.isDarkTheme() ? '#f8d7da' : '#721c24'
+                      }}>{this.state.passwordError}</div>
                     )}
                   <div className="d-flex justify-content-center gap-3 mt-3" style={{ width: '100%' }}>
                     <button
                       type="button"
                       className="btn btn-outline-secondary modal-btn"
-                      style={{ minWidth: 160, maxWidth: 220, height: 44, fontSize: 16, flex: 1, borderRadius: 24, padding: 0, textAlign: 'center', margin: 0 }}
+                      style={{ 
+                        minWidth: 160, 
+                        maxWidth: 220, 
+                        height: 44, 
+                        fontSize: 16, 
+                        flex: 1, 
+                        borderRadius: 24, 
+                        padding: 0, 
+                        textAlign: 'center', 
+                        margin: 0,
+                        background: this.isDarkTheme() ? '#3a3a3a' : '#fff',
+                        border: this.isDarkTheme() ? '1px solid #666' : '1px solid #6c757d',
+                        color: this.isDarkTheme() ? '#ccc' : '#6c757d'
+                      }}
                       onClick={this.closePasswordModal}
                     >
                       {t('profile.cancel')}
@@ -850,7 +1061,20 @@ class EditProfile extends Component {
                     <button
                       type="submit"
                       className="btn btn-primary modal-btn"
-                      style={{ minWidth: 160, maxWidth: 220, height: 44, fontSize: 16, flex: 1, borderRadius: 24, padding: 0, textAlign: 'center', margin: 0 }}
+                      style={{ 
+                        minWidth: 160, 
+                        maxWidth: 220, 
+                        height: 44, 
+                        fontSize: 16, 
+                        flex: 1, 
+                        borderRadius: 24, 
+                        padding: 0, 
+                        textAlign: 'center', 
+                        margin: 0,
+                        background: this.isDarkTheme() ? '#4a90e2' : '#007bff',
+                        border: this.isDarkTheme() ? '1px solid #4a90e2' : '1px solid #007bff',
+                        color: '#fff'
+                      }}
                     >
                       {t('profile.save_changes')}
                     </button>
@@ -869,11 +1093,12 @@ class EditProfile extends Component {
     
     // Проверяем авторизацию
     if (!this.state.isAuthenticated) {
+      const isDark = localStorage.getItem('theme') === 'dark';
       return (
         <div style={{ 
           minHeight: '100vh', 
-          background: '#f8f9fa',
-          color: '#333333'
+          background: isDark ? '#1a1a1a' : '#f8f9fa',
+          color: isDark ? '#ffffff' : '#333333'
         }}>
           <NavBar />
           
@@ -892,15 +1117,15 @@ class EditProfile extends Component {
                 fontSize: '2.5rem', 
                 fontWeight: '700', 
                 marginBottom: '10px',
-                color: '#333333'
+                color: isDark ? '#ffffff' : '#333333'
               }}>
-                Редактирование профиля
+                {t('auth.edit_profile')}
               </h1>
               <p style={{ 
                 fontSize: '1.1rem', 
-                color: '#666666'
+                color: isDark ? '#cccccc' : '#666666'
               }}>
-                Войдите в систему, чтобы редактировать профиль
+                {t('auth.login_to_edit_profile')}
               </p>
             </div>
 
@@ -908,23 +1133,31 @@ class EditProfile extends Component {
             <div style={{ 
               textAlign: 'center', 
               padding: '60px 20px',
-              background: '#ffffff',
+              background: isDark ? '#2d2d2d' : '#ffffff',
               borderRadius: '12px',
-              border: '1px solid #e9ecef'
+              border: `1px solid ${isDark ? '#404040' : '#e9ecef'}`
             }}>
+              <FontAwesomeIcon 
+                icon={faUserEdit} 
+                style={{ 
+                  fontSize: '3rem', 
+                  color: '#6c757d', 
+                  marginBottom: '20px' 
+                }} 
+              />
               <h3 style={{ 
                 fontSize: '1.3rem', 
                 fontWeight: '600', 
                 marginBottom: '10px',
-                color: '#333333'
+                color: isDark ? '#ffffff' : '#333333'
               }}>
-                Войдите в систему
+                {t('auth.login_required')}
               </h3>
               <p style={{ 
-                color: '#666666',
+                color: isDark ? '#cccccc' : '#666666',
                 marginBottom: '30px'
               }}>
-                Чтобы редактировать свой профиль, необходимо войти в систему или зарегистрироваться
+                {t('auth.login_to_edit_description')}
               </p>
               <div style={{ 
                 display: 'flex', 
@@ -948,7 +1181,7 @@ class EditProfile extends Component {
                   onMouseOver={(e) => e.target.style.background = '#0056b3'}
                   onMouseOut={(e) => e.target.style.background = '#007bff'}
                 >
-                  Войти
+                  {t('auth.login')}
                 </button>
                 <button
                   onClick={() => window.location.href = '/register'}
@@ -966,7 +1199,7 @@ class EditProfile extends Component {
                   onMouseOver={(e) => e.target.style.background = '#218838'}
                   onMouseOut={(e) => e.target.style.background = '#28a745'}
                 >
-                  Зарегистрироваться
+                  {t('auth.register')}
                 </button>
               </div>
             </div>
@@ -990,6 +1223,7 @@ class EditProfile extends Component {
     const borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
 
     const jobTitles = [
+      { key: 'select_job', value: 'Выбрать должность' },
       { key: 'back_end', value: 'Back End Developer/Engineer' },
       { key: 'data_scientist', value: 'Data Scientist' },
       { key: 'technology_consultant', value: 'Technology Consultant' },
@@ -1092,15 +1326,104 @@ class EditProfile extends Component {
     const goalOptions = goalList.map(g => ({ label: t('goals.'+g.key) || g.value, value: g.value }));
 
     return (
-      <div className="edit-profile" style={{ background: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#18191c' : '#fff', minHeight: 'calc(100vh - 80px)', paddingTop: 0 }}>
+      <div className="edit-profile" style={{ background: this.isDarkTheme() ? '#18191c' : '#fff', minHeight: 'calc(100vh - 80px)', paddingTop: 0 }}>
         <NavBar />
+        
+        {/* Компонент уведомлений */}
+        {this.state.showNotification && (
+          <div 
+            style={{
+              position: 'fixed',
+              top: '20px',
+              right: '20px',
+              zIndex: 10000,
+              padding: '16px 24px',
+              borderRadius: '8px',
+              color: '#fff',
+              fontWeight: '500',
+              fontSize: '16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              background: this.state.notificationType === 'success' 
+                ? (this.isDarkTheme() ? '#4caf50' : '#28a745')
+                : this.state.notificationType === 'error'
+                ? (this.isDarkTheme() ? '#f44336' : '#dc3545')
+                : (this.isDarkTheme() ? '#2196f3' : '#007bff'),
+              border: this.isDarkTheme() ? '1px solid #444' : 'none',
+              minWidth: '300px',
+              maxWidth: '400px',
+              animation: 'slideInRight 0.3s ease'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{this.state.notificationMessage}</span>
+              <button
+                onClick={this.hideNotification}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: '18px',
+                  cursor: 'pointer',
+                  marginLeft: '16px',
+                  padding: '0',
+                  lineHeight: '1'
+                }}
+              >
+                ×
+              </button>
+            </div>
+          </div>
+        )}
+        
         <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '80vh', flexDirection: 'column', paddingTop: 0, marginTop: 0 }}>
           <div className="d-flex mb-4 tab-btns" style={{ gap: 32, width: 'auto', minWidth: 400, maxWidth: '100%', justifyContent: 'center', alignItems: 'center', marginTop: 21, minHeight: 60, zIndex: 10 }}>
-            <button className={`btn tab-btn ${this.state.activeTab === 'profile' ? 'tab-btn-active' : ''}`} onClick={() => this.handleTabChange('profile')}>{t('profile.personal_data')}</button>
-            <button className={`btn tab-btn ${this.state.activeTab === 'security' ? 'tab-btn-active' : ''}`} onClick={() => this.handleTabChange('security')}>{t('profile.security_and_login')}</button>
+            <button 
+              className={`btn tab-btn ${this.state.activeTab === 'profile' ? 'tab-btn-active' : ''}`} 
+              onClick={() => this.handleTabChange('profile')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '8px',
+                border: this.isDarkTheme() ? '2px solid #555' : '2px solid #e9ecef',
+                background: this.state.activeTab === 'profile' 
+                  ? (this.isDarkTheme() ? '#4a90e2' : '#007bff') 
+                  : (this.isDarkTheme() ? '#2d2d2d' : '#f8f9fa'),
+                color: this.state.activeTab === 'profile' 
+                  ? '#fff' 
+                  : (this.isDarkTheme() ? '#fff' : '#495057'),
+                fontWeight: '600',
+                fontSize: '16px',
+                transition: 'all 0.3s ease',
+                boxShadow: this.isDarkTheme() ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
+                minWidth: '160px'
+              }}
+            >
+              {t('profile.personal_data')}
+            </button>
+            <button 
+              className={`btn tab-btn ${this.state.activeTab === 'security' ? 'tab-btn-active' : ''}`} 
+              onClick={() => this.handleTabChange('security')}
+              style={{
+                padding: '12px 24px',
+                borderRadius: '8px',
+                border: this.isDarkTheme() ? '2px solid #555' : '2px solid #e9ecef',
+                background: this.state.activeTab === 'security' 
+                  ? (this.isDarkTheme() ? '#4a90e2' : '#007bff') 
+                  : (this.isDarkTheme() ? '#2d2d2d' : '#f8f9fa'),
+                color: this.state.activeTab === 'security' 
+                  ? '#fff' 
+                  : (this.isDarkTheme() ? '#fff' : '#495057'),
+                fontWeight: '600',
+                fontSize: '16px',
+                transition: 'all 0.3s ease',
+                boxShadow: this.isDarkTheme() ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
+                minWidth: '160px'
+              }}
+            >
+              {t('profile.security_and_login')}
+            </button>
           </div>
           <div className="form-anim-wrapper" key={this.state.activeTab} style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-            <div className="card shadow p-4 form-anim" style={{ maxWidth: 420, width: '100%', borderRadius: 16, margin: '0 auto', background: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#2d2d2d' : '#fff', color: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '#fff' : '#000', border: (document.body.getAttribute('data-theme')==='dark' || localStorage.getItem('theme')==='dark') ? '1px solid #404040' : '1px solid #e9ecef' }}>
+            <div className="card shadow p-4 form-anim" style={{ maxWidth: 420, width: '100%', borderRadius: 16, margin: '0 auto', background: this.isDarkTheme() ? '#2d2d2d' : '#fff', color: this.isDarkTheme() ? '#fff' : '#000', border: this.isDarkTheme() ? '1px solid #404040' : '1px solid #e9ecef' }}>
               {this.state.activeTab === 'profile'
                 ? this.renderProfileForm(errors, jobTitleOptions, goalOptions)
                 : this.renderSecurityForms()}
@@ -1113,6 +1436,7 @@ class EditProfile extends Component {
         {/* Модальное окно для загрузки аватарки */}
         {this.state.showAvatarModal && (
           <div 
+            className="avatar-modal"
             style={{
               position: 'fixed',
               top: 0,
@@ -1130,49 +1454,72 @@ class EditProfile extends Component {
           >
             <div 
               ref={this.avatarModalRef}
+              className="avatar-modal-content"
               style={{
-                background: '#fff',
+                background: this.isDarkTheme() ? '#2d2d2d' : '#fff',
+                color: this.isDarkTheme() ? '#fff' : '#000',
                 borderRadius: '16px',
                 padding: '32px',
                 maxWidth: '600px',
                 width: '100%',
                 maxHeight: '90vh',
                 overflow: 'auto',
-                position: 'relative'
+                position: 'relative',
+                border: this.isDarkTheme() ? '1px solid #444' : 'none',
+                boxShadow: this.isDarkTheme() ? '0 10px 30px rgba(0,0,0,0.8)' : '0 10px 30px rgba(0,0,0,0.1)'
               }}
             >
-              <h3 style={{ marginBottom: '24px', textAlign: 'center', fontWeight: '600' }}>
-                Настройка аватарки
+              <h3 style={{ 
+                marginBottom: '24px', 
+                textAlign: 'center', 
+                fontWeight: '600',
+                color: this.isDarkTheme() ? '#fff' : '#000'
+              }}>
+                {t('profile.avatar_settings')}
               </h3>
               
               {!this.state.avatarSrc ? (
                 // Экран выбора файла
                 <div style={{ textAlign: 'center' }}>
                   <div 
+                    className="avatar-upload-area"
                     style={{ 
-                      border: '2px dashed #ddd', 
+                      border: this.isDarkTheme() ? '2px dashed #555' : '2px dashed #ddd', 
                       borderRadius: '12px', 
                       padding: '40px 20px',
                       marginBottom: '24px',
-                      background: '#f8f9fa',
-                      transition: 'all 0.2s ease'
+                      background: this.isDarkTheme() ? '#3a3a3a' : '#f8f9fa',
+                      transition: 'all 0.3s ease',
+                      cursor: 'pointer'
                     }}
                     onDragOver={this.handleDragOver}
                     onDrop={this.handleDrop}
                     onDragEnter={(e) => {
                       e.preventDefault();
-                      e.currentTarget.style.borderColor = '#007bff';
-                      e.currentTarget.style.background = '#e3f2fd';
+                      e.currentTarget.classList.add('dragover');
                     }}
                     onDragLeave={(e) => {
                       e.preventDefault();
-                      e.currentTarget.style.borderColor = '#ddd';
-                      e.currentTarget.style.background = '#f8f9fa';
+                      e.currentTarget.classList.remove('dragover');
                     }}
+                    onClick={() => document.getElementById('avatar-input').click()}
                   >
-                    <div style={{ fontSize: '48px', color: '#666', marginBottom: '16px' }}>📷</div>
-                    <p style={{ marginBottom: '16px', color: '#666' }}>
-                      Перетащите изображение сюда или нажмите для выбора
+                    <div 
+                      className="camera-icon"
+                      style={{ 
+                        fontSize: '48px', 
+                        color: this.isDarkTheme() ? '#aaa' : '#666', 
+                        marginBottom: '16px',
+                        transition: 'all 0.3s ease',
+                        display: 'inline-block'
+                      }}
+                    >📷</div>
+                    <p style={{ 
+                      marginBottom: '16px', 
+                      color: this.isDarkTheme() ? '#aaa' : '#666',
+                      transition: 'color 0.3s ease'
+                    }}>
+                      {t('profile.drag_drop_image')}
                     </p>
                     <input
                       type="file"
@@ -1181,7 +1528,9 @@ class EditProfile extends Component {
                       style={{ display: 'none' }}
                       id="avatar-input"
                     />
+                    <div style={{ textAlign: 'center' }}>
                     <label 
+                        className="avatar-modal-btn"
                       htmlFor="avatar-input"
                       style={{
                         background: '#007bff',
@@ -1193,12 +1542,10 @@ class EditProfile extends Component {
                         fontWeight: '500'
                       }}
                     >
-                      Выбрать изображение
+                        {t('profile.select_image')}
                     </label>
                   </div>
-                  <p style={{ fontSize: '14px', color: '#666' }}>
-                    Поддерживаемые форматы: JPG, PNG, GIF. Максимальный размер: 5MB
-                  </p>
+                  </div>
                 </div>
               ) : (
                 // Экран настройки и кропа
@@ -1231,7 +1578,7 @@ class EditProfile extends Component {
                   
                   {/* Предпросмотр */}
                   <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-                    <h5 style={{ marginBottom: '12px' }}>Предпросмотр</h5>
+                    <h5 style={{ marginBottom: '12px' }}>{t('profile.preview')}</h5>
                     <div style={{ 
                       display: 'inline-block',
                       width: '80px',
@@ -1265,6 +1612,7 @@ class EditProfile extends Component {
                 flexWrap: 'wrap'
               }}>
                 <button
+                  className="avatar-modal-btn"
                   onClick={this.onAvatarClose}
                   style={{
                     padding: '12px 24px',
@@ -1276,12 +1624,13 @@ class EditProfile extends Component {
                     fontWeight: '500'
                   }}
                 >
-                  Отмена
+                  {t('profile.cancel')}
                 </button>
                 
                 {this.state.avatarSrc && (
                   <>
                     <button
+                      className="avatar-modal-btn"
                       onClick={() => {
                         this.setState({ avatarSrc: null, crop: { x: 0, y: 0 }, zoom: 1 });
                         const input = document.getElementById('avatar-input');
@@ -1299,10 +1648,11 @@ class EditProfile extends Component {
                         fontWeight: '500'
                       }}
                     >
-                      Выбрать другое
+                      {t('profile.choose_another')}
                     </button>
                     
                     <button
+                      className="avatar-modal-btn"
                       onClick={this.onSaveCropped}
                       style={{
                         padding: '12px 24px',
@@ -1314,7 +1664,7 @@ class EditProfile extends Component {
                         fontWeight: '500'
                       }}
                     >
-                      Сохранить аватарку
+                      {t('profile.save_avatar')}
                     </button>
                   </>
                 )}
@@ -1322,235 +1672,157 @@ class EditProfile extends Component {
             </div>
           </div>
         )}
-        <style>{`
-  body[data-theme="light"], body:not([data-theme]) { background: #fff !important; }
-  .edit-profile { background: #e9ecf3; }
-  [data-theme="dark"] .edit-profile { background: #18191c; }
-  [data-theme="dark"] .form-anim h4.mb-0 { color: #fff !important; }
-  [data-theme="dark"] .form-anim small, [data-theme="dark"] .form-anim .form-text { color: #eaf4fd !important; }
-
-  body {
-    overflow-y: scroll;
-  }
-
-  .tab-btns {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 32px !important;
-    width: 400px;
-    max-width: 100%;
-    margin: 21px auto 32px auto;
-  }
-
-  .tab-btn {
-    min-width: 180px;
-    width: 180px;
-    max-width: 180px;
-    border-radius: 24px;
-    font-weight: 600;
-    font-size: 17px;
-    padding: 12px 0;
-    margin-right: 0;
-    border: 2px solid ${theme === 'dark' ? '#4485ed' : '#3976A8'};
-    background: ${theme === 'dark' ? '#2d2d2d' : '#fff'};
-    color: ${theme === 'dark' ? '#4485ed' : '#3976A8'};
-    box-shadow: none;
-    outline: none;
-    border-bottom: none;
-    text-decoration: none;
-    transition: background 0.22s cubic-bezier(0.4,0,0.2,1), color 0.22s, border 0.18s, box-shadow 0.22s, transform 0.22s;
-    will-change: background, color, box-shadow, transform;
-  }
-
-  .tab-btn.tab-btn-active {
-    background: ${theme === 'dark' ? '#4485ed' : '#3976A8'};
-    color: #fff;
-    border: 2px solid ${theme === 'dark' ? '#4485ed' : '#3976A8'};
-    transition: none;
-    box-shadow: none;
-    transform: none;
-    z-index: 1;
-  }
-
-  .tab-btn:not(.tab-btn-active):hover,
-  .tab-btn:not(.tab-btn-active):focus {
-    background: #f3f4f6;
-    color: #23272f;
-    border: 2px solid #3976A8;
-    box-shadow: 0 4px 16px rgba(52,60,77,0.10);
-    transform: translateY(-2px) scale(1.03);
-    z-index: 2;
-  }
-
-  .tab-btn.tab-btn-active:hover,
-  .tab-btn.tab-btn-active:focus {
-    background: #3976A8;
-    color: #fff;
-    box-shadow: none;
-    transform: none;
-    transition: none;
-    z-index: 1;
-  }
-
-  input[type="range"] {
-    accent-color: #3976a8 !important;
-    height: 6px !important;
-    border-radius: 3px !important;
-  }
-
-  .btn,
-  .btn:focus,
-  .btn:active,
-  .btn:visited,
-  .btn:focus-visible,
-  .btn:hover,
-  .btn::after,
-  .btn::before,
-  .modal-btn,
-  .modal-btn:focus,
-  .modal-btn:active,
-  .modal-btn:visited,
-  .modal-btn:focus-visible,
-  .modal-btn:hover,
-  .modal-btn::after,
-  .modal-btn::before,
-  .action-btn,
-  .action-btn:focus,
-  .action-btn:active,
-  .action-btn:visited,
-  .action-btn:focus-visible,
-  .action-btn:hover,
-  .action-btn::after,
-  .action-btn::before {
-    border: none !important;
-    border-bottom: none !important;
-    text-decoration: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-    background-image: none !important;
-    filter: none !important;
-    transition: none !important;
-    background: #3976A8 !important;
-    color: #fff !important;
-  }
-
-  .btn.btn-outline-secondary,
-  .btn.modal-btn.btn-outline-secondary {
-    background: #f0f2f8 !important;
-    color: #3976A8 !important;
-    border: 1.5px solid #e0e0e0 !important;
-  }
-
-  .btn.btn-outline-secondary:hover,
-  .btn.modal-btn.btn-outline-secondary:hover {
-    background: #e0e0e0 !important;
-    color: #3976A8 !important;
-    border: 1.5px solid #e0e0e0 !important;
-  }
-
-  .btn::after,
-  .btn::before,
-  .modal-btn::after,
-  .modal-btn::before,
-  .action-btn::after,
-  .action-btn::before {
-    display: none !important;
-    border: none !important;
-    background: none !important;
-    content: none !important;
-    box-shadow: none !important;
-  }
-
-  .switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-  }
-
-  .switch input {
-    display: none;
-  }
-
-  .slider {
-    position: absolute;
-    cursor: pointer;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: #d1d5db;
-    transition: 0.4s;
-    border-radius: 24px;
-  }
-
-  .slider:before {
-    position: absolute;
-    content: '';
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background: #fff;
-    transition: 0.4s;
-    border-radius: 50%;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-  }
-
-  input:checked + .slider {
-    background: #3976A8;
-  }
-
-  input:checked + .slider:before {
-    transform: translateX(20px);
-  }
-
-  .form-anim-wrapper {
-    position: relative;
-    width: 100%;
-    min-height: 420px;
-  }
-
-  .form-anim {
-    animation: fadeInSlide 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-    transition: opacity 0.45s cubic-bezier(0.4, 0, 0.2, 1), transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  @keyframes fadeInSlide {
-    0% {
-      opacity: 0;
-      transform: translateY(30px) scale(0.98);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  .avatar-modal-btn {
-    min-width: 160px !important;
-    max-width: 220px !important;
-    width: 100% !important;
-    height: 44px !important;
-    font-size: 16px !important;
-    border-radius: 24px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 8px !important;
-    padding: 0 !important;
-    text-align: center !important;
-    box-shadow: none !important;
-    border: none !important;
-  }
-
-  .password-strength-bar { background: #eee; width: 100%; height: 6px; border-radius: 4px; margin-bottom: 2px; }
-  .password-strength-bar.weak > div { background: #e57373; }
-  .password-strength-bar.moderate > div { background: #ffd54f; }
-  .password-strength-bar.strong > div { background: #81c784; }
-`}</style>
-
+        <style jsx>{`
+          .avatar-modal {
+            animation: fadeIn 0.3s ease-out;
+          }
+          
+          .avatar-modal-content {
+            animation: slideInUp 0.3s ease-out;
+          }
+          
+          .avatar-modal-content.closing {
+            animation: slideOutDown 0.3s ease-in;
+          }
+          
+          .avatar-upload-area {
+            transition: all 0.3s ease;
+          }
+          
+          .avatar-upload-area:hover {
+            border-color: #007bff !important;
+            background: #e9ecef !important;
+          }
+          
+          .avatar-upload-area.dragover {
+            border-color: #007bff !important;
+            background: #e9ecef !important;
+            transform: scale(1.02);
+          }
+          
+          .camera-icon {
+            transition: all 0.3s ease;
+          }
+          
+          .avatar-upload-area:hover .camera-icon {
+            transform: scale(1.1);
+            color: #007bff !important;
+          }
+          
+          .avatar-modal-btn {
+            transition: all 0.3s ease;
+            border: none;
+            outline: none;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            padding: 12px 24px;
+            min-width: 120px;
+          }
+          
+          .avatar-modal-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+          }
+          
+          .avatar-modal-btn:active {
+            transform: translateY(0);
+          }
+          
+          .avatar-modal-btn[style*="background: #007bff"]:hover {
+            background: #0056b3 !important;
+          }
+          
+          .avatar-modal-btn[style*="background: #6c757d"]:hover {
+            background: #545b62 !important;
+          }
+          
+          .avatar-modal-btn[style*="background: #dc3545"]:hover {
+            background: #c82333 !important;
+          }
+          
+          .avatar-modal-btn[style*="background: #28a745"]:hover {
+            background: #1e7e34 !important;
+          }
+          
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          
+          @keyframes slideInUp {
+            from { 
+              opacity: 0;
+              transform: translateY(30px);
+            }
+            to { 
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          
+          @keyframes slideOutDown {
+            from { 
+              opacity: 1;
+              transform: translateY(0);
+            }
+            to { 
+              opacity: 0;
+              transform: translateY(30px);
+            }
+          }
+          
+          @keyframes slideInRight {
+            from { 
+              opacity: 0;
+              transform: translateX(100%);
+            }
+            to { 
+              opacity: 1;
+              transform: translateX(0);
+            }
+          }
+          
+          /* Темная тема */
+          [data-theme="dark"] .avatar-modal-content {
+            background: #2d2d2d !important;
+            color: #fff !important;
+            border: 1px solid #444 !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+          }
+          
+          [data-theme="dark"] .avatar-modal-content h3,
+          [data-theme="dark"] .avatar-modal-content h5 {
+            color: #fff !important;
+          }
+          
+          [data-theme="dark"] .avatar-upload-area {
+            background: #3a3a3a !important;
+            border-color: #555 !important;
+          }
+          
+          [data-theme="dark"] .avatar-upload-area:hover {
+            background: #444 !important;
+          }
+          
+          [data-theme="dark"] .avatar-upload-area.dragover {
+            background: #444 !important;
+          }
+          
+          [data-theme="dark"] .camera-icon {
+            color: #aaa !important;
+          }
+          
+          [data-theme="dark"] .avatar-upload-area:hover .camera-icon {
+            color: #007bff !important;
+          }
+          
+          [data-theme="dark"] p {
+            color: #aaa !important;
+          }
+        `}</style>
+        
       </div>
     );
   }
@@ -1575,7 +1847,6 @@ EditProfile.propTypes = {
   getCurrentProfile: PropTypes.func.isRequired,
   profile: PropTypes.object.isRequired,
   errors: PropTypes.object.isRequired,
-  deleteAccount: PropTypes.func.isRequired,
 };
 
 const mapStateToProps = state => ({
@@ -1587,23 +1858,7 @@ const mapDispatchToProps = dispatch => ({
   createProfile: (data, history) => dispatch(createProfile(data, history)),
   getCurrentProfile: () => dispatch(getCurrentProfile()),
   clearCurrentProfile: () => dispatch(clearCurrentProfile()),
-  deleteAccount: () => dispatch(deleteAccount()),
   dispatch,
 });
 
 export default connect(mapStateToProps, mapDispatchToProps )(withRouter(EditProfile));
-
-
-
-// --- Вспомогательные функции ---
-function getTimeAgo(dateStr) {
-  if (!dateStr) return '';
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diff = Math.floor((now - date) / 1000);
-  if (diff < 60) return t('profile.just_now');
-  if (diff < 3600) return t('profile.minutes_ago', { count: Math.floor(diff/60) });
-  if (diff < 86400) return t('profile.hours_ago', { count: Math.floor(diff/3600) });
-  return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`;
-}
-// --- END ---

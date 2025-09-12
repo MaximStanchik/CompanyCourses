@@ -10,9 +10,16 @@ import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 export default function LessonsList() {
+  console.log('[LessonsList] Component mounted');
   const { t } = useTranslation();
   const { theme } = useTheme();
   const location = useLocation();
+  
+  // Очищаем все toast-уведомления при монтировании компонента
+  React.useEffect(() => {
+    console.log('[LessonsList] Clearing all toasts on mount');
+    toast.dismiss();
+  }, []);
 
   // Read initial course filter from URL to prevent initial unfiltered load
   const initialCourseFilter = (() => {
@@ -23,7 +30,7 @@ export default function LessonsList() {
 
   const [lessons, setLessons] = useState([]);
   const [courses, setCourses] = useState([]);
-  const [selectedCourse, setSelectedCourse] = useState(initialCourseFilter);
+  const [selectedCourse, setSelectedCourse] = useState(''); // Убираем чтение из URL
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
@@ -31,25 +38,15 @@ export default function LessonsList() {
   const [createTitle, setCreateTitle] = useState('');
 
   useEffect(() => {
-    console.log('Component mounted, loading courses...');
+    console.log('[LessonsList] Component mounted, loading courses...');
+    // Очищаем все toast-уведомления при загрузке компонента
+    toast.dismiss();
     loadCourses();
   }, []);
 
   useEffect(() => {
-    // Check if course filter is set in URL
-    const urlParams = new URLSearchParams(location.search);
-    const courseFilter = urlParams.get('course');
-    console.log('URL params changed, course filter:', courseFilter);
-    if (courseFilter) {
-      console.log('Setting selected course from URL:', courseFilter);
-      setSelectedCourse(courseFilter);
-      // Load lessons for this course immediately
-      loadLessons(courseFilter);
-    }
-  }, [location.search]);
-
-  useEffect(() => {
     console.log('selectedCourse changed:', selectedCourse);
+    // Загружаем уроки только если selectedCourse действительно изменился
     if (selectedCourse) {
       loadLessons(selectedCourse);
     } else {
@@ -75,37 +72,62 @@ export default function LessonsList() {
   const loadLessons = async (courseId) => {
     try {
       setLoading(true);
-      console.log('Loading lessons for course:', courseId);
-      const response = await axios.get(`/lessons`, {
+      setError(''); // Очищаем предыдущие ошибки
+      console.log('=== LOADING LESSONS FOR COURSE ===');
+      console.log('Course ID:', courseId);
+      console.log('Course ID type:', typeof courseId);
+      
+      // Проверяем, что courseId не пустой
+      if (!courseId || courseId === '' || courseId === 'undefined') {
+        console.log('Course ID is empty, loading all lessons instead');
+        await loadAllLessons();
+        return;
+      }
+      
+      // Сначала пробуем серверную фильтрацию
+      const url = `/lessons?course=${courseId}`;
+      console.log('Making request to:', url);
+      
+      const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
       });
-      const all = response.data || [];
-      console.log('All lessons:', all);
       
-      // Улучшенная фильтрация с проверкой типов
-      const filtered = all.filter(l => {
-        const lessonCourseId = l.course_id || l.courseId;
-        const courseIdNum = Number(courseId);
+      const lessons = response.data || [];
+      console.log('Lessons loaded from server for course', courseId, ':', lessons.length, 'lessons');
+      console.log('Raw lessons data:', lessons);
+      
+      // Дополнительная клиентская фильтрация для гарантии
+      const courseIdNum = Number(courseId);
+      const filteredLessons = lessons.filter(lesson => {
+        const lessonCourseId = lesson.course_id || lesson.courseId;
         const lessonCourseIdNum = Number(lessonCourseId);
-        console.log('Comparing:', { lessonCourseId, courseId, lessonCourseIdNum, courseIdNum, match: lessonCourseIdNum === courseIdNum });
-        return lessonCourseIdNum === courseIdNum;
+        const matches = lessonCourseIdNum === courseIdNum;
+        
+        if (!matches) {
+          console.log('Lesson', lesson.id, 'does not belong to course', courseId, '(lesson course_id:', lessonCourseId, ')');
+        }
+        
+        return matches;
       });
       
-      console.log('Filtered lessons:', filtered);
+      console.log('Final filtered lessons for course', courseId, ':', filteredLessons.length, 'lessons');
       
-      const enriched = await Promise.all(filtered.map(async (l) => {
-        try {
-          const one = await axios.get(`/lessons/${l.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` } });
-          return { ...l, isPinned: !!one.data.isPinned };
-        } catch {
-          return l;
-        }
+      // Убираем дополнительные запросы - isPinned уже есть в основном ответе
+      const enriched = filteredLessons.map(l => ({
+        ...l,
+        isPinned: !!l.isPinned // Убеждаемся, что isPinned является boolean
       }));
+      
+      // Сортируем: закрепленные уроки вверху
       enriched.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
       setLessons(enriched);
+      
+      console.log('Final lessons set:', enriched.length, 'lessons');
+      console.log('=== END LOADING LESSONS ===');
     } catch (error) {
       console.error('Error loading lessons:', error);
       setError(t('lessons.load_error'));
+      setLessons([]); // Очищаем уроки при ошибке
     } finally {
       setLoading(false);
     }
@@ -118,14 +140,14 @@ export default function LessonsList() {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
       });
       const base = response.data || [];
-      const enriched = await Promise.all(base.map(async (l) => {
-        try {
-          const one = await axios.get(`/lessons/${l.id}`, { headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` } });
-          return { ...l, isPinned: !!one.data.isPinned };
-        } catch {
-          return l;
-        }
+      
+      // Убираем дополнительные запросы - isPinned уже есть в основном ответе
+      const enriched = base.map(l => ({
+        ...l,
+        isPinned: !!l.isPinned // Убеждаемся, что isPinned является boolean
       }));
+      
+      // Сортируем: закрепленные уроки вверху
       enriched.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
       setLessons(enriched);
     } catch (error) {
@@ -148,18 +170,22 @@ export default function LessonsList() {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
       });
       const courseName = courseRes.data?.name;
-      await axios.post(`/lecture/add`, { name: title, content: '', course: courseName }, {
+      const response = await axios.post(`/lecture/add`, { name: title, content: '', course: courseName }, {
         headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
       });
       toast.success(t('lessons.created'));
       setCreateOpen(false);
       setCreateCourseId('');
       setCreateTitle('');
+      
+      // Перезагружаем уроки с правильной сортировкой
       if (selectedCourse) {
         loadLessons(selectedCourse);
       } else {
         loadAllLessons();
       }
+      
+      console.log('Lesson created successfully:', response.data);
     } catch (e) {
       console.error(e);
       if (e?.response?.status === 409) toast.error(t('lessons.already_exists'));
@@ -190,19 +216,31 @@ export default function LessonsList() {
     }
   };
   
-  const handlePinLesson = async (lessonId, isPinned) => {
+  const handlePinLesson = async (lessonId, currentPinnedState) => {
     try {
-      await axios.patch(`/lesson/${lessonId}`, {
-        isPinned: !isPinned
-      }, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` }
-      });
-      toast.success(isPinned ? t('lessons.pinned') : t('lessons.unpinned'));
+      const newPinnedState = !currentPinnedState;
+      
+      const response = await axios.patch(`/lesson/${lessonId}`, 
+        { isPinned: newPinnedState },  // Отправляем новое состояние, а не инвертированное
+        { 
+          headers: { 
+            Authorization: `Bearer ${localStorage.getItem('jwtToken')}` 
+          } 
+        }
+      );
+  
+      toast.success(newPinnedState ? t('lessons.pinned') : t('lessons.unpinned'));
+      
+      // Обновляем состояние уроков
       setLessons(prev => {
-        const next = prev.map(l => l.id === lessonId ? { ...l, isPinned: !isPinned } : l);
-        next.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
-        return next;
+        const updated = prev.map(l => 
+          l.id === lessonId ? { ...l, isPinned: newPinnedState } : l
+        );
+        // Сортируем: закрепленные уроки вверху
+        return updated.sort((a, b) => (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0));
       });
+      
+      console.log(`Lesson ${lessonId} pinned status updated to: ${newPinnedState}`);
     } catch (error) {
       console.error('Error pinning lesson:', error);
       toast.error(t('lessons.pin_error'));
@@ -218,11 +256,14 @@ export default function LessonsList() {
       if (response.data && response.data.id) {
         toast.success(t('lessons.copied'));
         
+        // Перезагружаем уроки с правильной сортировкой
         if (selectedCourse) {
           loadLessons(selectedCourse);
         } else {
           loadAllLessons();
         }
+        
+        console.log('Lesson copied successfully:', response.data.id);
       }
     } catch (error) {
       console.error('Error copying lesson:', error);
@@ -250,23 +291,36 @@ export default function LessonsList() {
             }
           `}</style>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h1 style={{ fontWeight: 700, fontSize: 32, color: 'var(--text-color)' }}>
+            <h1 style={{ 
+              fontWeight: 700, 
+              fontSize: 32, 
+              color: theme === 'dark' ? '#eaf4fd' : '#333333'
+            }}>
               {t('lessons.title')}
             </h1>
-            <button type="button" onClick={() => setCreateOpen(true)} className="button" style={{ padding: '10px 22px', borderRadius: 6, background: '#54ad54', color: '#fff', border: 'none', fontWeight: 600, fontSize: 16 }}>
+            <button type="button" onClick={() => setCreateOpen(true)} className="button" style={{ padding: '10px 22px', borderRadius: 6, background: theme === 'dark' ? '#fff' : '#54ad54', color: theme === 'dark' ? '#333' : '#fff', border: 'none', fontWeight: 600, fontSize: 16 }}>
               {t('lessons.create_title')}
             </button>
           </div>
 
+          
+
           <div style={{ display: 'flex', gap: 16, marginBottom: 24, alignItems: 'center' }}>
-            <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, color: 'var(--text-color)' }}>
+            <label style={{ 
+              display: 'block', 
+              fontWeight: 600, 
+              marginBottom: 8, 
+              color: theme === 'dark' ? '#eaf4fd' : '#333333'
+            }}>
               {t('lessons.filter_by_course')}
             </label>
             <select
               value={selectedCourse}
               onChange={(e) => {
-                console.log('Course selection changed:', e.target.value);
-                setSelectedCourse(e.target.value);
+                const newCourseId = e.target.value;
+                console.log('Course selection changed from', selectedCourse, 'to', newCourseId);
+                setSelectedCourse(newCourseId);
+                // useEffect автоматически вызовет loadLessons или loadAllLessons
               }}
               style={{
                 padding: '10px 14px',
@@ -301,14 +355,18 @@ export default function LessonsList() {
           )}
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-color)' }}>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px', 
+              color: theme === 'dark' ? '#eaf4fd' : '#333333'
+            }}>
               {t('lessons.loading')}
             </div>
           ) : lessons.length === 0 ? (
             <div style={{ 
               textAlign: 'center', 
               padding: '60px 40px', 
-              color: 'var(--text-color)',
+              color: theme === 'dark' ? '#eaf4fd' : '#333333',
               background: 'var(--teach-tile-bg)',
               border: '2px dashed var(--border-color)',
               borderRadius: 12,
@@ -319,7 +377,7 @@ export default function LessonsList() {
                 fontSize: 24, 
                 fontWeight: 600, 
                 marginBottom: 12,
-                color: 'var(--text-color)'
+                color: theme === 'dark' ? '#eaf4fd' : '#333333'
               }}>
                 {selectedCourse ? t('lessons.no_lessons_in_course') : t('lessons.no_lessons')}
               </h3>
@@ -341,16 +399,16 @@ export default function LessonsList() {
                 style={{ 
                   padding: '12px 24px', 
                   borderRadius: 8, 
-                  background: '#54ad54', 
-                  color: '#fff', 
+                  background: theme === 'dark' ? '#fff' : '#54ad54', 
+                  color: theme === 'dark' ? '#333' : '#fff', 
                   border: 'none', 
                   fontWeight: 600, 
                   fontSize: 16,
                   cursor: 'pointer',
                   transition: 'background 0.2s'
                 }}
-                onMouseOver={(e) => e.target.style.background = '#45a045'}
-                onMouseOut={(e) => e.target.style.background = '#54ad54'}
+                onMouseOver={(e) => e.target.style.background = theme === 'dark' ? '#f0f0f0' : '#45a045'}
+                onMouseOut={(e) => e.target.style.background = theme === 'dark' ? '#fff' : '#54ad54'}
               >
                 {t('lessons.create_title')}
               </button>
@@ -374,7 +432,7 @@ export default function LessonsList() {
                         margin: '0 0 8px 0', 
                         fontWeight: '600', 
                         fontSize: 18,
-                        color: 'var(--text-color)'
+                        color: theme === 'dark' ? '#eaf4fd' : '#333333'
                       }}>
                         {lesson.name}
                       </h3>
@@ -384,7 +442,7 @@ export default function LessonsList() {
                         gap: '12px', 
                         marginBottom: '8px',
                         fontSize: 14, 
-                        color: 'var(--text-color)', 
+                        color: theme === 'dark' ? '#eaf4fd' : '#333333', 
                         opacity: 0.7 
                       }}>
                         <span style={{ 

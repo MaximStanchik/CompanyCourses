@@ -5,6 +5,7 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/github-dark.css';
 import axios from '../utils/axios';
+import { getAvatarUrl } from '../utils/minioUtils';
 
 const langOptions=[{value:'en',label:'EN'},{value:'ru',label:'RU'},{value:'de',label:'DE'},{value:'es',label:'ES'},{value:'pt',label:'PT'},{value:'uk',label:'UK'},{value:'zh',label:'ZH'},{value:'be',label:'BE'}];
 
@@ -155,7 +156,7 @@ export default function ArticleView(){
             {comments.map(c=>(
               <li key={c.id} style={{display:'flex',gap:12,marginBottom:18}}>
                 {c.user.avatar ? (
-                   <img src={c.user.avatar} alt='' style={{width:32,height:32,borderRadius:'50%',objectFit:'cover'}}/>
+                   <img src={getAvatarUrl(c.user.avatar)} alt='' style={{width:32,height:32,borderRadius:'50%',objectFit:'cover'}}/>
                  ) : (
                    <div style={{width:32,height:32,borderRadius:'50%',background:'#b6d4fe',color:'#3976a8',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:16}}>{c.user.name?.[0]?.toUpperCase()||'?'}</div>
                  )}

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ToastContainer, toast } from "react-toastify";
 import Navbar from "../components/NavBar";
 import axios from "../utils/axios";
+import { getAvatarUrl } from "../utils/minioUtils";
 
 const ShowRole = (props) => (
   <option key={props.todo.name} value={props.todo.name}>
@@ -20,7 +21,8 @@ export default class UserEdit extends Component {
       avatarSrc: null,
       crop: { x: 0, y: 0 },
       zoom: 1,
-      croppedAreaPixels: null
+      croppedAreaPixels: null,
+      avatarError: false
     };
   }
 
@@ -256,14 +258,22 @@ export default class UserEdit extends Component {
                       fontSize: 32,
                       fontWeight: 700,
                       color: '#666',
-                      background: this.state.todos.avatar ? `url(${this.state.todos.avatar})` : '#f8f9fa',
+                      background: (this.state.todos.avatar && !this.state.avatarError) ? `url(${getAvatarUrl(this.state.todos.avatar)})` : '#f8f9fa',
                       backgroundSize: 'cover',
                       backgroundPosition: 'center',
                       backgroundRepeat: 'no-repeat',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
                     }} onClick={this.onAvatarClick.bind(this)}>
-                      {!this.state.todos.avatar && (this.state.todos.name?.[0] || '?')}
+                      {this.state.todos.avatar && (
+                        <img
+                          src={getAvatarUrl(this.state.todos.avatar)}
+                          alt=""
+                          style={{ display: 'none' }}
+                          onError={() => this.setState({ avatarError: true })}
+                        />
+                      )}
+                      {(!this.state.todos.avatar || this.state.avatarError) && (this.state.todos.name?.[0] || '?')}
                     </div>
                     <button 
                       type="button" 

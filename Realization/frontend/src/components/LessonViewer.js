@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import './LessonViewer.css';
 import { 
   faPlay, 
   faPause, 
@@ -16,11 +17,212 @@ import {
   faQuestionCircle,
   faEye,
   faEyeSlash,
-     faTimes
+  faTimes,
+  faCheck,
+  faTrophy,
+  faStar,
+  faRocket,
+  faLightbulb,
+  faInfoCircle,
+  faExclamationTriangle,
+  faCode,
+  faFile,
+  faFilePdf,
+  faFileWord,
+  faFileExcel,
+  faFilePowerpoint,
+  faFileArchive,
+  faFileImage,
+  faFileVideo,
+  faFileAudio,
+  faDownload,
+  faCheckCircle,
+  faExternalLinkAlt
  } from '@fortawesome/free-solid-svg-icons';
 import useTheme from '../hooks/useTheme';
 import axios from '../utils/axios';
 import jwt_decode from 'jwt-decode';
+import { getVideoUrl, getMinioDownloadUrl } from '../utils/minioUtils';
+
+// CSS стили для анимаций теста
+const testStyles = `
+  @keyframes testFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes testPulse {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(68, 133, 237, 0.7);
+    }
+    70% {
+      transform: scale(1.05);
+      box-shadow: 0 0 0 10px rgba(68, 133, 237, 0);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 0 0 0 rgba(68, 133, 237, 0);
+    }
+  }
+
+  @keyframes testShake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+  }
+
+  @keyframes testBounce {
+    0%, 20%, 53%, 80%, 100% { transform: translate3d(0,0,0); }
+    40%, 43% { transform: translate3d(0,-30px,0); }
+    70% { transform: translate3d(0,-15px,0); }
+    90% { transform: translate3d(0,-4px,0); }
+  }
+
+  @keyframes testGlow {
+    0% { box-shadow: 0 0 5px rgba(68, 133, 237, 0.5); }
+    50% { box-shadow: 0 0 20px rgba(68, 133, 237, 0.8), 0 0 30px rgba(68, 133, 237, 0.6); }
+    100% { box-shadow: 0 0 5px rgba(68, 133, 237, 0.5); }
+  }
+
+  @keyframes testSuccess {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  @keyframes testError {
+    0% { transform: scale(1); }
+    10%, 90% { transform: scale(1.1); }
+    20%, 80% { transform: scale(0.9); }
+    30%, 50%, 70% { transform: scale(1.05); }
+    40%, 60% { transform: scale(0.95); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes testProgress {
+    0% { width: 0%; }
+    100% { width: var(--progress-width, 0%); }
+  }
+
+  @keyframes testSparkle {
+    0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1) rotate(180deg); }
+  }
+
+  @keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .test-container {
+    animation: testFadeIn 0.6s ease-out;
+  }
+
+  .test-question {
+    animation: testFadeIn 0.4s ease-out;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .test-question::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(68, 133, 237, 0.1), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .test-question:hover::before {
+    left: 100%;
+  }
+
+  .test-answer-option {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .test-answer-option:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .test-answer-option.selected {
+    animation: testPulse 0.6s ease-in-out;
+  }
+
+  .test-answer-option.correct {
+    animation: testSuccess 0.5s ease-out;
+  }
+
+  .test-answer-option.incorrect {
+    animation: testError 0.6s ease-in-out;
+  }
+
+  .test-submit-btn {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .test-submit-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.6s ease, height 0.6s ease;
+  }
+
+  .test-submit-btn:hover::before {
+    width: 300px;
+    height: 300px;
+  }
+
+  .test-results {
+    animation: testFadeIn 0.8s ease-out;
+  }
+
+  .test-progress-bar {
+    animation: testProgress 1s ease-out;
+  }
+
+  .test-sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: #ffd700;
+    border-radius: 50%;
+    animation: testSparkle 1.5s ease-in-out infinite;
+  }
+
+  .test-sparkle:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+  .test-sparkle:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.3s; }
+  .test-sparkle:nth-child(3) { bottom: 30%; left: 20%; animation-delay: 0.6s; }
+  .test-sparkle:nth-child(4) { bottom: 10%; right: 10%; animation-delay: 0.9s; }
+
+  .test-gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-size: 200% 200%;
+    animation: gradientShift 3s ease infinite;
+  }
+`;
 
 const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, serverCompletedSteps = [], testAttempts: initialTestAttempts = [], userProgress = {} }) => {
   const { t } = useTranslation();
@@ -81,42 +283,9 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
     }
   };
 
-  // Сохраняем прогресс при изменении страницы
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (lesson?.id && completedSteps.size > 0 && lesson.courseId && lesson.courseId !== 'unknown') {
-        const lessonProgress = getLessonProgressPercent();
-        console.log(`Сохранение прогресса при изменении страницы: урок ${lesson.id}, прогресс ${lessonProgress}%`);
-        saveLessonProgressToDB(lessonProgress);
-      }
-    };
+ 
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [lesson?.id, completedSteps, lesson?.courseId]);
-
-  // Сохраняем прогресс перед выходом из компонента
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      if (lesson?.id && lesson.courseId && lesson.courseId !== 'unknown') {
-        const lessonProgress = getLessonProgressPercent();
-        saveLessonProgressToDB(lessonProgress);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Сохраняем при размонтировании компонента только если есть токен
-      const token = localStorage.getItem('jwtToken');
-      if (token) {
-        handleBeforeUnload();
-      }
-    };
-  }, [lesson?.id, completedSteps]);
+ 
 
   // Получаем шаги урока из данных урока
   let lessonSteps = lesson?.steps || lesson?.content?.steps || [];
@@ -153,54 +322,36 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
         console.warn('Токен не найден при сохранении прогресса шага');
         return;
       }
-
+  
       const decoded = jwt_decode(token);
       const courseId = lesson?.courseId;
       const lessonId = lesson?.id;
-
+  
       if (!courseId || !lessonId || courseId === 'unknown') {
         console.error('Неверные данные урока:', { courseId, lessonId });
         return;
       }
-
-      // Проверяем, не был ли шаг уже завершен
-      const existingStepCompletion = (userProgress.stepCompletions || []).find(
-        sc => sc.lessonId === Number(lessonId) && sc.stepIndex === stepIndex
-      );
-
-      if (existingStepCompletion && isCompleted) {
-        console.log(`Шаг ${stepIndex} уже завершен на сервере`);
-        return;
-      }
-
-      // Отправляем запрос на завершение шага только если шаг действительно завершен
-      if (isCompleted) {
-        console.log(`=== ЗАВЕРШЕНИЕ ШАГА ===`);
-        console.log(`Шаг ${stepIndex} завершается с результатом:`, testResult);
+  
+      // Если это результат теста, используем новый endpoint
+      if (testResult && !isCompleted) {
+        console.log(`=== СОХРАНЕНИЕ РЕЗУЛЬТАТА ТЕСТА ===`);
+        console.log(`Шаг ${stepIndex}, результат:`, testResult);
+        
         const response = await axios.post(
-          `/course/${courseId}/lesson/${lessonId}/step/${stepIndex}/complete`,
+          `/course/${courseId}/lesson/${lessonId}/step/${stepIndex}/test-result`,
           { testResult },
           {
             headers: { Authorization: `Bearer ${token}` }
           }
         );
-        console.log(`Шаг ${stepIndex} сохранен:`, response.data);
-      } else {
-        console.log(`=== СОХРАНЕНИЕ РЕЗУЛЬТАТА ТЕСТА БЕЗ ЗАВЕРШЕНИЯ ШАГА ===`);
-        console.log(`Шаг ${stepIndex} НЕ завершается (isCompleted: ${isCompleted}), только сохраняем результат теста`);
-        // Для тестов с 0% результатом отправляем запрос на /complete, но бэкенд не завершит шаг
-        if (testResult) {
-          console.log(`Отправляем результат теста на /course/${courseId}/lesson/${lessonId}/step/${stepIndex}/complete`);
-          const response = await axios.post(
-            `/course/${courseId}/lesson/${lessonId}/step/${stepIndex}/complete`,
-            { testResult },
-            {
-              headers: { Authorization: `Bearer ${token}` }
-            }
-          );
-          console.log(`Результат теста для шага ${stepIndex} сохранен:`, response.data);
-        }
+        
+        console.log(`Результат теста для шага ${stepIndex} сохранен:`, response.data);
+        return;
       }
+  
+      // Для обычных шагов (не тестов) - ничего не делаем
+      console.log(`Шаг ${stepIndex} не является тестом, пропускаем сохранение`);
+      
     } catch (error) {
       console.error('Ошибка при сохранении шага:', error);
     }
@@ -310,8 +461,19 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
       console.log('userProgress.testAttempts.length:', userProgress.testAttempts?.length || 0);
       
       if (userProgress.testAttempts && Array.isArray(userProgress.testAttempts)) {
+        // Добавляем детальное логирование структуры
+        console.log('Детальная структура testAttempts:');
+        userProgress.testAttempts.forEach((ta, index) => {
+          console.log(`Попытка ${index}:`, ta);
+          console.log(`  - ta.lessonId:`, ta.lessonId, typeof ta.lessonId);
+          console.log(`  - ta.lesson_id:`, ta.lesson_id, typeof ta.lesson_id);
+          console.log(`  - ta.stepIndex:`, ta.stepIndex, typeof ta.stepIndex);
+          console.log(`  - ta.step_index:`, ta.step_index, typeof ta.step_index);
+        });
+        
         const lessonTestAttempts = userProgress.testAttempts.filter(ta => {
-          const attemptLessonId = Number(ta.lessonId);
+          // Пробуем разные варианты названий полей
+          const attemptLessonId = Number(ta.lessonId || ta.lesson_id);
           const currentLessonId = Number(lesson.id);
           console.log(`Сравнение попыток: ${attemptLessonId} === ${currentLessonId}`);
           return attemptLessonId === currentLessonId;
@@ -350,13 +512,6 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
     }
   }, [lesson?.id, userProgress]);
 
-  // Сохранение прогресса при изменении completedSteps
-  useEffect(() => {
-    if (lesson?.id && completedSteps.size > 0 && lesson.courseId && lesson.courseId !== 'unknown') {
-      const lessonProgress = getLessonProgressPercent();
-      saveLessonProgressToDB(lessonProgress);
-    }
-  }, [completedSteps, lesson?.id]);
 
   const getLessonProgressPercent = () => {
     if (!lessonSteps || lessonSteps.length === 0) return 0;
@@ -388,14 +543,21 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
     // Добавляем прогресс от тестов (для всех тестов, включая 0%)
     let totalTestProgress = 0;
     lessonTestAttempts.forEach(ta => {
-      // Для тестовых шагов прогресс = (результат теста / 100) / общее количество шагов
-      // Например: тест 50% = (50/100) / 4 = 0.5 / 4 = 0.125
-      const testProgress = (ta.lastScore / 100) / lessonSteps.length;
-      totalTestProgress += testProgress;
+      // Для тестовых шагов:
+      // - 100% результат = 1 полный шаг
+      // - <100% результат = частичный прогресс
+      if (ta.lastScore >= 100) {
+        totalTestProgress += 1; // Полный шаг
+      } else {
+        // Исправляем: прогресс теста должен быть пропорциональным
+        // Если тест на 50%, то это 0.5 шага
+        const testProgress = ta.lastScore / 100;
+        totalTestProgress += testProgress;
+      }
     });
     
     const completedCount = completedStepIndices.size + totalTestProgress;
-    const calculatedProgress = lessonSteps.length > 0 ? Math.round((completedCount / lessonSteps.length) * 100) : 0;
+    const calculatedProgress = lessonSteps.length > 0 ? Math.round((completedCount / lessonSteps.length) * 1000) / 10 : 0;
     
     // Всегда используем рассчитанный прогресс, а не сохраненный
     const finalProgress = calculatedProgress;
@@ -471,7 +633,6 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
     lessonSteps = lessonSteps.map((step, index) => {
       console.log(`Processing step ${index}:`, step);
       
-      // Проверяем, не является ли шаг JSON строкой с тестом
       if (typeof step === 'string') {
         try {
           const parsedStep = JSON.parse(step);
@@ -481,7 +642,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
               type: 'test',
               title: `Тест ${index + 1}`,
               questions: parsedStep.questions,
-              description: 'Тест по материалу урока'
+              description: t('lesson.test_description')
             };
           }
         } catch (e) {
@@ -501,7 +662,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
                 type: 'test',
                 title: step.title || `Тест ${index + 1}`,
                 questions: parsedContent.questions,
-                description: step.description || 'Тест по материалу урока'
+                description: t('lesson.test_description')
               };
             }
           } catch (e) {
@@ -519,7 +680,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
                 type: 'test',
                 title: step.title || `Тест ${index + 1}`,
                 questions: parsedText.questions,
-                description: step.description || 'Тест по материалу урока'
+                description: t('lesson.test_description')
               };
             }
           } catch (e) {
@@ -573,7 +734,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
             type: 'test',
             title: step.title || `Тест ${index + 1}`,
             questions: step.questions,
-            description: step.description
+            description: t('lesson.test_description')
           };
         } else if (step.type === 'video' || step.videoUrl || step.videoFile) {
           // Проверяем, есть ли видео в JSON content
@@ -647,7 +808,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
       lessonSteps = [{
         type: 'video',
         title: lesson.title,
-        videoUrl: lesson.videoUrl || lesson.videoLink,
+        videoUrl: (lesson.videoUrl || lesson.videoLink) ? getVideoUrl(lesson.videoUrl || lesson.videoLink) : null,
         description: lesson.description
       }];
     } else if (lesson.content || lesson.text) {
@@ -820,6 +981,8 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
     console.log(`Шаг ${stepIndex}, результат:`, result);
     console.log(`Урок ID: ${lesson?.id}`);
     console.log(`Курс ID: ${lesson?.courseId}`);
+    console.log(`onStepComplete функция:`, typeof onStepComplete);
+    console.log(`lesson?.id:`, lesson?.id);
     
     setTestAnswers(prev => ({ ...prev, [stepIndex]: (result && result.answers) ? result.answers : result }))
     setShowTestResults(true);
@@ -831,12 +994,16 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
         const isPassed = !!(result && result.isPassed === true);
         console.log(`НЕМЕДЛЕННО вызываем onStepComplete с результатом теста: score=${score}, isPassed=${isPassed}`);
         onStepComplete(lesson.id, stepIndex, { testResult: { score, isPassed, answers: (result && result.answers) ? result.answers : {} } });
+      } else {
+        console.log(`НЕ вызываем onStepComplete: onStepComplete=${!!onStepComplete}, lesson?.id=${lesson?.id}`);
       }
       
       // НЕМЕДЛЕННО сохраняем результат теста в БД
       const score = result && typeof result.score === 'number' ? result.score : 0;
       const isPassed = !!(result && result.isPassed === true);
       console.log(`НЕМЕДЛЕННО сохраняем результат теста в БД: score=${score}, isPassed=${isPassed}`);
+      console.log(`Вызываем saveStepProgress с параметрами: stepIndex=${stepIndex}, isCompleted=false, testResult=`, { score, isPassed, answers: (result && result.answers) ? result.answers : {} });
+      
       saveStepProgress(stepIndex, false, { // Не завершаем шаг автоматически
         score: score,
         isPassed: isPassed,
@@ -1095,6 +1262,8 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
 
     // Автоматически определяем тип шага на основе содержимого
     const determineStepType = (step) => {
+      console.log('🔍 Determining step type for:', step);
+      
       if (!step || typeof step !== 'object') return 'text';
       // ВАЖНО: Если тип уже установлен как 'test', ВСЕГДА используем его
       if (step.type === 'test') {
@@ -1158,6 +1327,25 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
         return 'code';
       }
       
+      // Проверяем на наличие файлов
+      if (step.fileUrl || step.fileUpload || (typeof content === 'string' && content.includes('"fileUrl"'))) {
+        console.log('File step detected by direct fields or string content');
+        return 'file';
+      }
+      
+      // Дополнительная проверка для JSON строк с файлами
+      if (typeof content === 'string') {
+        try {
+          const parsed = JSON.parse(content);
+          if (parsed && typeof parsed === 'object' && (parsed.fileUrl || parsed.filename)) {
+            console.log('Auto-detected file step from JSON content:', parsed);
+            return 'file';
+          }
+        } catch (e) {
+          // Если не JSON, продолжаем проверку
+        }
+      }
+      
       // По умолчанию текст
       return 'text';
     };
@@ -1198,39 +1386,11 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
         );
       case 'code':
         return <CodeStep step={safeStep} onComplete={() => handleStepComplete(index)} />;
+      case 'file':
+        console.log('🎯 Rendering FileStep component for step:', safeStep);
+        return <FileStep step={safeStep} onComplete={() => handleStepComplete(index)} />;
       default:
         return <TextStep step={safeStep} onComplete={() => handleStepComplete(index)} />;
-    }
-  };
-
-  const saveLessonProgressToDB = async (progress) => {
-    try {
-      const token = localStorage.getItem('jwtToken');
-      if (!token) {
-        console.warn('Токен не найден при сохранении прогресса урока - это нормально при размонтировании компонента');
-        return;
-      }
-
-      const decoded = jwt_decode(token);
-      const lessonId = lesson?.id;
-      const courseId = lesson?.courseId;
-
-      if (!lessonId || !courseId || courseId === 'unknown') {
-        console.error('Неверные данные урока:', { lessonId, courseId });
-        return;
-      }
-
-      const response = await axios.post(
-        `/course/${courseId}/lesson/${lessonId}/progress`,
-        { progress },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      console.log(`Прогресс урока ${lessonId} сохранен: ${progress}%`);
-    } catch (error) {
-      console.error('Ошибка при сохранении прогресса урока:', error);
     }
   };
 
@@ -1320,48 +1480,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
         </div>
       </div>
 
-      {/* Прогресс урока */}
-      {lessonSteps.length > 0 && (
-        <div style={{ 
-          padding: '15px 20px',
-          borderBottom: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            marginBottom: '8px'
-          }}>
-            <span style={{ 
-              fontSize: '0.9rem', 
-              color: theme === 'dark' ? '#cccccc' : '#666666' 
-            }}>
-              {t('lesson.lesson_progress')}
-            </span>
-            <span style={{ 
-              fontSize: '0.9rem', 
-              fontWeight: '600',
-              color: getProgressColor(getLessonProgressPercent())
-            }}>
-              {getLessonProgressPercent()}%
-            </span>
-          </div>
-          <div style={{ 
-            width: '100%', 
-            height: '8px', 
-            background: theme === 'dark' ? '#404040' : '#e9ecef', 
-            borderRadius: '4px', 
-            overflow: 'hidden' 
-          }}>
-            <div style={{ 
-              width: `${getLessonProgressPercent()}%`, 
-              height: '100%', 
-              background: getProgressColor(getLessonProgressPercent()),
-              transition: 'width 0.3s'
-            }} />
-          </div>
-        </div>
-      )}
+
 
       {/* Навигация по шагам */}
       {lessonSteps.length > 1 && (
@@ -1442,7 +1561,7 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
           <div style={{ 
             textAlign: 'center', 
             padding: '40px 20px',
-            color: theme === 'dark' ? '#cccccc' : '#666666'
+            color: theme === 'dark' ? '#ffffff' : '#666666'
           }}>
             <FontAwesomeIcon 
               icon={faFileAlt} 
@@ -1452,7 +1571,13 @@ const LessonViewer = ({ lesson, onComplete, onNext, onPrevious, onStepComplete, 
                 marginBottom: '20px' 
               }} 
             />
-            <h3>{t('lesson.no_steps_in_lesson')}</h3>
+            <p style={{ 
+              fontSize: '1.75rem', 
+              fontWeight: 'bold',  
+              margin: '0'          
+            }}>
+              {t('lesson.no_steps_in_lesson')}
+            </p>
             <p>{t('lesson.no_steps_in_lesson_desc')}</p>
           </div>
         )}
@@ -1619,6 +1744,22 @@ const VideoStep = ({ step, onComplete }) => {
       }
     }
     
+    // Преобразуем старые URL в MinIO URL
+    if (videoUrl && (videoUrl.includes('static/uploads/') || videoUrl.includes('localhost:9000'))) {
+      console.log('🔄 Преобразуем старый URL в MinIO URL:', videoUrl);
+      const minioUrl = getVideoUrl(videoUrl);
+      console.log('✅ Новый MinIO URL:', minioUrl);
+      return minioUrl;
+    }
+    
+    // Исправляем URL, которые начинаются с имени бакета без префикса
+    if (videoUrl && (videoUrl.startsWith('course-files/') || videoUrl.startsWith('uploads/') || videoUrl.startsWith('avatars/'))) {
+      console.log('🔄 Исправляем URL без префикса:', videoUrl);
+      const minioUrl = getVideoUrl(videoUrl);
+      console.log('✅ Исправленный MinIO URL:', minioUrl);
+      return minioUrl;
+    }
+    
     return videoUrl;
   };
 
@@ -1715,6 +1856,19 @@ const VideoStep = ({ step, onComplete }) => {
 
   const cleanVideoUrl = getCleanVideoUrl();
 
+  // Функция для проверки файла в MinIO
+  const checkFileInMinio = async (filename) => {
+    try {
+      const response = await fetch(`/api/minio/check-file/${filename}`);
+      const data = await response.json();
+      console.log('🔍 Результат проверки файла:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Ошибка при проверке файла:', error);
+      return null;
+    }
+  };
+
   // Если видео URL пустой, автоматически завершаем шаг
   React.useEffect(() => {
     if (!cleanVideoUrl && !isCompleted) {
@@ -1804,6 +1958,7 @@ const VideoStep = ({ step, onComplete }) => {
           (() => {
             const videoType = getVideoType(cleanVideoUrl);
             console.log('Video type:', videoType, 'URL:', cleanVideoUrl);
+            console.log('🎬 Используемый URL в source:', cleanVideoUrl);
             
             if (videoType === 'youtube') {
               const youtubeId = getYouTubeId(cleanVideoUrl);
@@ -1859,7 +2014,7 @@ const VideoStep = ({ step, onComplete }) => {
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
-                        ✓ Завершено
+                        ✓ {t('lesson.completed') || 'Завершено'}
                       </div>
                     )}
                   </div>
@@ -1908,7 +2063,7 @@ const VideoStep = ({ step, onComplete }) => {
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
-                        ✓ Завершено
+                        ✓ {t('lesson.completed') || 'Завершено'}
                       </div>
                     )}
                   </div>
@@ -1957,7 +2112,7 @@ const VideoStep = ({ step, onComplete }) => {
                         fontSize: '12px',
                         fontWeight: 'bold'
                       }}>
-                        ✓ Завершено
+                        ✓ {t('lesson.completed') || 'Завершено'}
                       </div>
                     )}
                   </div>
@@ -1993,22 +2148,7 @@ const VideoStep = ({ step, onComplete }) => {
                       }}
                     />
                     
-                    {/* Индикатор завершения */}
-                    {isCompleted && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '10px',
-                        right: '10px',
-                        background: '#28a745',
-                        color: 'white',
-                        padding: '5px 10px',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold'
-                      }}>
-                        ✓ Завершено
-                      </div>
-                    )}
+                  
                   </div>
                 );
               }
@@ -2026,7 +2166,7 @@ const VideoStep = ({ step, onComplete }) => {
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexDirection: 'column',
-                  color: theme === 'dark' ? '#cccccc' : '#666666',
+                  color: theme === 'dark' ? '#ffffff' : '#666666',
                   position: 'relative'
                 }}>
                   <FontAwesomeIcon icon={faVideo} style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.5 }} />
@@ -2071,38 +2211,63 @@ const VideoStep = ({ step, onComplete }) => {
                       fontSize: '12px',
                       fontWeight: 'bold'
                     }}>
-                      ✓ Завершено
+                      ✓ {t('lesson.completed') || 'Завершено'}
                     </div>
                   )}
                 </div>
               );
             } else if (videoType === 'external') {
               // Для внешних ссылок, которые не распознаны как известные платформы
+              console.log('🎨 External video theme:', theme, 'color:', theme === 'dark' ? '#ffffff' : '#666666');
               return (
-                <div style={{
-                  width: '100%',
-                  height: '300px',
-                  background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
-                  border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
-                  borderRadius: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexDirection: 'column',
-                  color: theme === 'dark' ? '#cccccc' : '#666666',
-                  position: 'relative'
-                }}>
-                  <FontAwesomeIcon icon={faVideo} style={{ fontSize: '3rem', marginBottom: '15px', opacity: 0.5 }} />
-                  <h4 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
-                    Внешнее видео
+                <div 
+                  className="external-video-container"
+                  style={{
+                    width: '100%',
+                    height: '300px',
+                    background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
+                    border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexDirection: 'column',
+                    position: 'relative',
+                    boxShadow: theme === 'dark' ? '0 4px 6px rgba(0, 0, 0, 0.3)' : '0 2px 4px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <FontAwesomeIcon 
+                    icon={faVideo} 
+                    className="video-icon"
+                    style={{ 
+                      fontSize: '3rem', 
+                      marginBottom: '15px', 
+                      opacity: 0.5
+                    }} 
+                  />
+                  <h4 style={{ 
+                    margin: '0 0 10px 0', 
+                    fontSize: '16px',
+                    fontWeight: '600'
+                  }}>
+                    {(() => {
+                      const text = t('lesson.external_video');
+                      console.log('🎨 External video text:', text, 'theme:', theme);
+                      return text;
+                    })()}
                   </h4>
-                  <p style={{ fontSize: '14px', margin: '0 0 15px 0', textAlign: 'center' }}>
-                    Видео размещено на внешней платформе
+                  <p style={{ 
+                    fontSize: '14px', 
+                    margin: '0 0 15px 0', 
+                    textAlign: 'center'
+                  }}>
+                    {t('lesson.video_external_platform')}
                   </p>
                   <a 
                     href={cleanVideoUrl} 
                     target="_blank" 
                     rel="noopener noreferrer"
+                    className="video-link-btn"
                     style={{
                       padding: '10px 20px',
                       background: '#007bff',
@@ -2114,7 +2279,7 @@ const VideoStep = ({ step, onComplete }) => {
                       marginBottom: '15px'
                     }}
                   >
-                    Открыть видео
+                    {t('lesson.go_to_video')}
                   </a>
                   
                   {/* Индикатор завершения */}
@@ -2130,7 +2295,7 @@ const VideoStep = ({ step, onComplete }) => {
                       fontSize: '12px',
                       fontWeight: 'bold'
                     }}>
-                      ✓ Завершено
+                      ✓ {t('lesson.completed') || 'Завершено'}
                     </div>
                   )}
                 </div>
@@ -2173,7 +2338,7 @@ const VideoStep = ({ step, onComplete }) => {
                       fontSize: '12px',
                       fontWeight: 'bold'
                     }}>
-                      ✓ Завершено
+                      ✓ {t('lesson.completed') || 'Завершено'}
                     </div>
                   )}
                 </div>
@@ -2215,7 +2380,7 @@ const VideoStep = ({ step, onComplete }) => {
                     fontSize: '12px',
                     fontWeight: 'bold'
                   }}>
-                    ✓ Завершено
+                    ✓ {t('lesson.completed') || 'Завершено'}
                   </div>
                 )}
               </div>
@@ -2253,27 +2418,26 @@ const TextStep = ({ step, onComplete }) => {
   const [isCompleted, setIsCompleted] = useState(false);
 
   const handleComplete = () => {
+    console.log('=== ТЕКСТОВЫЙ ШАГ ===');
+    console.log('Текстовый шаг отображен, отмечаем как завершенный');
+    console.log('onComplete функция:', onComplete);
     setIsCompleted(true);
-    onComplete();
+    // Добавляем небольшую задержку, чтобы избежать конфликтов с навигацией
+    setTimeout(() => {
+      console.log('Вызываем onComplete для текстового шага');
+      if (onComplete && typeof onComplete === 'function') {
+        onComplete();
+        console.log('onComplete вызван успешно');
+      } else {
+        console.error('onComplete не является функцией:', onComplete);
+      }
+    }, 500); // Увеличиваем задержку
   };
 
   // Автоматически отмечаем текстовый шаг завершенным при отображении
   React.useEffect(() => {
     if (!isCompleted) {
-      console.log('=== ТЕКСТОВЫЙ ШАГ ===');
-      console.log('Текстовый шаг отображен, отмечаем как завершенный');
-      console.log('onComplete функция:', onComplete);
-      setIsCompleted(true);
-      // Добавляем небольшую задержку, чтобы избежать конфликтов с навигацией
-      setTimeout(() => {
-        console.log('Вызываем onComplete для текстового шага');
-        if (onComplete && typeof onComplete === 'function') {
-          onComplete();
-          console.log('onComplete вызван успешно');
-        } else {
-          console.error('onComplete не является функцией:', onComplete);
-        }
-      }, 500); // Увеличиваем задержку
+      handleComplete();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -2376,6 +2540,7 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
   const [isResetting, setIsResetting] = useState(false); // Добавляем состояние для отслеживания сброса
   const [resetCounter, setResetCounter] = useState(0); // Добавляем счетчик сбросов
   const [showTestResults, setShowTestResults] = useState(false);
+  const [animationState, setAnimationState] = useState('idle'); // Состояние для анимаций
 
   // Инициализируем ответы, если ранее уже отвечали
   React.useEffect(() => {
@@ -2534,6 +2699,7 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
   };
 
   const handleSubmit = () => {
+    console.log('=== TEST STEP HANDLE SUBMIT ===');
     console.log('Тест отправлен, отмечаем как завершенный');
     setIsSubmitted(true);
     
@@ -2739,58 +2905,206 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
 
   return (
     <div style={{ position: 'relative', zIndex: 1 }}>
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: '10px',
-        marginBottom: '15px'
-      }}>
-        <FontAwesomeIcon icon={faQuestionCircle} style={{ color: '#ffc107' }} />
-        <h3 style={{ 
-          fontSize: '1.1rem', 
-          fontWeight: '600',
-          color: theme === 'dark' ? '#ffffff' : '#333333'
-        }}>
-          {step.title || 'Тест'}
-        </h3>
-      </div>
+      <style>{testStyles}</style>
       
-      <div style={{ marginBottom: '20px' }}>
-        {step.description && (
-          <p style={{ 
-            fontSize: '0.9rem',
-            color: theme === 'dark' ? '#cccccc' : '#666666',
-            marginBottom: '15px'
+      {/* Sparkle эффекты */}
+      <div className="test-sparkle"></div>
+      <div className="test-sparkle"></div>
+      <div className="test-sparkle"></div>
+      <div className="test-sparkle"></div>
+      
+      <div className="test-container" style={{ 
+        background: theme === 'dark' 
+          ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+          : 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+        borderRadius: '16px',
+        padding: '24px',
+        border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+        boxShadow: theme === 'dark' 
+          ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
+          : '0 8px 32px rgba(0, 0, 0, 0.1)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Градиентный фон */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '4px',
+          background: 'linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c)',
+          backgroundSize: '200% 200%',
+          animation: 'gradientShift 3s ease infinite'
+        }}></div>
+        
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: '15px',
+          marginBottom: '20px',
+          padding: '16px',
+          background: theme === 'dark' 
+            ? 'linear-gradient(135deg, rgba(68, 133, 237, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' 
+            : 'linear-gradient(135deg, rgba(68, 133, 237, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+          borderRadius: '12px',
+          border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+        }}>
+          <div style={{
+            width: '48px',
+            height: '48px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+            animation: 'testPulse 2s ease-in-out infinite'
           }}>
-            {step.description}
-          </p>
-        )}
+            <FontAwesomeIcon 
+              icon={faQuestionCircle} 
+              style={{ 
+                color: '#ffffff', 
+                fontSize: '20px',
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+              }} 
+            />
+          </div>
+          <div>
+            <h3 style={{ 
+              fontSize: '1.4rem', 
+              fontWeight: '700',
+              color: theme === 'dark' ? '#ffffff' : '#333333',
+              margin: '0 0 4px 0',
+              textShadow: theme === 'dark' ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'
+            }}>
+              {step.title || 'Тест'}
+            </h3>
+            <p style={{
+              fontSize: '0.9rem',
+              color: theme === 'dark' ? '#cccccc' : '#666666',
+              margin: 0,
+              fontWeight: '500'
+            }}>
+              {t('lesson.test_description')}
+            </p>
+          </div>
+        </div>
+      
+              <div style={{ marginBottom: '20px' }}>
+          
+          {step.description && (
+            <p style={{ 
+              fontSize: '0.9rem',
+              color: theme === 'dark' ? '#cccccc' : '#666666',
+              marginBottom: '15px',
+              padding: '12px 16px',
+              background: theme === 'dark' 
+                ? 'linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(253, 126, 20, 0.1) 100%)' 
+                : 'linear-gradient(135deg, rgba(255, 193, 7, 0.05) 0%, rgba(253, 126, 20, 0.05) 100%)',
+              borderRadius: '8px',
+              border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+            }}>
+              <FontAwesomeIcon 
+                icon={faInfoCircle} 
+                style={{ 
+                  color: '#ffc107', 
+                  marginRight: '8px',
+                  fontSize: '14px'
+                }} 
+              />
+              {step.description}
+            </p>
+          )}
         
         {questions.length === 0 ? (
           <div style={{
-            padding: '20px',
-            background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
-            borderRadius: '8px',
+            padding: '24px',
+            background: theme === 'dark' 
+              ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+              : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            borderRadius: '16px',
             textAlign: 'center',
-            color: theme === 'dark' ? '#cccccc' : '#666666'
+            color: theme === 'dark' ? '#cccccc' : '#666666',
+            border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+            boxShadow: theme === 'dark' 
+              ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.1)',
+            animation: 'testFadeIn 0.6s ease-out'
           }}>
-            <p>Вопросы не найдены</p>
-            <p style={{ fontSize: '0.8rem', marginTop: '10px' }}>
+            <div style={{
+              width: '64px',
+              height: '64px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+              boxShadow: '0 6px 20px rgba(255, 193, 7, 0.3)',
+              animation: 'testPulse 2s ease-in-out infinite'
+            }}>
+              <FontAwesomeIcon 
+                icon={faExclamationTriangle} 
+                style={{ 
+                  color: '#ffffff', 
+                  fontSize: '24px',
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+                }} 
+              />
+            </div>
+            
+            <h4 style={{
+              fontSize: '1.2rem',
+              fontWeight: '600',
+              color: theme === 'dark' ? '#ffffff' : '#333333',
+              margin: '0 0 8px 0'
+            }}>
+              Вопросы не найдены
+            </h4>
+            
+            <p style={{ 
+              fontSize: '0.9rem', 
+              margin: '0 0 16px 0',
+              color: theme === 'dark' ? '#cccccc' : '#666666'
+            }}>
               Тип шага: {step.type}
             </p>
-            <p style={{ fontSize: '0.8rem', marginTop: '5px' }}>
-              Raw data: {JSON.stringify(step.questions || step.content || step.text)}
-            </p>
-            <details style={{ marginTop: '10px', textAlign: 'left' }}>
-              <summary style={{ cursor: 'pointer', fontSize: '0.8rem' }}>Отладочная информация</summary>
+            
+            <details style={{ 
+              marginTop: '16px', 
+              textAlign: 'left',
+              background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
+              borderRadius: '8px',
+              border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+              display: process.env.NODE_ENV === 'development' ? 'block' : 'none' // Скрываем в продакшене
+            }}>
+              <summary style={{ 
+                cursor: 'pointer', 
+                fontSize: '0.9rem',
+                padding: '12px 16px',
+                fontWeight: '600',
+                color: theme === 'dark' ? '#ffffff' : '#333333',
+                borderBottom: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+              }}>
+                <FontAwesomeIcon 
+                  icon={faInfoCircle} 
+                  style={{ 
+                    marginRight: '8px',
+                    color: '#667eea'
+                  }} 
+                />
+                Отладочная информация
+              </summary>
               <pre style={{ 
-                fontSize: '0.7rem', 
-                background: theme === 'dark' ? '#1a1a1a' : '#ffffff',
-                padding: '10px',
-                borderRadius: '4px',
-                marginTop: '5px',
+                fontSize: '0.8rem', 
+                background: 'transparent',
+                padding: '16px',
+                margin: 0,
                 overflow: 'auto',
-                maxHeight: '200px'
+                maxHeight: '200px',
+                color: theme === 'dark' ? '#cccccc' : '#666666',
+                borderTop: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
               }}>
                 {JSON.stringify(step, null, 2)}
               </pre>
@@ -2800,24 +3114,67 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
           questions.map((question, questionIndex) => (
             <div
               key={questionIndex}
+              className="test-question"
               style={{
-                marginBottom: '20px',
-                padding: '15px',
-                background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
-                borderRadius: '8px',
-                border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+                marginBottom: '24px',
+                padding: '20px',
+                background: theme === 'dark' 
+                  ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+                  : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+                borderRadius: '12px',
+                border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+                boxShadow: theme === 'dark' 
+                  ? '0 4px 20px rgba(0, 0, 0, 0.3)' 
+                  : '0 4px 20px rgba(0, 0, 0, 0.1)',
+                position: 'relative',
+                overflow: 'hidden'
               }}
             >
-              <h4 style={{ 
-                fontSize: '1rem', 
-                fontWeight: '500',
-                marginBottom: '10px',
-                color: theme === 'dark' ? '#ffffff' : '#333333'
+              {/* Номер вопроса с иконкой */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                marginBottom: '16px',
+                padding: '8px 16px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '20px',
+                width: 'fit-content'
               }}>
-                {questionIndex + 1}. {question.question || question.text}
+                <div style={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'rgba(255, 255, 255, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  color: '#ffffff'
+                }}>
+                  {questionIndex + 1}
+                </div>
+                <FontAwesomeIcon 
+                  icon={faQuestionCircle} 
+                  style={{ 
+                    color: '#ffffff', 
+                    fontSize: '14px' 
+                  }} 
+                />
+              </div>
+              
+              <h4 style={{ 
+                fontSize: '1.1rem', 
+                fontWeight: '600',
+                marginBottom: '16px',
+                color: theme === 'dark' ? '#ffffff' : '#333333',
+                lineHeight: '1.5'
+              }}>
+                {question.question || question.text}
               </h4>
               
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {(question.options || question.answers || []).map((answer, answerIndex) => {
                   const selectedForQuestion = Array.isArray(selectedAnswers[questionIndex])
                     ? selectedAnswers[questionIndex]
@@ -2827,34 +3184,87 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
                   return (
                     <label
                       key={answerIndex}
+                      className={`test-answer-option ${isSelected ? 'selected' : ''}`}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '10px',
-                        padding: '10px',
-                        borderRadius: '6px',
+                        gap: '12px',
+                        padding: '16px',
+                        borderRadius: '10px',
                         cursor: 'pointer',
                         background: isSelected 
-                          ? theme === 'dark' ? '#404040' : '#e9ecef'
-                          : 'transparent',
-                        border: `1px solid ${
+                          ? 'linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)'
+                          : theme === 'dark' 
+                            ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)'
+                            : 'linear-gradient(135deg, rgba(0, 0, 0, 0.02) 0%, rgba(0, 0, 0, 0.01) 100%)',
+                        border: `2px solid ${
                           isSelected 
-                            ? '#007bff' 
+                            ? '#667eea' 
                             : theme === 'dark' ? '#404040' : '#e9ecef'
                         }`,
                         color: theme === 'dark' ? '#eaf4fd' : '#333333',
-                        transition: 'all 0.2s ease'
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}
                     >
+                      {/* Кастомный чекбокс */}
+                      <div style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '4px',
+                        border: `2px solid ${isSelected ? '#667eea' : theme === 'dark' ? '#666666' : '#cccccc'}`,
+                        background: isSelected ? '#667eea' : 'transparent',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s ease'
+                      }}>
+                        {isSelected && (
+                          <FontAwesomeIcon 
+                            icon={faCheck} 
+                            style={{ 
+                              color: '#ffffff', 
+                              fontSize: '12px',
+                              animation: 'testSuccess 0.3s ease-out'
+                            }} 
+                          />
+                        )}
+                      </div>
+                      
                       <input
                         type="checkbox"
                         name={`question-${questionIndex}`}
                         checked={isSelected}
                         onChange={() => handleAnswerSelect(questionIndex, answerIndex)}
-                        style={{ margin: 0 }}
+                        style={{ 
+                          position: 'absolute',
+                          opacity: 0,
+                          pointerEvents: 'none'
+                        }}
                         disabled={isSubmitted}
                       />
-                      <span>{answer.text || answer}</span>
+                      
+                      <span style={{
+                        fontSize: '1rem',
+                        fontWeight: '500',
+                        flex: 1
+                      }}>
+                        {answer.text || answer}
+                      </span>
+                      
+                      {/* Индикатор выбора */}
+                      {isSelected && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          width: '8px',
+                          height: '8px',
+                          borderRadius: '50%',
+                          background: '#667eea',
+                          animation: 'testPulse 1s ease-in-out infinite'
+                        }}></div>
+                      )}
                     </label>
                   );
                 })}
@@ -2862,58 +3272,160 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
             </div>
           ))
         ) : (
-          <div style={{
-            padding: '20px',
-            background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
-            borderRadius: '8px',
+          <div className="test-results" style={{
+            padding: '24px',
+            background: theme === 'dark' 
+              ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+              : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+            borderRadius: '16px',
             textAlign: 'center',
-            color: theme === 'dark' ? '#cccccc' : '#666666'
+            color: theme === 'dark' ? '#cccccc' : '#666666',
+            border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+            boxShadow: theme === 'dark' 
+              ? '0 8px 32px rgba(0, 0, 0, 0.3)' 
+              : '0 8px 32px rgba(0, 0, 0, 0.1)',
+            position: 'relative',
+            overflow: 'hidden'
           }}>
+            {/* Градиентная полоса сверху */}
+            <div style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: testResults && testResults.score >= 70 
+                ? 'linear-gradient(90deg, #28a745, #20c997, #17a2b8)' 
+                : testResults && testResults.score >= 50 
+                  ? 'linear-gradient(90deg, #ffc107, #fd7e14, #e83e8c)' 
+                  : 'linear-gradient(90deg, #dc3545, #fd7e14, #ffc107)',
+              backgroundSize: '200% 200%',
+              animation: 'gradientShift 3s ease infinite'
+            }}></div>
+            
             {testResults && (
-              <div style={{ marginBottom: '20px' }}>
-                <h4 style={{ 
-                  fontSize: '1.2rem', 
-                  fontWeight: '600',
-                  color: testResults.score >= 70 ? '#28a745' : testResults.score >= 50 ? '#ffc107' : '#dc3545',
-                  marginBottom: '10px'
+              <div style={{ marginBottom: '24px' }}>
+                {/* Иконка результата */}
+                <div style={{
+                  width: '80px',
+                  height: '80px',
+                  borderRadius: '50%',
+                  background: testResults.score >= 70 
+                    ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' 
+                    : testResults.score >= 50 
+                      ? 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)' 
+                      : 'linear-gradient(135deg, #dc3545 0%, #e83e8c 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 20px',
+                  boxShadow: testResults.score >= 70 
+                    ? '0 8px 25px rgba(40, 167, 69, 0.4)' 
+                    : testResults.score >= 50 
+                      ? '0 8px 25px rgba(255, 193, 7, 0.4)' 
+                      : '0 8px 25px rgba(220, 53, 69, 0.4)',
+                  animation: 'testBounce 1s ease-out'
                 }}>
-                  {t('lesson.test_result')}: {testResults.score}%
+                  <FontAwesomeIcon 
+                    icon={testResults.score >= 70 ? faTrophy : testResults.score >= 50 ? faStar : faTimes} 
+                    style={{ 
+                      color: '#ffffff', 
+                      fontSize: '32px',
+                      filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+                    }} 
+                  />
+                </div>
+                
+                <h4 style={{ 
+                  fontSize: '1.5rem', 
+                  fontWeight: '700',
+                  color: testResults.score >= 70 ? '#28a745' : testResults.score >= 50 ? '#ffc107' : '#dc3545',
+                  marginBottom: '12px',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }}>
+                  {testResults.score}%
                 </h4>
-                <p style={{ fontSize: '0.9rem', marginBottom: '5px' }}>
+                
+                <p style={{ 
+                  fontSize: '1rem', 
+                  marginBottom: '8px',
+                  fontWeight: '600',
+                  color: theme === 'dark' ? '#ffffff' : '#333333'
+                }}>
                   {t('lesson.correct_answers_count', { correct: testResults.correctAnswers, total: testResults.totalQuestions })}
                 </p>
-                <p style={{ fontSize: '0.9rem', marginBottom: '5px', color: theme === 'dark' ? '#cccccc' : '#666666' }}>
-                  {t('lesson.attempts_count', { count: testResults.attempts || 1 })}
+                
+                <p style={{ 
+                  fontSize: '0.9rem', 
+                  marginBottom: '16px', 
+                  color: theme === 'dark' ? '#ffffff' : '#666666',
+                  fontWeight: '500'
+                }}>
+                  {t('lesson.attempts_count', { count: (testResults.attempts || 1) + 1 })}
                 </p>
+                
+                {/* Прогресс бар */}
                 <div style={{
                   width: '100%',
-                  height: '8px',
+                  height: '12px',
                   background: theme === 'dark' ? '#404040' : '#e9ecef',
-                  borderRadius: '4px',
+                  borderRadius: '6px',
                   overflow: 'hidden',
-                  marginTop: '10px'
+                  marginTop: '16px',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
                 }}>
-                  <div style={{
-                    width: `${testResults.score}%`,
-                    height: '100%',
-                    background: testResults.score >= 70 ? '#28a745' : testResults.score >= 50 ? '#ffc107' : '#dc3545',
-                    transition: 'width 0.5s ease'
-                  }} />
+                  <div 
+                    className="test-progress-bar"
+                    style={{
+                      width: `${testResults.score}%`,
+                      height: '100%',
+                      background: testResults.score >= 70 
+                        ? 'linear-gradient(90deg, #28a745 0%, #20c997 100%)' 
+                        : testResults.score >= 50 
+                          ? 'linear-gradient(90deg, #ffc107 0%, #fd7e14 100%)' 
+                          : 'linear-gradient(90deg, #dc3545 0%, #e83e8c 100%)',
+                      borderRadius: '6px',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      '--progress-width': `${testResults.score}%`
+                    }} 
+                  />
                 </div>
               </div>
             )}
 
             {/* Правильные ответы (по кнопке) */}
             {testResults && showCorrectAnswers && (
-              <div style={{ textAlign: 'left' }}>
-                <h5 style={{ 
-                  fontSize: '1rem', 
-                  fontWeight: '500',
-                  marginBottom: '15px',
-                  color: theme === 'dark' ? '#ffffff' : '#333333'
+              <div style={{ 
+                textAlign: 'left',
+                animation: 'testFadeIn 0.6s ease-out'
+              }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  marginBottom: '20px',
+                  padding: '12px 16px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                  borderRadius: '12px',
+                  width: 'fit-content'
                 }}>
-                  {t('lesson.correct_answers')}
-                </h5>
+                  <FontAwesomeIcon 
+                    icon={faLightbulb} 
+                    style={{ 
+                      color: '#ffffff', 
+                      fontSize: '16px' 
+                    }} 
+                  />
+                  <h5 style={{ 
+                    fontSize: '1.1rem', 
+                    fontWeight: '600',
+                    margin: 0,
+                    color: '#ffffff'
+                  }}>
+                    {t('lesson.correct_answers')}
+                  </h5>
+                </div>
+                
                 {questions.map((question, questionIndex) => {
                   const result = testResults.results && testResults.results[questionIndex];
                   const options = (question.options || question.answers || []);
@@ -2924,27 +3436,58 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
                   return (
                     <div
                       key={questionIndex}
+                      className={`test-answer-option ${(result && result.isCorrect) ? 'correct' : 'incorrect'}`}
                       style={{
-                        marginBottom: '15px',
-                        padding: '12px',
-                        background: (result && result.isCorrect) ? '#d4edda' : '#f8d7da',
-                        border: `1px solid ${(result && result.isCorrect) ? '#c3e6cb' : '#f5c6cb'}`,
-                        borderRadius: '6px'
+                        marginBottom: '16px',
+                        padding: '16px',
+                        background: (result && result.isCorrect) 
+                          ? 'linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(32, 201, 151, 0.1) 100%)' 
+                          : 'linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(232, 62, 140, 0.1) 100%)',
+                        border: `2px solid ${(result && result.isCorrect) ? '#28a745' : '#dc3545'}`,
+                        borderRadius: '12px',
+                        position: 'relative',
+                        overflow: 'hidden'
                       }}
                     >
+                      {/* Иконка результата */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        background: (result && result.isCorrect) 
+                          ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' 
+                          : 'linear-gradient(135deg, #dc3545 0%, #e83e8c 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}>
+                        <FontAwesomeIcon 
+                          icon={(result && result.isCorrect) ? faCheck : faTimes} 
+                          style={{ 
+                            color: '#ffffff', 
+                            fontSize: '12px' 
+                          }} 
+                        />
+                      </div>
+                      
                       <p style={{ 
-                        fontSize: '0.9rem',
-                        fontWeight: '500',
-                        marginBottom: '5px',
-                        color: (result && result.isCorrect) ? '#155724' : '#721c24'
+                        fontSize: '1rem',
+                        fontWeight: '600',
+                        marginBottom: '8px',
+                        color: (result && result.isCorrect) ? '#155724' : '#721c24',
+                        paddingRight: '40px'
                       }}>
                         {questionIndex + 1}. {question.question || question.text}
                       </p>
                       <p style={{ 
-                        fontSize: '0.8rem',
-                        color: (result && result.isCorrect) ? '#155724' : '#721c24'
+                        fontSize: '0.9rem',
+                        color: (result && result.isCorrect) ? '#155724' : '#721c24',
+                        fontWeight: '500'
                       }}>
-                        {t('lesson.correct_answers')} {correctOptions.length > 0
+                        <strong>{t('lesson.correct_answers')}:</strong> {correctOptions.length > 0
                           ? correctOptions.map(opt => (opt?.text ?? String(opt))).join(', ')
                           : t('lesson.correct_answers_not_specified')}
                       </p>
@@ -2956,19 +3499,49 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
             
             {/* Сообщение о завершении теста */}
             <div style={{ 
-              marginTop: '20px',
-              marginBottom: '16px',
-              padding: '8px 16px',
-              background: testResults && testResults.score >= 100 ? '#d4edda' : '#fff3cd',
-              border: `1px solid ${testResults && testResults.score >= 100 ? '#c3e6cb' : '#ffeaa7'}`,
-              borderRadius: '6px',
-              textAlign: 'center'
+              marginTop: '24px',
+              marginBottom: '20px',
+              padding: '16px 24px',
+              background: testResults && testResults.score >= 100 
+                ? 'linear-gradient(135deg, rgba(40, 167, 69, 0.1) 0%, rgba(32, 201, 151, 0.1) 100%)' 
+                : 'linear-gradient(135deg, rgba(255, 193, 7, 0.1) 0%, rgba(253, 126, 20, 0.1) 100%)',
+              border: `2px solid ${testResults && testResults.score >= 100 ? '#28a745' : '#ffc107'}`,
+              borderRadius: '12px',
+              textAlign: 'center',
+              position: 'relative',
+              overflow: 'hidden'
             }}>
+              {/* Анимированная иконка */}
+              <div style={{
+                position: 'absolute',
+                top: '8px',
+                right: '8px',
+                width: '24px',
+                height: '24px',
+                borderRadius: '50%',
+                background: testResults && testResults.score >= 100 
+                  ? 'linear-gradient(135deg, #28a745 0%, #20c997 100%)' 
+                  : 'linear-gradient(135deg, #ffc107 0%, #fd7e14 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                animation: 'testPulse 2s ease-in-out infinite'
+              }}>
+                <FontAwesomeIcon 
+                  icon={testResults && testResults.score >= 100 ? faTrophy : faStar} 
+                  style={{ 
+                    color: '#ffffff', 
+                    fontSize: '12px' 
+                  }} 
+                />
+              </div>
+              
               <p style={{ 
-                fontSize: '0.9rem', 
+                fontSize: '1rem', 
                 margin: '0',
                 color: testResults && testResults.score >= 100 ? '#155724' : '#856404',
-                fontWeight: '500'
+                fontWeight: '600',
+                textShadow: '0 1px 2px rgba(0,0,0,0.1)'
               }}>
                 {testResults && testResults.score >= 100 
                   ? t('lesson.test_completed_100')
@@ -2978,21 +3551,45 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
             </div>
             
             {/* Кнопки рядом */}
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '16px', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              marginTop: '24px'
+            }}>
               {/* Кнопка показа правильных ответов */}
               <button
                 onClick={() => setShowCorrectAnswers(prev => !prev)}
+                className="test-submit-btn"
                 style={{
-                  padding: '10px 16px',
-                  background: '#007bff',
+                  padding: '14px 24px',
+                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '12px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '500'
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.3)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(102, 126, 234, 0.3)';
                 }}
               >
+                <FontAwesomeIcon 
+                  icon={showCorrectAnswers ? faEyeSlash : faEye} 
+                  style={{ fontSize: '14px' }} 
+                />
                 {showCorrectAnswers ? t('lesson.hide_correct_answers') : t('lesson.show_correct_answers')}
               </button>
               
@@ -3012,18 +3609,36 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
                     setIsResetting(false);
                   }, 100);
                 }}
+                className="test-submit-btn"
                 style={{
-                  padding: '10px 20px',
-                  background: '#28a745',
+                  padding: '14px 24px',
+                  background: 'linear-gradient(135deg, #28a745 0%, #20c997 100%)',
                   color: 'white',
                   border: 'none',
-                  borderRadius: '6px',
+                  borderRadius: '12px',
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
-                  fontWeight: '500'
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  boxShadow: '0 6px 20px rgba(40, 167, 69, 0.3)',
+                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.transform = 'translateY(-2px)';
+                  e.target.style.boxShadow = '0 8px 25px rgba(40, 167, 69, 0.5)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.transform = 'translateY(0)';
+                  e.target.style.boxShadow = '0 6px 20px rgba(40, 167, 69, 0.3)';
                 }}
               >
-                {t('lesson.solve_again')} {testResults && testResults.attempts > 1 ? `(попытка ${testResults.attempts})` : ''}
+                <FontAwesomeIcon 
+                  icon={faRocket} 
+                  style={{ fontSize: '14px' }} 
+                />
+                 {t('lesson.solve_again')}
               </button>
             </div>
           </div>
@@ -3031,30 +3646,54 @@ const TestStep = ({ step, onComplete, showResults, userAnswers, testAttempts = [
       </div>
       
       {questions.length > 0 && !isSubmitted && !testResults ? (
-        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '20px' }}>
           <button
             onClick={handleSubmit}
             disabled={answeredCount < questions.length}
+            className="test-submit-btn"
             style={{
-              padding: '12px 24px',
-              background: answeredCount < questions.length ? '#6c757d' : '#007bff',
+              padding: '16px 32px',
+              background: answeredCount < questions.length 
+                ? 'linear-gradient(135deg, #6c757d 0%, #5a6268 100%)' 
+                : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
               color: 'white',
               border: 'none',
-              borderRadius: '6px',
+              borderRadius: '12px',
               cursor: answeredCount < questions.length ? 'not-allowed' : 'pointer',
               opacity: answeredCount < questions.length ? 0.6 : 1,
-              fontSize: '1rem',
-              fontWeight: '500',
-              transition: 'all 0.2s ease'
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              boxShadow: answeredCount < questions.length 
+                ? '0 4px 15px rgba(108, 117, 125, 0.3)' 
+                : '0 8px 25px rgba(102, 126, 234, 0.4)',
+              transform: answeredCount < questions.length ? 'none' : 'translateY(0)',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onMouseEnter={(e) => {
+              if (answeredCount >= questions.length) {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 12px 35px rgba(102, 126, 234, 0.6)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (answeredCount >= questions.length) {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 8px 25px rgba(102, 126, 234, 0.4)';
+              }
             }}
           >
+            <FontAwesomeIcon 
+              icon={answeredCount < questions.length ? faTimes : faCheck} 
+              style={{ marginRight: '8px' }} 
+            />
             {answeredCount < questions.length 
-              ? `Ответить на все вопросы (${answeredCount}/${questions.length})`
-              : 'Отправить ответы'
+              ? t('lesson.answer_all_questions', { answered: answeredCount, total: questions.length })
+              : t('lesson.send_answers')
             }
           </button>
         </div>
       ) : null}
+      </div> {/* Закрывающий div для test-container */}
     </div>
   );
 };
@@ -3096,6 +3735,297 @@ const CodeStep = ({ step, onComplete }) => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Стили для разных языков программирования (как в популярных IDE)
+  const getLanguageStyles = (language) => {
+    const lang = language?.toLowerCase();
+    
+    const styles = {
+      // Visual Studio (C++, C#, C)
+      'cpp': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#007acc',
+        headerBg: '#007acc',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'c': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#007acc',
+        headerBg: '#007acc',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'csharp': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#68217a',
+        headerBg: '#68217a',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'cs': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#68217a',
+        headerBg: '#68217a',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      
+      // IntelliJ IDEA (Java, Kotlin)
+      'java': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#f36522',
+        headerBg: '#f36522',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      'kotlin': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#f18e33',
+        headerBg: '#f18e33',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      
+      // VS Code (JavaScript, TypeScript)
+      'javascript': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#f7df1e',
+        headerBg: '#f7df1e',
+        headerColor: '#000000',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'js': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#f7df1e',
+        headerBg: '#f7df1e',
+        headerColor: '#000000',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'typescript': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#3178c6',
+        headerBg: '#3178c6',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'ts': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#3178c6',
+        headerBg: '#3178c6',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      
+      // PyCharm (Python)
+      'python': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#3776ab',
+        headerBg: '#3776ab',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      'py': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#3776ab',
+        headerBg: '#3776ab',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      
+      // GoLand (Go)
+      'go': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#00add8',
+        headerBg: '#00add8',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      
+      // Rust (Rust Analyzer)
+      'rust': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#ce422b',
+        headerBg: '#ce422b',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      
+      // Swift (Xcode)
+      'swift': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'SF Mono, Consolas, monospace',
+        borderColor: '#ffac45',
+        headerBg: '#ffac45',
+        headerColor: '#000000',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      
+      // PHP (PhpStorm)
+      'php': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#777bb4',
+        headerBg: '#777bb4',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      
+      // Ruby (RubyMine)
+      'ruby': {
+        background: '#2b2b2b',
+        color: '#a9b7c6',
+        fontFamily: 'JetBrains Mono, Consolas, monospace',
+        borderColor: '#cc342d',
+        headerBg: '#cc342d',
+        headerColor: '#ffffff',
+        keywordColor: '#cc7832',
+        stringColor: '#6a8759',
+        commentColor: '#808080',
+        numberColor: '#6897bb',
+        functionColor: '#ffc66d'
+      },
+      
+      // HTML/CSS
+      'html': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#e34f26',
+        headerBg: '#e34f26',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      'css': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#1572b6',
+        headerBg: '#1572b6',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      },
+      
+      // SQL
+      'sql': {
+        background: '#1e1e1e',
+        color: '#d4d4d4',
+        fontFamily: 'Consolas, "Courier New", monospace',
+        borderColor: '#336791',
+        headerBg: '#336791',
+        headerColor: '#ffffff',
+        keywordColor: '#569cd6',
+        stringColor: '#ce9178',
+        commentColor: '#6a9955',
+        numberColor: '#b5cea8',
+        functionColor: '#dcdcaa'
+      }
+    };
+    
+    return styles[lang] || styles['javascript']; // Fallback к JavaScript стилю
+  };
 
   const getLanguageColor = (language) => {
     const colors = {
@@ -3207,86 +4137,254 @@ const CodeStep = ({ step, onComplete }) => {
 
   console.log('CodeStep render:', { code, language, description, step });
 
+  const languageStyles = getLanguageStyles(language);
+  
+  // Функция для базовой подсветки синтаксиса
+  const highlightSyntax = (code, language) => {
+    const lang = language?.toLowerCase();
+    const styles = getLanguageStyles(language);
+    
+    // Ключевые слова для разных языков
+    const keywords = {
+      'javascript': ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'import', 'export', 'default', 'async', 'await'],
+      'js': ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'import', 'export', 'default', 'async', 'await'],
+      'typescript': ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'import', 'export', 'default', 'async', 'await', 'interface', 'type', 'enum'],
+      'ts': ['function', 'const', 'let', 'var', 'if', 'else', 'for', 'while', 'return', 'class', 'import', 'export', 'default', 'async', 'await', 'interface', 'type', 'enum'],
+      'java': ['public', 'private', 'protected', 'class', 'interface', 'extends', 'implements', 'static', 'final', 'void', 'int', 'String', 'boolean', 'if', 'else', 'for', 'while', 'return', 'new'],
+      'python': ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'return', 'import', 'from', 'as', 'True', 'False', 'None', 'self', 'lambda'],
+      'py': ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'return', 'import', 'from', 'as', 'True', 'False', 'None', 'self', 'lambda'],
+      'cpp': ['int', 'float', 'double', 'char', 'bool', 'string', 'vector', 'class', 'public', 'private', 'protected', 'if', 'else', 'for', 'while', 'return', 'new', 'delete'],
+      'c': ['int', 'float', 'double', 'char', 'if', 'else', 'for', 'while', 'return', 'struct', 'typedef', 'include', 'define'],
+      'csharp': ['public', 'private', 'protected', 'class', 'interface', 'namespace', 'using', 'static', 'void', 'int', 'string', 'bool', 'if', 'else', 'for', 'while', 'return', 'new'],
+      'cs': ['public', 'private', 'protected', 'class', 'interface', 'namespace', 'using', 'static', 'void', 'int', 'string', 'bool', 'if', 'else', 'for', 'while', 'return', 'new']
+    };
+    
+    const langKeywords = keywords[lang] || [];
+    
+    // Простая подсветка ключевых слов
+    let highlightedCode = code;
+    
+    // Подсветка ключевых слов
+    langKeywords.forEach(keyword => {
+      const regex = new RegExp(`\\b${keyword}\\b`, 'g');
+      highlightedCode = highlightedCode.replace(regex, `<span style="color: ${styles.keywordColor}; font-weight: 600;">${keyword}</span>`);
+    });
+    
+    // Подсветка строк (в кавычках)
+    highlightedCode = highlightedCode.replace(/"([^"]*)"/g, `<span style="color: ${styles.stringColor};">"$1"</span>`);
+    highlightedCode = highlightedCode.replace(/'([^']*)'/g, `<span style="color: ${styles.stringColor};">'$1'</span>`);
+    
+    // Подсветка комментариев
+    if (['javascript', 'js', 'typescript', 'ts', 'java', 'cpp', 'c', 'csharp', 'cs'].includes(lang)) {
+      // Однострочные комментарии //
+      highlightedCode = highlightedCode.replace(/\/\/.*$/gm, `<span style="color: ${styles.commentColor}; font-style: italic;">$&</span>`);
+      // Многострочные комментарии /* */
+      highlightedCode = highlightedCode.replace(/\/\*[\s\S]*?\*\//g, `<span style="color: ${styles.commentColor}; font-style: italic;">$&</span>`);
+    } else if (['python', 'py'].includes(lang)) {
+      // Python комментарии #
+      highlightedCode = highlightedCode.replace(/#.*$/gm, `<span style="color: ${styles.commentColor}; font-style: italic;">$&</span>`);
+    }
+    
+    // Подсветка чисел
+    highlightedCode = highlightedCode.replace(/\b\d+\.?\d*\b/g, `<span style="color: ${styles.numberColor};">$&</span>`);
+    
+    return highlightedCode;
+  };
+
   return (
-    <div>
+    <div style={{ position: 'relative', zIndex: 1 }}>
+      {/* Заголовок с иконкой */}
       <div style={{ 
         display: 'flex', 
         alignItems: 'center', 
-        gap: '10px',
-        marginBottom: '15px',
-        marginTop: '50px', // Увеличиваем отступ сверху для языка программирования
-        justifyContent: 'center' // Центрируем заголовок
-      }}>
-        <h3 style={{ 
-          fontSize: '1.1rem', 
-          fontWeight: '600',
-          color: theme === 'dark' ? '#ffffff' : '#333333',
-          margin: 0,
-          textAlign: 'center' // Центрируем текст заголовка
-        }}>
-          {step.title || 'Код'}
-        </h3>
-      </div>
-      
-      <div style={{ 
-        position: 'relative',
-        marginBottom: '15px'
+        gap: '15px',
+        marginBottom: '20px',
+        padding: '16px',
+        background: theme === 'dark' 
+          ? 'linear-gradient(135deg, rgba(68, 133, 237, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%)' 
+          : 'linear-gradient(135deg, rgba(68, 133, 237, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)',
+        borderRadius: '12px',
+        border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
       }}>
         <div style={{
-          padding: '10px 15px',
-          background: theme === 'dark' ? '#1e1e1e' : '#f8f9fa',
-          border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
-          borderRadius: '8px',
-          borderTopLeftRadius: '0',
-          borderTopRightRadius: '0',
-          fontSize: '12px',
-          color: theme === 'dark' ? '#ffffff !important' : '#333333 !important',
-          fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-          lineHeight: '1.4'
+          width: '48px',
+          height: '48px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+          animation: 'testPulse 2s ease-in-out infinite'
         }}>
-          {language && (
-            <div style={{
-              position: 'absolute',
-              top: '-30px',
-              left: '0',
-              padding: '5px 10px',
-              background: getLanguageColor(language),
-              color: 'white',
-              fontSize: '11px',
-              fontWeight: 'bold',
-              borderRadius: '4px 4px 0 0',
-              textTransform: 'uppercase'
-            }}>
-              {language}
-            </div>
-          )}
+          <FontAwesomeIcon 
+            icon={faCode} 
+            style={{ 
+              color: '#ffffff', 
+              fontSize: '20px',
+              filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.3))'
+            }} 
+          />
+        </div>
+        <div>
+          <h3 style={{ 
+            fontSize: '1.4rem', 
+            fontWeight: '700',
+            color: theme === 'dark' ? '#ffffff' : '#333333',
+            margin: '0 0 4px 0',
+            textShadow: theme === 'dark' ? '0 2px 4px rgba(0,0,0,0.5)' : 'none'
+          }}>
+            {step.title || t('lesson.code')}
+          </h3>
+          <p style={{
+            fontSize: '0.9rem',
+            color: theme === 'dark' ? '#cccccc' : '#666666',
+            margin: 0,
+            fontWeight: '500'
+          }}>
+            {language ? `${language.toUpperCase()} ${t('lesson.code_example')}` : t('lesson.code_example')}
+          </p>
+        </div>
+      </div>
+      
+      {/* Контейнер кода */}
+      <div style={{ 
+        position: 'relative',
+        marginBottom: '20px',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+        border: `2px solid ${languageStyles.borderColor}`
+      }}>
+        {/* Заголовок с языком программирования */}
+        <div style={{
+          padding: '12px 20px',
+          background: languageStyles.headerBg,
+          color: languageStyles.headerColor,
+          fontSize: '14px',
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          borderBottom: `1px solid ${languageStyles.borderColor}`
+        }}>
+          <FontAwesomeIcon 
+            icon={faCode} 
+            style={{ fontSize: '16px' }} 
+          />
+          {language || 'Code'}
+        </div>
+        
+        {/* Код */}
+        <div style={{
+          padding: '20px',
+          background: languageStyles.background,
+          color: languageStyles.color,
+          fontFamily: languageStyles.fontFamily,
+          fontSize: '14px',
+          lineHeight: '1.6',
+          overflowX: 'auto',
+          position: 'relative'
+        }}>
+          {/* Код без нумерации строк */}
           <pre style={{
             margin: 0,
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            overflowX: 'auto',
-            color: theme === 'dark' ? '#ffffff' : '#333333',
-            fontFamily: 'Consolas, Monaco, "Courier New", monospace'
+            fontFamily: languageStyles.fontFamily,
+            fontSize: '14px',
+            lineHeight: '1.6',
+            padding: '20px'
           }}>
             <code style={{
-              color: theme === 'dark' ? '#ffffff' : '#333333',
-              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+              color: languageStyles.color,
+              fontFamily: languageStyles.fontFamily,
               backgroundColor: 'transparent'
-            }}>{code}</code>
+            }}>
+              {code.split('\n').map((line, lineIndex) => {
+                const isNotEmpty = line.trim().length > 0;
+                return (
+                  <div key={lineIndex} style={{ 
+                    height: '1.6em',
+                    lineHeight: '1.6em',
+                    padding: '0 10px',
+                    paddingTop: '0',
+                    paddingBottom: '0',
+                    borderLeft: isNotEmpty ? `3px solid ${languageStyles.borderColor}` : '3px solid transparent',
+                    display: 'flex',
+                    alignItems: 'center',
+                    backgroundColor: isNotEmpty ? 'rgba(255, 255, 255, 0.02)' : 'transparent'
+                  }}>
+                    <span 
+                      style={{ 
+                        whiteSpace: 'pre',
+                        fontFamily: languageStyles.fontFamily,
+                        color: isNotEmpty ? languageStyles.color : theme === 'dark' ? '#666666' : '#999999'
+                      }}
+                    >
+                      {line || '\u00A0'}
+                    </span>
+                  </div>
+                );
+              })}
+            </code>
           </pre>
         </div>
       </div>
       
+      {/* Описание */}
       {description && (
         <div style={{ 
-          padding: '15px',
-          background: theme === 'dark' ? '#2d2d2d' : '#f8f9fa',
-          borderRadius: '8px',
-          marginBottom: '15px',
-          border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+          padding: '20px',
+          background: theme === 'dark' 
+            ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+            : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+          borderRadius: '12px',
+          marginBottom: '20px',
+          border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+          position: 'relative',
+          overflow: 'hidden'
         }}>
+          {/* Градиентная полоса сверху */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: '4px',
+            background: 'linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c)',
+            backgroundSize: '200% 200%',
+            animation: 'gradientShift 3s ease infinite'
+          }}></div>
+          
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '12px'
+          }}>
+            <FontAwesomeIcon 
+              icon={faInfoCircle} 
+              style={{ 
+                color: '#667eea',
+                fontSize: '16px'
+              }} 
+            />
+            <h4 style={{
+              fontSize: '1.1rem',
+              fontWeight: '600',
+              color: theme === 'dark' ? '#ffffff' : '#333333',
+              margin: 0
+            }}>
+              {t('lesson.code_description')}
+            </h4>
+          </div>
+          
           <p style={{ 
-            fontSize: '0.95rem',
+            fontSize: '1rem',
             color: theme === 'dark' ? '#cccccc' : '#666666',
             lineHeight: '1.6',
             margin: 0,
@@ -3294,6 +4392,629 @@ const CodeStep = ({ step, onComplete }) => {
           }}>
             {description}
           </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Компонент для отображения файловых шагов
+const FileStep = ({ step, onComplete }) => {
+  const { t } = useTranslation();
+  const { theme } = useTheme();
+  const [isCompleted, setIsCompleted] = useState(false);
+
+  console.log('🚀 FileStep component rendered with step:', step);
+
+  const handleComplete = () => {
+    console.log('Файл скачан или переход по ссылке, отмечаем как завершенный');
+    setIsCompleted(true);
+    onComplete();
+  };
+
+  // Извлекаем данные из шага, учитывая возможные форматы
+  const getStepData = () => {
+    let data = {
+      fileUrl: null,
+      filename: null,
+      description: '',
+      title: step.title || 'Файл для скачивания'
+    };
+
+    // Сначала проверяем content как JSON строку (высший приоритет)
+    if (step.content && typeof step.content === 'string') {
+      try {
+        const parsed = JSON.parse(step.content);
+        console.log('✅ Successfully parsed JSON content:', parsed);
+        
+        if (parsed.fileUrl) data.fileUrl = parsed.fileUrl;
+        if (parsed.filename) data.filename = parsed.filename;
+        if (parsed.description) data.description = parsed.description;
+        if (parsed.title) data.title = parsed.title;
+      } catch (e) {
+        console.log('❌ Failed to parse JSON content:', e.message);
+        // Если не JSON, используем как есть
+      }
+    }
+
+    // Затем проверяем content как объект
+    if (step.content && typeof step.content === 'object') {
+      console.log('📋 Content is object:', step.content);
+      
+      if (step.content.fileUrl && !data.fileUrl) data.fileUrl = step.content.fileUrl;
+      if (step.content.filename && !data.filename) data.filename = step.content.filename;
+      if (step.content.description && !data.description) data.description = step.content.description;
+      if (step.content.title && !data.title) data.title = step.content.title;
+    }
+
+    // В последнюю очередь проверяем прямые поля (низший приоритет)
+    if (step.fileUrl && !data.fileUrl) data.fileUrl = step.fileUrl;
+    if (step.filename && !data.filename) data.filename = step.filename;
+    if (step.description && !data.description) data.description = step.description;
+    if (step.title && !data.title) data.title = step.title;
+
+    // Если название файла не найдено, но есть URL, извлекаем из URL
+    if (!data.filename && data.fileUrl) {
+      const urlParts = data.fileUrl.split('/');
+      const lastPart = urlParts[urlParts.length - 1];
+      if (lastPart && lastPart.includes('.')) {
+        // Убираем timestamp из имени файла для лучшего отображения
+        const cleanName = lastPart.replace(/^\d{4}-\d{2}-\d{2}\s+at\s+\d{2}\.\d{2}\.\d{2}\s*/, '');
+        data.filename = cleanName || lastPart;
+      }
+    }
+
+    console.log('🔍 Extracted step data:', data);
+    return data;
+  };
+
+  const { fileUrl: originalFileUrl, filename, description, title } = getStepData();
+  
+  // Преобразуем fileUrl в URL для скачивания через наш backend
+  const fileUrl = (() => {
+    if (!originalFileUrl) return null;
+    
+    // Проверяем, что это не внешняя ссылка (Google, YouTube и т.д.)
+    if (originalFileUrl.includes('google.com') || originalFileUrl.includes('youtube.com') || 
+        originalFileUrl.includes('youtu.be') || originalFileUrl.includes('facebook.com')) {
+      console.log('⚠️ fileUrl содержит внешнюю ссылку, пропускаем:', originalFileUrl);
+      return null;
+    }
+    
+    // Преобразуем старые URL в MinIO URL
+    if (originalFileUrl.includes('static/uploads/') || originalFileUrl.includes('localhost:9000')) {
+      console.log('🔄 Преобразуем старый URL в MinIO URL:', originalFileUrl);
+      const minioUrl = getVideoUrl(originalFileUrl);
+      console.log('✅ Новый MinIO URL:', minioUrl);
+      return minioUrl;
+    }
+    
+    // Для остальных возвращаем оригинальный URL - формирование download URL будет в handleDownload
+    return originalFileUrl;
+  })();
+
+  console.log('FileStep data:', { 
+    step, 
+    extractedData: { fileUrl, filename, description, title },
+    originalContent: step.content,
+    stepKeys: Object.keys(step),
+    contentType: typeof step.content,
+    hasFileUrl: !!step.fileUrl,
+    hasFilename: !!step.filename,
+    hasDescription: !!step.description,
+    filenameEncoding: filename ? {
+      original: filename,
+      encoded: encodeURIComponent(filename),
+      decoded: decodeURIComponent(encodeURIComponent(filename))
+    } : null
+  });
+
+  const handleDownload = async () => {
+    if (fileUrl) {
+      // Отмечаем шаг как завершенный при скачивания файла
+      handleComplete();
+      
+      console.log('📥 Starting file download from:', fileUrl);
+      
+      // Получаем оригинальное расширение из URL файла (реальный файл)
+      const urlParts = fileUrl.split('/');
+      const originalFileName = urlParts[urlParts.length - 1];
+      const originalExtension = originalFileName.includes('.') ? originalFileName.split('.').pop() : '';
+      
+      // Формируем имя для скачивания
+      let downloadFilename;
+      
+      if (filename && filename !== 'Файл' && filename !== '') {
+        // Если есть пользовательское название, добавляем к нему оригинальное расширение
+        if (originalExtension && !filename.toLowerCase().endsWith(`.${originalExtension.toLowerCase()}`)) {
+          downloadFilename = `${filename}.${originalExtension}`;
+        } else {
+          downloadFilename = filename;
+        }
+      } else {
+        // Если нет пользовательского названия, используем оригинальное имя файла
+        downloadFilename = originalFileName;
+      }
+      
+      console.log('Download filename calculation:', {
+        originalFileName,
+        originalExtension,
+        userFilename: filename,
+        finalDownloadFilename: downloadFilename
+      });
+      
+      // Формируем правильный download URL с downloadName параметром
+      let downloadUrl = fileUrl;
+      
+      // Используем frontend URL для скачивания, а не backend API
+      if (originalFileUrl.startsWith('course-files/')) {
+        const fileName = originalFileUrl.split('/').pop();
+        downloadUrl = `https://localhost:3000/api/minio/download/course-files/${fileName}?downloadName=${encodeURIComponent(downloadFilename)}`;
+        console.log('✅ Frontend download URL для файла курса:', downloadUrl);
+      } else if (originalFileUrl.startsWith('uploads/')) {
+        const fileName = originalFileUrl.split('/').pop();
+        downloadUrl = `https://localhost:3000/api/files/download-direct/${fileName}?downloadName=${encodeURIComponent(downloadFilename)}`;
+        console.log('✅ Frontend download URL для загруженного файла:', downloadUrl);
+      }
+      
+      try {
+        // Скачиваем файл через fetch
+        console.log('🔄 Fetching file from:', downloadUrl);
+        console.log('🔍 Request details:', {
+          url: downloadUrl,
+          method: 'GET',
+          headers: {
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        const response = await fetch(downloadUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': '*/*',
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
+        console.log('📥 Response received:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries())
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        // Получаем blob из ответа
+        const blob = await response.blob();
+        console.log('✅ File blob received, size:', blob.size);
+        
+        // Создаем URL для blob
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        // Создаем временную ссылку для скачивания
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = downloadFilename;
+        link.style.display = 'none';
+        
+        // Добавляем ссылку в DOM, кликаем по ней и удаляем
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Освобождаем память
+        window.URL.revokeObjectURL(blobUrl);
+        
+        console.log('✅ File download initiated:', downloadFilename);
+        
+      } catch (error) {
+        console.error('❌ Error downloading file:', error);
+        // Fallback к старому способу если fetch не сработал
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = downloadFilename;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('🔄 Fallback download initiated');
+      }
+    }
+  };
+
+  const handleExternalLink = () => {
+    if (fileUrl) {
+      // Отмечаем шаг как завершенный при переходе по внешней ссылке
+      handleComplete();
+      
+      // Открываем внешнюю ссылку в новой вкладке
+      window.open(fileUrl, '_blank');
+    }
+  };
+
+  const getFileIcon = (filename, fileUrl) => {
+    // Сначала пытаемся определить расширение из реального файла (fileUrl)
+    let ext = '';
+    
+    if (fileUrl) {
+      const urlParts = fileUrl.split('/');
+      const originalFileName = urlParts[urlParts.length - 1];
+      ext = originalFileName.includes('.') ? originalFileName.split('.').pop()?.toLowerCase() : '';
+    }
+    
+    // Если не удалось определить из URL, используем filename
+    if (!ext && filename) {
+      ext = filename.split('.').pop()?.toLowerCase();
+    }
+    
+    console.log('File icon determination:', { filename, fileUrl, ext });
+    
+    switch (ext) {
+      case 'pdf':
+        return faFilePdf;
+      case 'doc':
+      case 'docx':
+        return faFileWord;
+      case 'xls':
+      case 'xlsx':
+        return faFileExcel;
+      case 'ppt':
+      case 'pptx':
+        return faFilePowerpoint;
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return faFileArchive;
+      case 'txt':
+      case 'md':
+      case 'log':
+        return faFileAlt;
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'bmp':
+      case 'svg':
+      case 'webp':
+        return faFileImage;
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+      case 'wmv':
+      case 'flv':
+      case 'webm':
+      case 'mkv':
+        return faFileVideo;
+      case 'mp3':
+      case 'wav':
+      case 'ogg':
+      case 'flac':
+      case 'aac':
+        return faFileAudio;
+      default:
+        return faFile;
+    }
+  };
+
+  const getFileTypeColor = (filename, fileUrl) => {
+    // Сначала пытаемся определить расширение из реального файла (fileUrl)
+    let ext = '';
+    
+    if (fileUrl) {
+      const urlParts = fileUrl.split('/');
+      const originalFileName = urlParts[urlParts.length - 1];
+      ext = originalFileName.includes('.') ? originalFileName.split('.').pop()?.toLowerCase() : '';
+    }
+    
+    // Если не удалось определить из URL, используем filename
+    if (!ext && filename) {
+      ext = filename.split('.').pop()?.toLowerCase();
+    }
+    
+    switch (ext) {
+      case 'pdf':
+        return '#ff4444';
+      case 'doc':
+      case 'docx':
+        return '#4285f4';
+      case 'xls':
+      case 'xlsx':
+        return '#0f9d58';
+      case 'ppt':
+      case 'pptx':
+        return '#ff6b35';
+      case 'zip':
+      case 'rar':
+      case '7z':
+      case 'tar':
+      case 'gz':
+        return '#ffc107';
+      case 'txt':
+      case 'md':
+      case 'log':
+        return '#9e9e9e';
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'gif':
+      case 'bmp':
+      case 'svg':
+      case 'webp':
+        return '#e91e63';
+      case 'mp4':
+      case 'avi':
+      case 'mov':
+      case 'wmv':
+      case 'flv':
+      case 'webm':
+      case 'mkv':
+        return '#9c27b0';
+      case 'mp3':
+      case 'wav':
+      case 'ogg':
+      case 'flac':
+      case 'aac':
+        return '#3f51b5';
+      default:
+        return '#607d8b';
+    }
+  };
+
+  // Функция для определения, является ли файл изображением
+  const isImageFile = (filename, fileUrl) => {
+    // Сначала пытаемся определить расширение из реального файла (fileUrl)
+    let ext = '';
+    
+    if (fileUrl) {
+      const urlParts = fileUrl.split('/');
+      const originalFileName = urlParts[urlParts.length - 1];
+      ext = originalFileName.includes('.') ? originalFileName.split('.').pop()?.toLowerCase() : '';
+    }
+    
+    // Если не удалось определить из URL, используем filename
+    if (!ext && filename) {
+      ext = filename.split('.').pop()?.toLowerCase();
+    }
+    
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'svg', 'webp'];
+    return imageExtensions.includes(ext);
+  };
+
+  return (
+    <div style={{ 
+      padding: '20px',
+      background: theme === 'dark' 
+        ? 'linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%)' 
+        : 'linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%)',
+      borderRadius: '12px',
+      border: `2px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Градиентная полоса сверху */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '4px',
+        background: 'linear-gradient(90deg, #667eea, #764ba2, #f093fb, #f5576c)',
+        backgroundSize: '200% 200%',
+        animation: 'gradientShift 3s ease infinite'
+      }}></div>
+
+      {/* Заголовок */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        marginBottom: '20px'
+      }}>
+        <FontAwesomeIcon 
+          icon={getFileIcon(filename, fileUrl)} 
+          style={{ 
+            color: getFileTypeColor(filename, fileUrl),
+            fontSize: '20px'
+          }} 
+        />
+        <h3 style={{
+          fontSize: '1.3rem',
+          fontWeight: '600',
+          color: theme === 'dark' ? '#ffffff' : '#333333',
+          margin: 0
+        }}>
+          {filename && filename !== 'Файл' ? filename : 'Файл для скачивания'}
+        </h3>
+      </div>
+
+      {/* Файл для скачивания */}
+      <div style={{ 
+        padding: '20px',
+        background: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
+        borderRadius: '8px',
+        border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+        marginBottom: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <FontAwesomeIcon 
+            icon={getFileIcon(filename)} 
+            style={{ 
+              color: getFileTypeColor(filename),
+              fontSize: '20px'
+            }} 
+          />
+          <div>
+            <div style={{
+              fontSize: '1rem',
+              fontWeight: '500',
+              color: theme === 'dark' ? '#ffffff' : '#333333',
+              marginBottom: '4px'
+            }}>
+              {filename && filename !== 'Файл' ? filename : (fileUrl ? fileUrl.split('/').pop() : 'Файл не загружен')}
+            </div>
+            <div style={{
+              fontSize: '0.9rem',
+              color: theme === 'dark' ? '#999999' : '#666666'
+            }}>
+              {fileUrl ? 'Файл доступен для скачивания' : 'Файл недоступен'}
+            </div>
+          </div>
+        </div>
+        
+        {fileUrl ? (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {/* Кнопка скачивания для всех файлов */}
+            <button
+              onClick={handleDownload}
+              style={{
+                padding: '10px 20px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '0.9rem',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.3s ease',
+                boxShadow: '0 2px 10px rgba(102, 126, 234, 0.3)'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.boxShadow = '0 4px 15px rgba(102, 126, 234, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.boxShadow = '0 2px 10px rgba(102, 126, 234, 0.3)';
+              }}
+            >
+              <FontAwesomeIcon icon={faDownload} />
+              {t('lesson.download_file') || 'Скачать файл'}
+            </button>
+          </div>
+        ) : (
+          <div style={{
+            padding: '10px 20px',
+            background: theme === 'dark' ? '#404040' : '#e9ecef',
+            color: theme === 'dark' ? '#999999' : '#666666',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '0.9rem',
+            fontWeight: '500',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <FontAwesomeIcon icon={faExclamationTriangle} />
+            {filename && filename !== 'Файл' ? `Файл "${filename}" недоступен` : 'Файл не загружен'}
+          </div>
+        )}
+      </div>
+
+      {/* Описание */}
+      {description && (
+        <div style={{ 
+          padding: '16px',
+          background: theme === 'dark' ? '#2a2a2a' : '#f8f9fa',
+          borderRadius: '8px',
+          border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            marginBottom: '12px'
+          }}>
+            <FontAwesomeIcon 
+              icon={faInfoCircle} 
+              style={{ 
+                color: '#667eea',
+                fontSize: '14px'
+              }} 
+            />
+            <h4 style={{
+              fontSize: '1rem',
+              fontWeight: '500',
+              color: theme === 'dark' ? '#ffffff' : '#333333',
+              margin: 0
+            }}>
+              {t('lesson.file_description') || 'Описание файла'}
+            </h4>
+          </div>
+          
+          <p style={{ 
+            fontSize: '0.95rem',
+            color: theme === 'dark' ? '#cccccc' : '#666666',
+            lineHeight: '1.6',
+            margin: 0
+          }}>
+            {description}
+          </p>
+        </div>
+      )}
+
+      {/* Информация о завершении */}
+      <div style={{
+        marginTop: '20px',
+        padding: '12px',
+        background: theme === 'dark' ? '#1a1a1a' : '#e8f5e8',
+        borderRadius: '8px',
+        border: `1px solid ${theme === 'dark' ? '#404040' : '#4caf50'}`,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px'
+      }}>
+        <FontAwesomeIcon 
+          icon={faCheckCircle} 
+          style={{ 
+            color: '#4caf50',
+            fontSize: '14px'
+          }} 
+        />
+        <span style={{
+          fontSize: '0.9rem',
+          color: theme === 'dark' ? '#cccccc' : '#2e7d32'
+        }}>
+          {t('lesson.file_step_completed') }
+        </span>
+      </div>
+
+      {/* Превью изображения для файлов типа изображение */}
+      {fileUrl && isImageFile(filename, fileUrl) && (
+        <div style={{ 
+          marginBottom: '20px',
+          textAlign: 'center'
+        }}>
+          <img 
+            src={fileUrl} 
+            alt={filename || 'Превью файла'}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '300px',
+              borderRadius: '8px',
+              border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+              boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)'
+            }}
+            onError={(e) => {
+              console.log('Image preview failed to load');
+              e.target.style.display = 'none';
+            }}
+          />
         </div>
       )}
     </div>

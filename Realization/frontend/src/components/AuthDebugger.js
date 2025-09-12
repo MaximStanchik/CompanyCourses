@@ -29,24 +29,7 @@ const AuthDebugger = () => {
 
   return (
     <>
-      <button
-        onClick={() => setIsVisible(!isVisible)}
-        style={{
-          position: 'fixed',
-          top: '20px',
-          left: '200px',
-          zIndex: 9999,
-          padding: '10px',
-          background: '#dc3545',
-          color: 'white',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-          fontSize: '12px'
-        }}
-      >
-        Auth Debug
-      </button>
+
       
       {isVisible && (
         <div style={{

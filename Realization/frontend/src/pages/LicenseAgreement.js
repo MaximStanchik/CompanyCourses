@@ -124,7 +124,7 @@ const LicenseAgreement = () => {
             }}
             onClick={() => window.history.back()}
           >
-            {t('back')}
+            {t('common.back')}
           </button>
         </div>
 

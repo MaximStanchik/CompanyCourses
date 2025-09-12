@@ -167,11 +167,8 @@ class lectureController {
           
           let processedVideoLink = null;
           if (lecture.videoLink && typeof lecture.videoLink === 'string') {
-            if (lecture.videoLink.startsWith("/static/")) {
-              processedVideoLink = lecture.videoLink;
-            } else {
-              processedVideoLink = `/static/${lecture.videoLink}`;
-            }
+            // Возвращаем только имя файла
+            processedVideoLink = lecture.videoLink.split('/').pop();
           }
           
           return {

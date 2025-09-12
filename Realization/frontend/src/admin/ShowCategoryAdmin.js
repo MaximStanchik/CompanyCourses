@@ -13,6 +13,18 @@ function getCurrentTheme() {
   return 'light';
 }
 
+function getInputStyles() {
+  const theme = getCurrentTheme();
+  return {
+    borderRadius: '8px',
+    border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`,
+    padding: '12px 16px',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
+    background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
+    color: theme === 'dark' ? '#ffffff' : '#333333'
+  };
+}
+
 // Функция для преобразования плоского списка в дерево
 function buildCategoryTree(flatList) {
   console.log('=== BUILD CATEGORY TREE ===');
@@ -64,6 +76,12 @@ class ShowCategory extends Component {
       newSubName: "",
       newSubNameEn: "",
       newSubNameRu: "",
+      newSubNameZh: "",
+      newSubNameDe: "",
+      newSubNameEs: "",
+      newSubNamePt: "",
+      newSubNameUk: "",
+      newSubNameBe: "",
       showCreateModal: false,
       newCategoryName: "",
       newCategoryNameEn: "",
@@ -175,32 +193,43 @@ class ShowCategory extends Component {
     const value = e.target.value;
     this.setState({ 
       editName: value,
-      editNameEn: value,
-      editNameZh: value,
-      editNameDe: value,
-      editNameEs: value,
-      editNamePt: value,
-      editNameUk: value,
-      editNameBe: value
+      editNameEn: value
     });
   }
 
   handleEditNameEnChange = (e) => {
     const value = e.target.value;
     this.setState({ 
-      editName: value,
-      editNameEn: value,
-      editNameZh: value,
-      editNameDe: value,
-      editNameEs: value,
-      editNamePt: value,
-      editNameUk: value,
-      editNameBe: value
+      editNameEn: value
     });
   }
 
   handleEditNameRuChange = (e) => {
     this.setState({ editNameRu: e.target.value });
+  }
+
+  handleEditNameZhChange = (e) => {
+    this.setState({ editNameZh: e.target.value });
+  }
+
+  handleEditNameDeChange = (e) => {
+    this.setState({ editNameDe: e.target.value });
+  }
+
+  handleEditNameEsChange = (e) => {
+    this.setState({ editNameEs: e.target.value });
+  }
+
+  handleEditNamePtChange = (e) => {
+    this.setState({ editNamePt: e.target.value });
+  }
+
+  handleEditNameUkChange = (e) => {
+    this.setState({ editNameUk: e.target.value });
+  }
+
+  handleEditNameBeChange = (e) => {
+    this.setState({ editNameBe: e.target.value });
   }
 
   saveEdit = async () => {
@@ -300,7 +329,13 @@ class ShowCategory extends Component {
       addingToCategory: null,
       newSubName: "",
       newSubNameEn: "",
-      newSubNameRu: ""
+      newSubNameRu: "",
+      newSubNameZh: "",
+      newSubNameDe: "",
+      newSubNameEs: "",
+      newSubNamePt: "",
+      newSubNameUk: "",
+      newSubNameBe: ""
     });
   }
 
@@ -308,7 +343,13 @@ class ShowCategory extends Component {
     const value = e.target.value;
     this.setState({ 
       newSubName: value,
-      newSubNameEn: value // синхронизируем с английским полем
+      newSubNameEn: value,
+      newSubNameZh: value,
+      newSubNameDe: value,
+      newSubNameEs: value,
+      newSubNamePt: value,
+      newSubNameUk: value,
+      newSubNameBe: value
     });
   }
 
@@ -316,7 +357,13 @@ class ShowCategory extends Component {
     const value = e.target.value;
     this.setState({ 
       newSubName: value,
-      newSubNameEn: value
+      newSubNameEn: value,
+      newSubNameZh: value,
+      newSubNameDe: value,
+      newSubNameEs: value,
+      newSubNamePt: value,
+      newSubNameUk: value,
+      newSubNameBe: value
     });
   }
 
@@ -324,8 +371,44 @@ class ShowCategory extends Component {
     this.setState({ newSubNameRu: e.target.value });
   }
 
+  handleNewSubNameZhChange = (e) => {
+    this.setState({ newSubNameZh: e.target.value });
+  }
+
+  handleNewSubNameDeChange = (e) => {
+    this.setState({ newSubNameDe: e.target.value });
+  }
+
+  handleNewSubNameEsChange = (e) => {
+    this.setState({ newSubNameEs: e.target.value });
+  }
+
+  handleNewSubNamePtChange = (e) => {
+    this.setState({ newSubNamePt: e.target.value });
+  }
+
+  handleNewSubNameUkChange = (e) => {
+    this.setState({ newSubNameUk: e.target.value });
+  }
+
+  handleNewSubNameBeChange = (e) => {
+    this.setState({ newSubNameBe: e.target.value });
+  }
+
   saveAddSub = async () => {
-    const { addingToCategory, newSubName, newSubNameEn, newSubNameRu } = this.state;
+    const { 
+      addingToCategory, 
+      newSubName, 
+      newSubNameEn, 
+      newSubNameRu,
+      newSubNameZh,
+      newSubNameDe,
+      newSubNameEs,
+      newSubNamePt,
+      newSubNameUk,
+      newSubNameBe
+    } = this.state;
+    
     if (!newSubName.trim() || !newSubNameEn.trim() || !newSubNameRu.trim()) {
       toast.error(this.props.t('admin.all_fields_required'));
       return;
@@ -337,6 +420,12 @@ class ShowCategory extends Component {
           name: newSubNameEn,
           nameEn: newSubNameEn,
           nameRu: newSubNameRu,
+          nameZh: newSubNameZh,
+          nameDe: newSubNameDe,
+          nameEs: newSubNameEs,
+          namePt: newSubNamePt,
+          nameUk: newSubNameUk,
+          nameBe: newSubNameBe,
           parentId: addingToCategory.id 
         }, 
         { headers: { Authorization: `Bearer ${localStorage.getItem('jwtToken')}` } }
@@ -814,59 +903,386 @@ class ShowCategory extends Component {
             left: 0,
             width: '100%',
             height: '100%',
-            zIndex: 1050
+            zIndex: 1050,
+            animation: 'fadeIn 0.3s ease-out'
           }}>
+            <style>{`
+              @keyframes fadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes slideIn {
+                from { 
+                  opacity: 0; 
+                  transform: translateY(-20px) scale(0.95); 
+                }
+                to { 
+                  opacity: 1; 
+                  transform: translateY(0) scale(1); 
+                }
+              }
+            `}</style>
             <div className="modal-dialog" style={{ 
               display: 'flex',
               alignItems: 'center',
               minHeight: '100vh'
             }}>
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">{t('common.edit_category', 'Редактировать категорию')}</h5>
-                  <button type="button" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }} onClick={this.closeEditModal}>
+              <div className="modal-content" style={{
+                animation: 'slideIn 0.3s ease-out',
+                transform: 'translateY(0) scale(1)',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                borderRadius: '16px',
+                border: 'none',
+                background: getCurrentTheme() === 'dark' ? '#2d2d2d' : '#ffffff'
+              }}>
+                <div className="modal-header" style={{ 
+                  borderBottom: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`,
+                  padding: '20px 24px',
+                  borderRadius: '16px 16px 0 0'
+                }}>
+                  <h5 className="modal-title" style={{ 
+                    margin: 0, 
+                    fontSize: '20px', 
+                    fontWeight: '600',
+                    color: 'var(--text-color)'
+                  }}>
+                    {this.state.editingCategory && this.state.editingCategory.parentId ? 
+                      t('common.edit_subcategory', 'Редактировать подкатегорию') : 
+                      t('common.edit_category', 'Редактировать категорию')
+                    }
+                  </h5>
+                  <button 
+                    type="button" 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      fontSize: '24px', 
+                      cursor: 'pointer',
+                      color: '#6c757d',
+                      transition: 'color 0.2s ease'
+                    }} 
+                    onClick={this.closeEditModal}
+                    onMouseOver={(e) => e.target.style.color = '#dc3545'}
+                    onMouseOut={(e) => e.target.style.color = '#6c757d'}
+                  >
                     ✕
                   </button>
                 </div>
-                <div className="modal-body">
+                <div className="modal-body" style={{ 
+                  padding: '24px',
+                  maxHeight: '70vh',
+                  overflowY: 'auto'
+                }}>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameEn" className="form-label">{t('common.category_name_english', 'Название категории (английское)')}:</label>
-                    <input type="text" className="form-control" id="categoryNameEn" placeholder={t('common.enter_category_name', 'Enter category name in English')} value={this.state.editNameEn} onChange={this.handleEditNameEnChange} required />
+                    <label htmlFor="categoryNameEn" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.english')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameEn" 
+                      placeholder={t('common.enter_category_name_en')} 
+                      value={this.state.editNameEn} 
+                      onChange={this.handleEditNameEnChange} 
+                      required 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameRu" className="form-label">{t('common.category_name_russian', 'Название на русском')}:</label>
-                    <input type="text" className="form-control" id="categoryNameRu" placeholder={t('common.enter_category_name_ru', 'Введите название категории на русском')} value={this.state.editNameRu} onChange={this.handleEditNameRuChange} required />
+                    <label htmlFor="categoryNameRu" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.russian')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameRu" 
+                      placeholder={t('common.enter_category_name_ru')} 
+                      value={this.state.editNameRu} 
+                      onChange={this.handleEditNameRuChange} 
+                      required 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameBe" className="form-label">{t('common.category_name_belarusian', 'Название на белорусском')}:</label>
-                    <input type="text" className="form-control" id="categoryNameBe" placeholder={t('common.enter_category_name_be', 'Увядзіце назву па-беларуску')} value={this.state.editNameBe || ''} onChange={e => this.setState({ editNameBe: e.target.value })} />
+                    <label htmlFor="categoryNameZh" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.chinese')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameZh" 
+                      placeholder={t('common.enter_category_name_zh')} 
+                      value={this.state.editNameZh || ''} 
+                      onChange={e => this.setState({ editNameZh: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameDe" className="form-label">{t('common.category_name_german', 'Название на немецком')}:</label>
-                    <input type="text" className="form-control" id="categoryNameDe" placeholder={t('common.enter_category_name_de', 'Geben Sie den Kategorienamen auf Deutsch ein')} value={this.state.editNameDe || ''} onChange={e => this.setState({ editNameDe: e.target.value })} />
+                    <label htmlFor="categoryNameDe" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.german')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameDe" 
+                      placeholder={t('common.enter_category_name_de')} 
+                      value={this.state.editNameDe || ''} 
+                      onChange={e => this.setState({ editNameDe: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameEs" className="form-label">{t('common.category_name_spanish', 'Название на испанском')}:</label>
-                    <input type="text" className="form-control" id="categoryNameEs" placeholder={t('common.enter_category_name_es', 'Ingrese el nombre de la categoría en español')} value={this.state.editNameEs || ''} onChange={e => this.setState({ editNameEs: e.target.value })} />
+                    <label htmlFor="categoryNameEs" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.spanish')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameEs" 
+                      placeholder={t('common.enter_category_name_es')} 
+                      value={this.state.editNameEs || ''} 
+                      onChange={e => this.setState({ editNameEs: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNamePt" className="form-label">{t('common.category_name_portuguese', 'Название на португальском')}:</label>
-                    <input type="text" className="form-control" id="categoryNamePt" placeholder={t('common.enter_category_name_pt', 'Digite o nome da categoria em português')} value={this.state.editNamePt || ''} onChange={e => this.setState({ editNamePt: e.target.value })} />
+                    <label htmlFor="categoryNamePt" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.portuguese')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNamePt" 
+                      placeholder={t('common.enter_category_name_pt')} 
+                      value={this.state.editNamePt || ''} 
+                      onChange={e => this.setState({ editNamePt: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameUk" className="form-label">{t('common.category_name_ukrainian', 'Название на украинском')}:</label>
-                    <input type="text" className="form-control" id="categoryNameUk" placeholder={t('common.enter_category_name_uk', 'Введіть назву категорії українською')} value={this.state.editNameUk || ''} onChange={e => this.setState({ editNameUk: e.target.value })} />
+                    <label htmlFor="categoryNameUk" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.ukrainian')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameUk" 
+                      placeholder={t('common.enter_category_name_uk')} 
+                      value={this.state.editNameUk || ''} 
+                      onChange={e => this.setState({ editNameUk: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="categoryNameZh" className="form-label">{t('common.category_name_chinese', 'Название на китайском (упрощённом)')}:</label>
-                    <input type="text" className="form-control" id="categoryNameZh" placeholder={t('common.enter_category_name_zh', '输入类别名称（中文）')} value={this.state.editNameZh || ''} onChange={e => this.setState({ editNameZh: e.target.value })} />
+                    <label htmlFor="categoryNameBe" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.belarusian')}):</label>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      id="categoryNameBe" 
+                      placeholder={t('common.enter_category_name_be')} 
+                      value={this.state.editNameBe || ''} 
+                      onChange={e => this.setState({ editNameBe: e.target.value })} 
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
                   </div>
                 </div>
-                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <button type="button" className="btn btn-secondary" onClick={this.closeEditModal}>
+                <div className="modal-footer" style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  gap: '12px',
+                  padding: '20px 24px',
+                  borderTop: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`
+                }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={this.closeEditModal}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: '1px solid #6c757d',
+                      background: 'transparent',
+                      color: '#6c757d',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                      height: '40px',
+                      minWidth: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = '#6c757d';
+                      e.target.style.color = '#fff';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.color = '#6c757d';
+                    }}
+                  >
                     {t('common.cancel')}
                   </button>
-                  <button type="button" className="btn btn-primary" onClick={this.saveEdit}>
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    onClick={this.saveEdit}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#4485ed',
+                      color: '#fff',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(68, 133, 237, 0.2)',
+                      height: '40px',
+                      minWidth: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: '0'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = '#3668c9';
+                      e.target.style.boxShadow = '0 4px 12px rgba(68, 133, 237, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = '#4485ed';
+                      e.target.style.boxShadow = '0 2px 8px rgba(68, 133, 237, 0.2)';
+                    }}
+                  >
                     {t('common.save')}
                   </button>
                 </div>
@@ -885,50 +1301,366 @@ class ShowCategory extends Component {
             left: 0,
             width: '100%',
             height: '100%',
-            zIndex: 1050
+            zIndex: 1050,
+            animation: 'fadeIn 0.3s ease-out'
           }}>
             <div className="modal-dialog" style={{ 
               display: 'flex',
               alignItems: 'center',
               minHeight: '100vh'
             }}>
-              <div className="modal-content">
-                <div className="modal-header">
-                  <h5 className="modal-title">Добавить подкатегорию</h5>
-                  <button type="button" style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }} onClick={this.closeAddSubModal}>
+              <div className="modal-content" style={{
+                animation: 'slideIn 0.3s ease-out',
+                transform: 'translateY(0) scale(1)',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                borderRadius: '16px',
+                border: 'none',
+                background: getCurrentTheme() === 'dark' ? '#2d2d2d' : '#ffffff'
+              }}>
+                <div className="modal-header" style={{ 
+                  borderBottom: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`,
+                  padding: '20px 24px',
+                  borderRadius: '16px 16px 0 0'
+                }}>
+                  <h5 className="modal-title" style={{ 
+                    margin: 0, 
+                    fontSize: '20px', 
+                    fontWeight: '600',
+                    color: 'var(--text-color)'
+                  }}>{t('common.add_subcategory')}</h5>
+                  <button 
+                    type="button" 
+                    style={{ 
+                      background: 'none', 
+                      border: 'none', 
+                      fontSize: '24px', 
+                      cursor: 'pointer',
+                      color: '#6c757d',
+                      transition: 'color 0.2s ease'
+                    }} 
+                    onClick={this.closeAddSubModal}
+                    onMouseOver={(e) => e.target.style.color = '#dc3545'}
+                    onMouseOut={(e) => e.target.style.color = '#6c757d'}
+                  >
                     ✕
                   </button>
                 </div>
-                <div className="modal-body">
+                <div className="modal-body" style={{ 
+                  padding: '24px',
+                  maxHeight: '70vh',
+                  overflowY: 'auto'
+                }}>
                   <div className="mb-3">
-                    <label htmlFor="subCategoryName" className="form-label">Название подкатегории (английское):</label>
+                    <label htmlFor="subCategoryName" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.english')}):</label>
                     <input
                       type="text"
                       className="form-control"
                       id="subCategoryName"
                       value={this.state.newSubName}
                       onChange={this.handleNewSubNameChange}
-                      placeholder="Enter subcategory name in English"
+                      placeholder={t('common.enter_subcategory_name_en')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
                     />
                   </div>
                   <div className="mb-3">
-                    <label htmlFor="subCategoryNameRu" className="form-label">Название на русском:</label>
+                    <label htmlFor="subCategoryNameRu" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.russian')}):</label>
                     <input
                       type="text"
                       className="form-control"
                       id="subCategoryNameRu"
                       value={this.state.newSubNameRu}
                       onChange={this.handleNewSubNameRuChange}
-                      placeholder="Введите название подкатегории на русском"
+                      placeholder={t('common.enter_subcategory_name_ru')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNameZh" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.chinese')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNameZh"
+                      value={this.state.newSubNameZh}
+                      onChange={this.handleNewSubNameZhChange}
+                      placeholder={t('common.enter_subcategory_name_zh')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNameDe" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.german')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNameDe"
+                      value={this.state.newSubNameDe}
+                      onChange={this.handleNewSubNameDeChange}
+                      placeholder={t('common.enter_subcategory_name_de')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNameEs" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.spanish')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNameEs"
+                      value={this.state.newSubNameEs}
+                      onChange={this.handleNewSubNameEsChange}
+                      placeholder={t('common.enter_subcategory_name_es')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNamePt" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.portuguese')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNamePt"
+                      value={this.state.newSubNamePt}
+                      onChange={this.handleNewSubNamePtChange}
+                      placeholder={t('common.enter_subcategory_name_pt')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNameUk" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.ukrainian')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNameUk"
+                      value={this.state.newSubNameUk}
+                      onChange={this.handleNewSubNameUkChange}
+                      placeholder={t('common.enter_subcategory_name_uk')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                    />
+                  </div>
+                  <div className="mb-3">
+                    <label htmlFor="subCategoryNameBe" className="form-label" style={{ 
+                      fontWeight: '500',
+                      marginBottom: '8px',
+                      color: 'var(--text-color)'
+                    }}>{t('common.category_name')} ({t('common.belarusian')}):</label>
+                    <input
+                      type="text"
+                      className="form-control"
+                      id="subCategoryNameBe"
+                      value={this.state.newSubNameBe}
+                      onChange={this.handleNewSubNameBeChange}
+                      placeholder={t('common.enter_subcategory_name_be')}
+                      style={getInputStyles()}
+                      onFocus={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = '#4485ed';
+                        e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
+                      onBlur={(e) => {
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
+                        e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
+                      }}
                     />
                   </div>
                 </div>
-                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <button type="button" className="btn btn-secondary" onClick={this.closeAddSubModal}>
-                    Отмена
+                <div className="modal-footer" style={{ 
+                  display: 'flex', 
+                  justifyContent: 'flex-end', 
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '20px 24px',
+                  borderTop: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`,
+                  borderRadius: '0 0 16px 16px'
+                }}>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={this.closeAddSubModal}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: '1px solid #6c757d',
+                      background: 'transparent',
+                      color: '#6c757d',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                      height: '40px',
+                      minWidth: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = '#6c757d';
+                      e.target.style.color = '#fff';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = 'transparent';
+                      e.target.style.color = '#6c757d';
+                    }}
+                  >
+                    {t('common.cancel')}
                   </button>
-                  <button type="button" className="btn btn-success" onClick={this.saveAddSub}>
-                    Добавить
+                  <button 
+                    type="button" 
+                    className="btn btn-primary" 
+                    onClick={this.saveAddSub}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: '#4485ed',
+                      color: '#fff',
+                      fontWeight: '500',
+                      transition: 'all 0.2s ease',
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 8px rgba(68, 133, 237, 0.2)',
+                      height: '40px',
+                      minWidth: '80px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginTop: '0'
+                    }}
+                    onMouseOver={(e) => {
+                      e.target.style.background = '#3668c9';
+                      e.target.style.boxShadow = '0 4px 12px rgba(68, 133, 237, 0.3)';
+                    }}
+                    onMouseOut={(e) => {
+                      e.target.style.background = '#4485ed';
+                      e.target.style.boxShadow = '0 2px 8px rgba(68, 133, 237, 0.2)';
+                    }}
+                  >
+                    {t('common.save')}
                   </button>
                 </div>
               </div>
@@ -989,10 +1721,11 @@ class ShowCategory extends Component {
                 transform: this.state.isCreateModalVisible ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.95)',
                 boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
                 borderRadius: '16px',
-                border: 'none'
+                border: 'none',
+                background: getCurrentTheme() === 'dark' ? '#2d2d2d' : '#ffffff'
               }}>
                 <div className="modal-header" style={{ 
-                  borderBottom: '1px solid #e9ecef',
+                  borderBottom: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`,
                   padding: '20px 24px',
                   borderRadius: '16px 16px 0 0'
                 }}>
@@ -1036,20 +1769,21 @@ class ShowCategory extends Component {
                       id="newCategoryName"
                       value={this.state.newCategoryName}
                       onChange={this.handleNewCategoryNameChange}
-                      placeholder={t('common.enter_category_name', 'Enter category name in English')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_en')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
+                        const theme = getCurrentTheme();
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
                       }}
                     />
                   </div>
@@ -1065,20 +1799,21 @@ class ShowCategory extends Component {
                       id="newCategoryNameRu"
                       value={this.state.newCategoryNameRu}
                       onChange={this.handleNewCategoryNameRuChange}
-                      placeholder={t('common.enter_category_name_ru', 'Введите название категории на русском')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_ru')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
+                        const theme = getCurrentTheme();
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
+                        e.target.style.background = theme === 'dark' ? '#2d2d2d' : '#ffffff';
+                        e.target.style.color = theme === 'dark' ? '#ffffff' : '#333333';
                       }}
                     />
                   </div>
@@ -1087,26 +1822,22 @@ class ShowCategory extends Component {
                       fontWeight: '500',
                       marginBottom: '8px',
                       color: 'var(--text-color)'
-                    }}>{t('common.category_name')} ({t('common.chinese_simplified')}):</label>
+                    }}>{t('common.category_name')} ({t('common.chinese')}):</label>
                     <input
                       type="text"
                       className="form-control"
                       id="newCategoryNameZh"
                       value={this.state.newCategoryNameZh}
                       onChange={this.handleNewCategoryNameZhChange}
-                      placeholder={t('common.enter_category_name_zh', '输入类别名称（中文）')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_zh')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1123,19 +1854,15 @@ class ShowCategory extends Component {
                       id="newCategoryNameDe"
                       value={this.state.newCategoryNameDe}
                       onChange={this.handleNewCategoryNameDeChange}
-                      placeholder={t('common.enter_category_name_de', 'Geben Sie den Kategorienamen auf Deutsch ein')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_de')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1152,19 +1879,15 @@ class ShowCategory extends Component {
                       id="newCategoryNameEs"
                       value={this.state.newCategoryNameEs}
                       onChange={this.handleNewCategoryNameEsChange}
-                      placeholder={t('common.enter_category_name_es', 'Ingrese el nombre de la categoría en español')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_es')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1181,19 +1904,15 @@ class ShowCategory extends Component {
                       id="newCategoryNamePt"
                       value={this.state.newCategoryNamePt}
                       onChange={this.handleNewCategoryNamePtChange}
-                      placeholder={t('common.enter_category_name_pt', 'Digite o nome da categoria em português')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_pt')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1210,19 +1929,15 @@ class ShowCategory extends Component {
                       id="newCategoryNameUk"
                       value={this.state.newCategoryNameUk}
                       onChange={this.handleNewCategoryNameUkChange}
-                      placeholder={t('common.enter_category_name_uk', 'Введіть назву категорії українською')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_uk')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1239,19 +1954,15 @@ class ShowCategory extends Component {
                       id="newCategoryNameBe"
                       value={this.state.newCategoryNameBe}
                       onChange={this.handleNewCategoryNameBeChange}
-                      placeholder={t('common.enter_category_name_be', 'Увядзіце назву па-беларуску')}
-                      style={{
-                        borderRadius: '8px',
-                        border: '1px solid #e9ecef',
-                        padding: '12px 16px',
-                        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
-                      }}
+                      placeholder={t('common.enter_category_name_be')}
+                      style={getInputStyles()}
                       onFocus={(e) => {
                         e.target.style.borderColor = '#4485ed';
                         e.target.style.boxShadow = '0 0 0 3px rgba(68, 133, 237, 0.1)';
                       }}
                       onBlur={(e) => {
-                        e.target.style.borderColor = '#e9ecef';
+                        const theme = getCurrentTheme();
+                        e.target.style.borderColor = theme === 'dark' ? '#404040' : '#e9ecef';
                         e.target.style.boxShadow = 'none';
                       }}
                     />
@@ -1259,11 +1970,11 @@ class ShowCategory extends Component {
                 </div>
                 <div className="modal-footer" style={{ 
                   display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'stretch',
+                  justifyContent: 'flex-end', 
+                  alignItems: 'center',
                   gap: '12px',
                   padding: '20px 24px',
-                  borderTop: '1px solid #e9ecef',
+                  borderTop: `1px solid ${getCurrentTheme() === 'dark' ? '#404040' : '#e9ecef'}`,
                   borderRadius: '0 0 16px 16px'
                 }}>
                   <button 
@@ -1280,6 +1991,7 @@ class ShowCategory extends Component {
                       transition: 'all 0.2s ease',
                       cursor: 'pointer',
                       height: '40px',
+                      minWidth: '80px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center'
@@ -1310,9 +2022,11 @@ class ShowCategory extends Component {
                       cursor: 'pointer',
                       boxShadow: '0 2px 8px rgba(68, 133, 237, 0.2)',
                       height: '40px',
+                      minWidth: '80px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      marginTop: '0'
                     }}
                     onMouseOver={(e) => {
                       e.target.style.background = '#3367d6';

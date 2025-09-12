@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useHistory } from 'react-router-dom';
 import { useLanguage } from '../hooks/useLanguage';
 import axios from '../utils/axios';
@@ -20,7 +20,8 @@ import {
   faFolder,
   faFolderOpen,
   faChevronRight,
-  faChevronDown
+  faChevronDown,
+  faGlobe
 } from '@fortawesome/free-solid-svg-icons';
 import useTheme from '../hooks/useTheme';
 import '../admin/admin.css';
@@ -28,6 +29,8 @@ import { toast } from 'react-toastify';
 import CourseRating from '../components/CourseRating';
 import CourseComments from '../components/CourseComments';
 import i18n from '../i18n';
+import { getCourseFileUrl, getVideoUrl } from '../utils/minioUtils';
+import { getLanguageName } from '../utils/languageOptions';
 
 const CourseCatalog = () => {
   const { t, i18n, currentLanguage } = useLanguage();
@@ -41,6 +44,7 @@ const CourseCatalog = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]); // Изменено на массив
   const [selectedLevel, setSelectedLevel] = useState('all');
+  const [selectedLanguage, setSelectedLanguage] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [enrolling, setEnrolling] = useState({});
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -50,6 +54,40 @@ const CourseCatalog = () => {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categoryTree, setCategoryTree] = useState([]);
   const [expandedCategories, setExpandedCategories] = useState({});
+
+  // Функция для нормализации уровня курса
+  const normalizeLevel = (level) => {
+    if (!level) return 'Beginner';
+    
+    const normalized = level.toLowerCase();
+    console.log(`Normalizing level: "${level}" -> "${normalized}"`);
+    
+    switch (normalized) {
+      case 'beginner':
+        return 'Beginner';
+      case 'intermediate':
+        return 'Intermediate';
+      case 'advanced':
+        return 'Advanced';
+      default:
+        console.log(`Unknown level: "${level}", defaulting to Beginner`);
+        return 'Beginner';
+    }
+  };
+
+  // Функция для получения прогресса курса
+  const getCourseProgress = (courseId) => {
+    const enrolledCourse = enrolledCourses.find(ec => ec.courseId === courseId);
+    return enrolledCourse ? enrolledCourse.progress || 0 : 0;
+  };
+
+  // Функция для определения цвета прогресса
+  const getProgressColor = (progress) => {
+    if (progress >= 90) return '#28a745'; // Green for high progress
+    if (progress >= 70) return '#ffc107'; // Yellow for medium progress
+    if (progress >= 50) return '#007bff'; // Blue for low progress
+    return '#dc3545'; // Red for very low progress
+  };
 
   // Функция для получения названия категории на правильном языке
   const getCategoryName = (category) => {
@@ -366,8 +404,9 @@ const CourseCatalog = () => {
       const matchesCategory = selectedCategories.length === 0 ||
     (course.categories && course.categories.some(cat => selectedCategories.includes(cat.id.toString())));
     const matchesLevel = selectedLevel === 'all' || normalizeLevel(course.level) === selectedLevel;
+    const matchesLanguage = selectedLanguage === 'all' || course.language === selectedLanguage;
     
-    return matchesSearch && matchesCategory && matchesLevel;
+    return matchesSearch && matchesCategory && matchesLevel && matchesLanguage;
   });
 
   const sortedCourses = [...filteredCourses].sort((a, b) => {
@@ -391,25 +430,6 @@ const CourseCatalog = () => {
       case 'Intermediate': return '#ffc107';
       case 'Advanced': return '#dc3545';
       default: return '#6c757d';
-    }
-  };
-
-  const normalizeLevel = (level) => {
-    if (!level) return 'Beginner';
-    
-    const normalized = level.toLowerCase();
-    console.log(`Normalizing level: "${level}" -> "${normalized}"`);
-    
-    switch (normalized) {
-      case 'beginner':
-        return 'Beginner';
-      case 'intermediate':
-        return 'Intermediate';
-      case 'advanced':
-        return 'Advanced';
-      default:
-        console.log(`Unknown level: "${level}", defaulting to Beginner`);
-        return 'Beginner';
     }
   };
 
@@ -626,6 +646,84 @@ const CourseCatalog = () => {
                 </select>
               </div>
 
+              {/* Язык */}
+              <div>
+                <label style={{ 
+                  display: 'block', 
+                  marginBottom: '8px', 
+                  fontSize: '14px', 
+                  fontWeight: '600',
+                  color: 'var(--text-color)'
+                }}>
+                  {t('course_catalog.language')}
+                </label>
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border-color)',
+                    background: 'var(--teach-bg)',
+                    color: 'var(--teach-fg)',
+                    fontSize: '16px'
+                  }}
+                >
+                                  <option value="all">{t('course_catalog.all_languages')}</option>
+                <option value="be">беларуская</option>
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="es">español</option>
+                <option value="pt">Português</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+                <option value="zh">简体中文</option>
+                <option value="af">Afrikaans</option>
+                <option value="ar">العربيّة</option>
+                <option value="ast">asturianu</option>
+                <option value="az">Azərbaycanca</option>
+                <option value="bg">български</option>
+                <option value="bn">বাংলা</option>
+                <option value="br">brezhoneg</option>
+                <option value="bs">bosanski</option>
+                <option value="ca">català</option>
+                <option value="cs">česky</option>
+                <option value="cy">Cymraeg</option>
+                <option value="da">dansk</option>
+                <option value="el">Ελληνικά</option>
+                <option value="en-AU">Australian English</option>
+                <option value="en-GB">British English</option>
+                <option value="eo">Esperanto</option>
+                <option value="es-AR">español de Argentina</option>
+                <option value="es-CO">español de Colombia</option>
+                <option value="es-MX">español de Mexico</option>
+                <option value="es-NI">español de Nicaragua</option>
+                <option value="es-VE">español de Venezuela</option>
+                <option value="et">eesti</option>
+                <option value="eu">Basque</option>
+                <option value="fa">فارسی</option>
+                <option value="fi">suomi</option>
+                <option value="fr">français</option>
+                <option value="fy">frysk</option>
+                <option value="ga">Gaeilge</option>
+                <option value="gd">Gàidhlig</option>
+                <option value="gl">galego</option>
+                <option value="he">עברית</option>
+                <option value="hi">Hindi</option>
+                <option value="hr">Hrvatski</option>
+                <option value="hu">Magyar</option>
+                <option value="ia">Interlingua</option>
+                <option value="id">Bahasa Indonesia</option>
+                <option value="io">ido</option>
+                <option value="is">Íslenska</option>
+                <option value="it">italiano</option>
+                <option value="ja">日本語</option>
+                <option value="ka">ქართული</option>
+                <option value="kk">Қазақ</option>
+                </select>
+              </div>
+
               {/* Сортировка */}
               <div>
                 <label style={{ 
@@ -650,7 +748,6 @@ const CourseCatalog = () => {
                     fontSize: '16px'
                   }}
                 >
-                  <option value="name">{t('course_catalog.sort_name')}</option>
                   <option value="newest">{t('course_catalog.sort_newest')}</option>
                   <option value="oldest">{t('course_catalog.sort_oldest')}</option>
                   <option value="popular">{t('course_catalog.sort_popular')}</option>
@@ -753,7 +850,7 @@ const CourseCatalog = () => {
                   >
                     {course.logoUrl && (
                       <img
-                        src={course.logoUrl}
+                        src={getCourseFileUrl(course.logoUrl)}
                         alt={course.name}
                         style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
@@ -773,15 +870,20 @@ const CourseCatalog = () => {
                         justifyContent: 'center',
                         zIndex: 2
                       }}>
-                        <iframe
-                          src={course.introUrl}
+                        <video
+                          src={getVideoUrl(course.introUrl)}
                           style={{
                             width: '100%',
                             height: '100%',
-                            border: 'none'
+                            objectFit: 'cover'
                           }}
-                          title={course.name}
-                          allowFullScreen
+                          muted
+                          autoPlay
+                          loop
+                          onError={(e) => {
+                            console.error('Video error in CourseCatalog:', e);
+                            e.target.style.display = 'none';
+                          }}
                         />
                       </div>
                     ) : (
@@ -824,6 +926,29 @@ const CourseCatalog = () => {
                         )}
                       </>
                     )}
+                    {/* Язык курса - левый верхний угол */}
+                    {course.language && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '15px',
+                        left: '15px',
+                        background: '#17a2b8',
+                        color: '#fff',
+                        padding: '5px 10px',
+                        borderRadius: '20px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        zIndex: 1,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <FontAwesomeIcon icon={faGlobe} style={{ fontSize: '10px' }} />
+                        {getLanguageName(course.language)}
+                      </div>
+                    )}
+                    
+                    {/* Уровень курса - правый верхний угол */}
                     <div style={{
                       position: 'absolute',
                       top: '15px',
@@ -913,6 +1038,8 @@ const CourseCatalog = () => {
                     dangerouslySetInnerHTML={{ __html: course.description }}
                     />
 
+
+
                     {/* Информация о курсе */}
                     <div style={{ 
                       padding: '25px',
@@ -950,6 +1077,7 @@ const CourseCatalog = () => {
                             </span>
                           )}
                         </div>
+
                       </div>
 
                       {/* Кнопки действий */}

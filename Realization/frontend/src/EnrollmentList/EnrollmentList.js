@@ -51,7 +51,7 @@ const EnrollmentList = () => {
       setPendingEnrollments(pendingResponse.data || []);
     } catch (error) {
       console.error('Error loading enrollments:', error);
-      toast.error('Failed to load enrollments');
+      toast.error(t('enrollment.failed_to_load_enrollments'));
     } finally {
       setLoading(false);
     }
@@ -67,7 +67,7 @@ const EnrollmentList = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      toast.success(`Enrollment ${approved ? 'approved' : 'rejected'} successfully`);
+      toast.success(approved ? t('enrollment.enrollment_approved') : t('enrollment.enrollment_rejected'));
       
       // Reload enrollments to get updated data
       await loadEnrollments();
@@ -76,11 +76,11 @@ const EnrollmentList = () => {
       
       // Provide more specific error messages
       if (error.response?.status === 403) {
-        toast.error('Access denied. Admin privileges required to approve/reject enrollments.');
+        toast.error(t('enrollment.access_denied'));
       } else if (error.response?.status === 401) {
-        toast.error('Authentication required. Please log in again.');
+        toast.error(t('enrollment.authentication_required'));
       } else {
-        toast.error(`Failed to ${approved ? 'approve' : 'reject'} enrollment: ${error.response?.data || error.message}`);
+        toast.error(approved ? t('enrollment.failed_to_approve') : t('enrollment.failed_to_reject'));
       }
     } finally {
       setApproving(prev => ({ ...prev, [enrollmentId]: false }));
@@ -108,9 +108,9 @@ const EnrollmentList = () => {
 
   const getStatusText = (approved) => {
     if (approved === null || approved === undefined) {
-      return 'Pending';
+      return t('enrollment.pending');
     }
-    return approved ? 'Approved' : 'Rejected';
+    return approved ? t('enrollment.approved') : t('enrollment.rejected');
   };
 
   const getStatusClass = (approved) => {
@@ -135,7 +135,7 @@ const EnrollmentList = () => {
       <div className="enrollment-list-container">
         <div className="loading-spinner">
           <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-          <p>Loading enrollments...</p>
+          <p>{t('enrollment.loading_enrollments')}</p>
         </div>
       </div>
     );
@@ -144,20 +144,20 @@ const EnrollmentList = () => {
   return (
     <div className="enrollment-list-container">
       <div className="enrollment-header">
-        <h1>Enrollment Management</h1>
+        <h1>{t('enrollment.management')}</h1>
         <div className="enrollment-controls">
           <div className="filter-controls">
             <button 
               className={`filter-btn ${!showPendingOnly ? 'active' : ''}`}
               onClick={() => setShowPendingOnly(false)}
             >
-              <FontAwesomeIcon icon={faEye} /> All Enrollments
+              <FontAwesomeIcon icon={faEye} /> {t('enrollment.all_enrollments')}
             </button>
             <button 
               className={`filter-btn ${showPendingOnly ? 'active' : ''}`}
               onClick={() => setShowPendingOnly(true)}
             >
-              <FontAwesomeIcon icon={faClock} /> Pending Only
+              <FontAwesomeIcon icon={faClock} /> {t('enrollment.pending_only')}
             </button>
           </div>
           
@@ -167,10 +167,10 @@ const EnrollmentList = () => {
               onChange={(e) => setFilter(e.target.value)}
               className="status-filter"
             >
-              <option value="all">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
+              <option value="all">{t('enrollment.all_statuses')}</option>
+              <option value="pending">{t('enrollment.pending')}</option>
+              <option value="approved">{t('enrollment.approved')}</option>
+              <option value="rejected">{t('enrollment.rejected')}</option>
             </select>
           )}
         </div>
@@ -179,23 +179,23 @@ const EnrollmentList = () => {
       <div className="enrollment-stats">
         <div className="stat-card">
           <div className="stat-number">{enrollments.length}</div>
-          <div className="stat-label">Total Enrollments</div>
+          <div className="stat-label">{t('enrollment.total_enrollments')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-number pending">{pendingEnrollments.length}</div>
-          <div className="stat-label">Pending Approval</div>
+          <div className="stat-label">{t('enrollment.pending_approval')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-number approved">
             {enrollments.filter(e => e.approved === true).length}
           </div>
-          <div className="stat-label">Approved</div>
+          <div className="stat-label">{t('enrollment.approved')}</div>
         </div>
         <div className="stat-card">
           <div className="stat-number rejected">
             {enrollments.filter(e => e.approved === false).length}
           </div>
-          <div className="stat-label">Rejected</div>
+          <div className="stat-label">{t('enrollment.rejected')}</div>
         </div>
       </div>
 
@@ -203,17 +203,17 @@ const EnrollmentList = () => {
         {filteredEnrollments.length === 0 ? (
           <div className="no-enrollments">
             <FontAwesomeIcon icon={faBook} size="3x" />
-            <p>No enrollments found</p>
+            <p>{t('enrollment.no_enrollments_found')}</p>
           </div>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Student</th>
-                <th>Course</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Actions</th>
+                <th>{t('enrollment.student')}</th>
+                <th>{t('enrollment.course')}</th>
+                <th>{t('enrollment.status')}</th>
+                <th>{t('enrollment.date')}</th>
+                <th>{t('enrollment.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -223,7 +223,7 @@ const EnrollmentList = () => {
                     <FontAwesomeIcon icon={faUser} />
                     <div>
                       <div className="student-name">
-                        {enrollment.User?.username || enrollment.User?.email || 'Unknown User'}
+                        {enrollment.User?.username || enrollment.User?.email || t('enrollment.unknown_user')}
                       </div>
                       <div className="student-email">
                         {enrollment.User?.email}
@@ -234,10 +234,10 @@ const EnrollmentList = () => {
                     <FontAwesomeIcon icon={faBook} />
                     <div>
                       <div className="course-name">
-                        {enrollment.Course?.name || 'Unknown Course'}
+                        {enrollment.Course?.name || t('enrollment.unknown_course')}
                       </div>
                       <div className="course-status">
-                        Course Status: {enrollment.Course?.status || 'Unknown'}
+                        {t('enrollment.course_status')}: {enrollment.Course?.status || t('enrollment.unknown')}
                       </div>
                     </div>
                   </td>
@@ -268,7 +268,7 @@ const EnrollmentList = () => {
                           ) : (
                             <FontAwesomeIcon icon={faCheck} />
                           )}
-                          Approve
+                          {t('enrollment.approve')}
                         </button>
                         <button
                           className="reject-btn"
@@ -280,37 +280,37 @@ const EnrollmentList = () => {
                           ) : (
                             <FontAwesomeIcon icon={faTimes} />
                           )}
-                          Reject
+                          {t('enrollment.reject')}
                         </button>
                         </>
                         ) : (
                           <span className="status-text">
-                            Pending (Admin approval required)
+                            {t('enrollment.pending_admin_approval')}
                           </span>
                         )
                     ) : (
                       <span className="status-text">
-                        {enrollment.approved ? 'Approved' : 'Rejected'}
+                        {enrollment.approved ? t('enrollment.approved') : t('enrollment.rejected')}
                       </span>
                     )}
                       {enrollment.User?.id && (
                         <button
                           className="edit-student-btn"
                           onClick={() => handleEditStudent(enrollment.User.id)}
-                          title="Изменить данные студента"
+                          title={t('enrollment.edit_student_data')}
                         >
                           <FontAwesomeIcon icon={faEdit} />
-                          Изменить данные студента
+                          {t('enrollment.edit_student_data')}
                         </button>
                       )}
                       {enrollment.Course?.id && (
                         <button
                           className="edit-course-btn"
                           onClick={() => handleEditCourse(enrollment.Course.id)}
-                          title="Изменить курс"
+                          title={t('enrollment.edit_course_data')}
                         >
                           <FontAwesomeIcon icon={faCog} />
-                          Изменить курс
+                          {t('enrollment.edit_course_data')}
                         </button>
                       )}
                     </div>

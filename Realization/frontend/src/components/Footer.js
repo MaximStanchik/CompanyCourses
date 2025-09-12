@@ -73,7 +73,6 @@ const Footer = () => {
             <ul style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 14 }}>
               <li><Link to="/about" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('company.about_us')}</Link></li>
               <li><Link to="/contacts" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('company.contacts')}</Link></li>
-              <li><Link to="/reviews" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('company.reviews')}</Link></li>
               <li><Link to="/faq" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('company.faq')}</Link></li>
               <li><Link to="/support" className="footer-link" style={{ color: 'var(--footer-link)', textDecoration: 'none' }}>{t('company.support')}</Link></li>
             </ul>

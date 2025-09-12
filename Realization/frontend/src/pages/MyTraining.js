@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useHistory } from 'react-router-dom';
 import axios from '../utils/axios';
@@ -6,14 +6,12 @@ import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faBookOpen, 
   faClock, 
   faUsers, 
   faChartLine, 
   faSearch,
   faArrowRight,
   faGraduationCap,
-  faTrophy,
   faSync,
   faBook,
   faPlay,
@@ -22,10 +20,13 @@ import {
   faFolder,
   faFolderOpen,
   faChevronDown,
-  faChevronRight
+  faChevronRight,
+  faGlobe
 } from '@fortawesome/free-solid-svg-icons';
 import useTheme from '../hooks/useTheme';
 import i18n from '../i18n';
+import { getCourseFileUrl, getVideoUrl } from '../utils/minioUtils';
+import { getLanguageName } from '../utils/languageOptions';
 
 const MyTraining = () => {
   const { t } = useTranslation();
@@ -34,15 +35,10 @@ const MyTraining = () => {
   const [enrolledCourses, setEnrolledCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState({
-    totalCourses: 0,
-    completedCourses: 0,
-    totalHours: 0,
-    averageProgress: 0
-  });
   const [hoveredVideo, setHoveredVideo] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLevel, setSelectedLevel] = useState('all');
+  const [selectedLanguage, setSelectedLanguage] = useState('all');
   const [sortBy, setSortBy] = useState('name');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -111,7 +107,21 @@ const MyTraining = () => {
   const openCategoryModal = () => setShowCategoryModal(true);
   const closeCategoryModal = () => setShowCategoryModal(false);
   
-  const toggleCategorySelect = (id) => {
+  const toggleCategorySelect = (id, event) => {
+    // Добавляем анимацию при клике
+    if (event && event.currentTarget) {
+      const element = event.currentTarget;
+      element.style.transform = 'scale(0.95)';
+      element.style.transition = 'transform 0.1s ease';
+      
+      setTimeout(() => {
+        element.style.transform = 'scale(1)';
+        setTimeout(() => {
+          element.style.transition = 'all 0.2s';
+        }, 100);
+      }, 100);
+    }
+    
     if (selectedCategories.includes(id)) {
       setSelectedCategories(selectedCategories.filter(x => x !== id));
     } else {
@@ -155,7 +165,7 @@ const MyTraining = () => {
             border: isSelected ? '1px solid var(--primary-color, #007bff)' : '1px solid transparent',
             marginLeft: level * 20
           }}
-          onClick={() => toggleCategorySelect(node.id.toString())}
+          onClick={(e) => toggleCategorySelect(node.id.toString(), e)}
           onMouseEnter={(e) => {
             if (!isSelected) {
               if (theme === 'dark') {
@@ -272,8 +282,11 @@ const MyTraining = () => {
       const { stepCompletions, testAttempts } = progressResponse.data;
       const modules = fullSyllabusResponse.data.modules || [];
 
-      // Если нет модулей — считаем курс завершённым на 100%
-      if (!Array.isArray(modules) || modules.length === 0) return 100;
+      // Если нет модулей — возвращаем 0% (нечего проходить)
+      if (!Array.isArray(modules) || modules.length === 0) {
+        console.log(`Курс ${courseId}: нет модулей, возвращаем 0% (нечего проходить)`);
+        return 0;
+      }
 
       console.log(`\n=== РАСЧЕТ ОБЩЕГО ПРОГРЕССА КУРСА ${courseId} ===`);
       console.log(`Найдено модулей: ${modules.length}`);
@@ -352,7 +365,8 @@ const MyTraining = () => {
         return Math.max(0, Math.min(100, overallProgress));
       }
 
-      console.log(`Курс ${courseId}: нет модулей, возвращаем 0%`);
+      // Если нет шагов, возвращаем 0% (нечего проходить)
+      console.log(`Курс ${courseId}: нет шагов, возвращаем 0% (нечего проходить)`);
       return 0;
     } catch (error) {
       console.error(`Ошибка при расчете прогресса курса ${courseId}:`, error);
@@ -435,6 +449,8 @@ const MyTraining = () => {
       });
 
       const enrollments = response.data || [];
+      
+
       
       // Filter only approved enrollments
       // ВРЕМЕННО: показываем все записи для диагностики
@@ -542,7 +558,7 @@ const MyTraining = () => {
         }
         
         
-        const clamped = Math.max(0, Math.min(100, Math.round(actualProgress)));
+        const clamped = Math.max(0, Math.min(100, Math.round(actualProgress * 10) / 10));
         
         let finalProgress = clamped;
         console.log(`Курс ${course.id}: finalProgress=${finalProgress}`);
@@ -564,16 +580,28 @@ const MyTraining = () => {
 
       setEnrolledCourses(coursesWithProgress);
 
+      // Отладочная информация
+      console.log('=== ОТЛАДКА ПРОГРЕССА КУРСОВ ===');
+      coursesWithProgress.forEach(course => {
+        console.log(`Курс ${course.Course?.id} (${course.Course?.name}):`, {
+          computedProgress: course.computedProgress,
+          progress: course.progress,
+          hasProgress: course.computedProgress !== undefined,
+          progressValue: course.computedProgress
+        });
+      });
+      console.log('=== КОНЕЦ ОТЛАДКИ ===');
+
       const totalCourses = coursesWithProgress.length;
       const completedCourses = coursesWithProgress.filter(e => (e.computedProgress || 0) >= 100).length;
       const totalHours = 0; 
 
-      setStats({
-        totalCourses,
-        completedCourses,
-        totalHours,
-        averageProgress: 0
-      });
+      // setStats({
+      //   totalCourses,
+      //   completedCourses,
+      //   totalHours,
+      //   averageProgress: 0
+      // });
 
     } catch (error) {
       console.error('Error loading enrolled courses:', error);
@@ -637,15 +665,15 @@ const MyTraining = () => {
         return enrollment;
       });
       
-      const totalCourses = updated.length;
-      const completedCourses = updated.filter(e => (e.computedProgress || 0) >= 100).length;
+      // const totalCourses = updated.length;
+      // const completedCourses = updated.filter(e => (e.computedProgress || 0) >= 100).length;
 
-      setStats({
-        totalCourses,
-        completedCourses,
-        totalHours: 0,
-        averageProgress: 0
-      });
+      // setStats({
+      //   totalCourses,
+      //   completedCourses,
+      //   totalHours: 0,
+      //   averageProgress: 0
+      // });
       
       return updated;
     });
@@ -701,6 +729,17 @@ const MyTraining = () => {
     }
   };
 
+  const getProgressColor = (progress) => {
+    if (progress >= 90) return '#28a745'; // Green for high progress
+    if (progress >= 70) return '#ffc107'; // Yellow for medium progress
+    if (progress >= 50) return '#007bff'; // Blue for low progress
+    return '#dc3545'; // Red for very low progress
+  };
+
+
+
+
+
   const filteredCourses = enrolledCourses.filter(enrollment => {
     const course = enrollment.Course;
     if (!course) return false;
@@ -710,8 +749,9 @@ const MyTraining = () => {
     const matchesLevel = selectedLevel === 'all' || normalizeLevel(course.level) === selectedLevel;
     const matchesCategory = selectedCategories.length === 0 ||
       (course.categories && course.categories.some(cat => selectedCategories.includes(cat.id.toString())));
+    const matchesLanguage = selectedLanguage === 'all' || course.language === selectedLanguage;
     
-    return matchesSearch && matchesLevel && matchesCategory;
+    return matchesSearch && matchesLevel && matchesCategory && matchesLanguage;
   });
 
   console.log(`Сортировка курсов: тип = ${sortBy}, количество курсов = ${filteredCourses.length}`);
@@ -807,13 +847,6 @@ const MyTraining = () => {
             }}>
               {t('my_training.title')}
             </h1>
-            <p style={{ 
-              fontSize: '1.1rem', 
-              color: theme === 'dark' ? '#cccccc' : '#666666',
-              marginBottom: '30px'
-            }}>
-              {t('my_training.login_to_start')}
-            </p>
           </div>
 
           {/* Карточка для входа */}
@@ -933,78 +966,6 @@ const MyTraining = () => {
           </p>
         </div>
 
-        {/* Статистика */}
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', 
-          gap: '20px', 
-          marginBottom: '40px' 
-        }}>
-          <div style={{ 
-            background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
-            padding: '25px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            textAlign: 'center',
-            border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
-          }}>
-            <FontAwesomeIcon 
-              icon={faBookOpen} 
-              style={{ 
-                fontSize: '2rem', 
-                color: '#007bff', 
-                marginBottom: '15px' 
-              }} 
-            />
-            <h3 style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: '600', 
-              marginBottom: '5px',
-              color: theme === 'dark' ? '#ffffff' : '#333333'
-            }}>
-              {stats.totalCourses}
-            </h3>
-            <p style={{ 
-              color: theme === 'dark' ? '#cccccc' : '#666666',
-              fontSize: '0.9rem'
-            }}>
-              {t('my_training.total_courses')}
-            </p>
-          </div>
-
-          <div style={{ 
-            background: theme === 'dark' ? '#2d2d2d' : '#ffffff',
-            padding: '25px',
-            borderRadius: '12px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-            textAlign: 'center',
-            border: `1px solid ${theme === 'dark' ? '#404040' : '#e9ecef'}`
-          }}>
-            <FontAwesomeIcon 
-              icon={faTrophy} 
-              style={{ 
-                fontSize: '2rem', 
-                color: '#28a745', 
-                marginBottom: '15px' 
-              }} 
-            />
-            <h3 style={{ 
-              fontSize: '1.5rem', 
-              fontWeight: '600', 
-              marginBottom: '5px',
-              color: theme === 'dark' ? '#ffffff' : '#333333'
-            }}>
-              {stats.completedCourses}
-            </h3>
-            <p style={{ 
-              color: theme === 'dark' ? '#cccccc' : '#666666',
-              fontSize: '0.9rem'
-            }}>
-              {t('my_training.completed_courses')}
-            </p>
-          </div>
-        </div>
-
         {isAdmin && (
           <div style={{ 
             textAlign: 'center', 
@@ -1013,30 +974,7 @@ const MyTraining = () => {
             justifyContent: 'center',
             gap: '15px',
             flexWrap: 'wrap'
-          }}>
-            <button
-              onClick={handleUpdateEmptyCoursesProgress}
-              style={{
-                padding: '10px 20px',
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '6px',
-                fontSize: '0.9rem',
-                fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'background 0.2s',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-              onMouseOver={(e) => e.target.style.background = '#c82333'}
-              onMouseOut={(e) => e.target.style.background = '#dc3545'}
-            >
-              <FontAwesomeIcon icon={faSync} />
-              {t('my_training.update_progress_without_lessons')}
-            </button>
-            
+          }}>            
           </div>
         )}
 
@@ -1172,6 +1110,84 @@ const MyTraining = () => {
               </select>
             </div>
 
+            {/* Язык */}
+            <div>
+              <label style={{ 
+                display: 'block', 
+                marginBottom: '8px', 
+                fontSize: '14px', 
+                fontWeight: '600', 
+                color: 'var(--text-color)'
+              }}>
+                {t('course_catalog.language')}
+              </label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  background: 'var(--teach-bg)',
+                  color: 'var(--teach-fg)',
+                  fontSize: '16px'
+                }}
+              >
+                <option value="all">{t('course_catalog.all_languages')}</option>
+                <option value="be">беларуская</option>
+                <option value="de">Deutsch</option>
+                <option value="en">English</option>
+                <option value="es">español</option>
+                <option value="pt">Português</option>
+                <option value="ru">Русский</option>
+                <option value="uk">Українська</option>
+                <option value="zh">简体中文</option>
+                <option value="af">Afrikaans</option>
+                <option value="ar">العربيّة</option>
+                <option value="ast">asturianu</option>
+                <option value="az">Azərbaycanca</option>
+                <option value="bg">български</option>
+                <option value="bn">বাংলা</option>
+                <option value="br">brezhoneg</option>
+                <option value="bs">bosanski</option>
+                <option value="ca">català</option>
+                <option value="cs">česky</option>
+                <option value="cy">Cymraeg</option>
+                <option value="da">dansk</option>
+                <option value="el">Ελληνικά</option>
+                <option value="en-AU">Australian English</option>
+                <option value="en-GB">British English</option>
+                <option value="eo">Esperanto</option>
+                <option value="es-AR">español de Argentina</option>
+                <option value="es-CO">español de Colombia</option>
+                <option value="es-MX">español de Mexico</option>
+                <option value="es-NI">español de Nicaragua</option>
+                <option value="es-VE">español de Venezuela</option>
+                <option value="et">eesti</option>
+                <option value="eu">Basque</option>
+                <option value="fa">فارسی</option>
+                <option value="fi">suomi</option>
+                <option value="fr">français</option>
+                <option value="fy">frysk</option>
+                <option value="ga">Gaeilge</option>
+                <option value="gd">Gàidhlig</option>
+                <option value="gl">galego</option>
+                <option value="he">עברית</option>
+                <option value="hi">Hindi</option>
+                <option value="hr">Hrvatski</option>
+                <option value="hu">Magyar</option>
+                <option value="ia">Interlingua</option>
+                <option value="id">Bahasa Indonesia</option>
+                <option value="io">ido</option>
+                <option value="is">Íslenska</option>
+                <option value="it">italiano</option>
+                <option value="ja">日本語</option>
+                <option value="ka">ქართული</option>
+                <option value="kk">Қазақ</option>
+              </select>
+            </div>
+
             {/* Сортировка */}
             <div>
               <label style={{ 
@@ -1196,7 +1212,6 @@ const MyTraining = () => {
                   fontSize: '16px'
                 }}
               >
-                <option value="name">{t('course_catalog.sort_name')}</option>
                 <option value="newest">{t('course_catalog.sort_newest')}</option>
                 <option value="oldest">{t('course_catalog.sort_oldest')}</option>
                 <option value="popular">{t('course_catalog.sort_popular')}</option>
@@ -1317,7 +1332,7 @@ const MyTraining = () => {
                     >
                       {course.logoUrl && (
                         <img
-                          src={course.logoUrl}
+                          src={getCourseFileUrl(course.logoUrl)}
                           alt={course.name}
                           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
                           onError={(e) => { 
@@ -1341,15 +1356,20 @@ const MyTraining = () => {
                           justifyContent: 'center',
                           zIndex: 2
                         }}>
-                          <iframe
-                            src={course.introUrl}
+                          <video
+                            src={getVideoUrl(course.introUrl)}
                             style={{
                               width: '100%',
                               height: '100%',
-                              border: 'none'
+                              objectFit: 'cover'
                             }}
-                            title={course.name}
-                            allowFullScreen
+                            muted
+                            autoPlay
+                            loop
+                            onError={(e) => {
+                              console.error('Video error in MyTraining:', e);
+                              e.target.style.display = 'none';
+                            }}
                           />
                         </div>
                       ) : (
@@ -1392,6 +1412,29 @@ const MyTraining = () => {
                           )}
                         </>
                       )}
+                      {/* Язык курса - левый верхний угол */}
+                      {course.language && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '15px',
+                          left: '15px',
+                          background: '#17a2b8',
+                          color: '#fff',
+                          padding: '5px 10px',
+                          borderRadius: '20px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          zIndex: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          <FontAwesomeIcon icon={faGlobe} style={{ fontSize: '10px' }} />
+                          {getLanguageName(course.language)}
+                        </div>
+                      )}
+                      
+                      {/* Уровень курса - правый верхний угол */}
                       <div style={{
                         position: 'absolute',
                         top: '15px',
@@ -1403,9 +1446,9 @@ const MyTraining = () => {
                         fontSize: '12px',
                         fontWeight: '600',
                         zIndex: 1
-                                          }}>
-                      {t(`course.${normalizeLevel(course.level).toLowerCase()}_level`)}
-                    </div>
+                      }}>
+                        {t(`course.${normalizeLevel(course.level).toLowerCase()}_level`)}
+                      </div>
 
                     </div>
 
@@ -1460,6 +1503,8 @@ const MyTraining = () => {
                       dangerouslySetInnerHTML={{ __html: course.description }}
                       />
 
+
+
                       {/* Информация о курсе */}
                       <div style={{ 
                         display: 'flex', 
@@ -1479,6 +1524,7 @@ const MyTraining = () => {
                           <FontAwesomeIcon icon={faUsers} />
                           <span>{(course._count?.enrollments ?? course.studentsCount ?? 0)} {t('my_training.students')}</span>
                         </div>
+
                       </div>
 
                       {/* Кнопка перехода к курсу */}

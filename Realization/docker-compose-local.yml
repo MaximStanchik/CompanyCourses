@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  # База данных PostgreSQL
+  postgres:
+    image: postgres:15
+    container_name: company_courses_postgres
+    environment:
+      POSTGRES_DB: ItCourses
+      POSTGRES_USER: admin12345
+      POSTGRES_PASSWORD: admin12345
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin12345 -d ItCourses"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO для хранения файлов
+  minio:
+    image: minio/minio:latest
+    container_name: company_courses_minio
+    environment:
+      MINIO_ROOT_USER: Maxim
+      MINIO_ROOT_PASSWORD: 1337R1337R
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9075:9000"
+      - "9001:9001"
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Backend Node.js приложение
+  backend:
+    build: ./backend
+    container_name: company_courses_backend
+    environment:
+      DATABASE_URL: postgresql://admin12345:admin12345@postgres:5432/ItCourses
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: admin12345
+      DB_PASSWORD: admin12345
+      DB_NAME: ItCourses
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_ACCESS_KEY: Maxim
+      MINIO_SECRET_KEY: 1337R1337R
+      MINIO_BUCKET: uploads
+      MINIO_USE_SSL: false
+      # Внешний адрес MinIO для генерации presigned URL
+      MINIO_EXTERNAL_ENDPOINT: localhost
+      MINIO_EXTERNAL_PORT: 9075
+      JWT_SECRET: your_jwt_secret_here
+      PORT: 9000
+      NODE_ENV: development
+      # Добавляем переменные для правильного подключения к MinIO
+      MINIO_HOST: minio
+      MINIO_SERVICE_PORT: 9000
+      # Пути к SSL сертификатам (Linux пути в контейнере)
+      PRIVATE_KEY_PATH: /app/LAB.key
+      PRIMARY_CERT_PATH: /app/LAB.crt
+      # SMTP настройки
+      EMAIL_HOST: smtp.mail.yahoo.com
+      EMAIL_PORT: 587
+      EMAIL_USER: l_o_v_e.u@yahoo.com
+      EMAIL_PASS: "mcki kook jfar cdjx"
+      # OAuth настройки
+      GOOGLE_CLIENT_ID: 71846835446-kfbbuenrcao506mh1re3uq6l50m570sa.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: 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
+      GITHUB_CLIENT_ID: Ov23liDKjO2MEj0RM2Lm
+      GITHUB_CLIENT_SECRET: c76f9a97a5be04888297d3bd3ef929722a2036b0
+      YANDEX_CLIENT_ID: 86990a0d9a28494492fbd3494ae9a062
+      YANDEX_CLIENT_SECRET: 0e521210c79c4c7493f34f7757584eda
+      DRIBBBLE_CLIENT_ID: a9ab4f043b5a3c0e81e3d0420f6111e0fbab056e68de1b4b3cdacad44b713c08
+      DRIBBBLE_CLIENT_SECRET: 3606f7b0697c15cf28938bcbe66b6914d45473a9680582d70ec53427e1ec18e3
+      TELEGRAM_BOT_TOKEN: 8130382301:AAGG_Z7oy6Te64-HtBtulh-hvUXpAbyDh8c
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    volumes:
+      - ./backend/LAB.key:/app/LAB.key:ro
+      - ./backend/LAB.crt:/app/LAB.crt:ro
+      - ./backend/.env:/app/.env:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Frontend React приложение
+  frontend:
+    build: 
+      context: ./frontend
+      target: development
+    container_name: company_courses_frontend
+    environment:
+      REACT_APP_API_URL: https://localhost:9000
+      REACT_APP_MINIO_URL: http://localhost:9075
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      DANGEROUSLY_DISABLE_HOST_CHECK: "true"
+      HOST: "0.0.0.0"
+      HTTPS: "true"
+      SSL_CRT_FILE: /app/LAB.crt
+      SSL_KEY_FILE: /app/LAB.key
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_started
+    volumes:
+      - ./backend/LAB.crt:/app/LAB.crt:ro
+      - ./backend/LAB.key:/app/LAB.key:ro
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  minio_data:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge 

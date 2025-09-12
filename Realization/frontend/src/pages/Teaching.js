@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import TeachNavMenu from '../admin/TeachNavMenu';
 import { useTranslation } from 'react-i18next';
+import useTheme from '../hooks/useTheme';
 import axios from '../utils/axios';
 import { toast } from 'react-toastify';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -9,9 +10,11 @@ import { faEllipsisV, faPen, faCopy, faTrash, faThumbtack, faQuestion, faPlus, f
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import './Teaching.css';
+import { getCourseFileUrl } from '../utils/minioUtils';
 
 const Teaching = () => {
   const { t } = useTranslation();
+  const { theme } = useTheme();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeMenuId, setActiveMenuId] = useState(null);
@@ -260,7 +263,7 @@ const Teaching = () => {
       )}
       <NavBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 'calc(100vh - 60px)' }}>
-        <TeachNavMenu variant="teach" />
+        <TeachNavMenu variant="teach" theme={theme} />
         <main style={{ flex: 1, padding: '32px 24px', background: 'var(--teach-bg)', color: 'var(--teach-fg)' }}>
           {/* Заголовок и кнопка создания курса */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
@@ -427,10 +430,10 @@ const Teaching = () => {
               opacity: 0.7 
             }}>
               {search.trim() ? 
-                `По запросу "${search}" ничего не найдено` : 
+                t('teach.no_search_results', { search: search }) : 
                 courseFilter === 'all' ? 
-                  'У вас пока нет курсов. Создайте первый курс!' : 
-                  `Нет курсов со статусом "${filterOptions.find(opt => opt.value === courseFilter)?.label}"`
+                  t('teach.no_courses') : 
+                  t('teach.no_courses_with_status', { status: filterOptions.find(opt => opt.value === courseFilter)?.label })
               }
             </div>
           ) : (
@@ -484,7 +487,7 @@ const Teaching = () => {
                   
                   {/* Обложка курса */}
                   {course.logoUrl ? (
-                    <img src={course.logoUrl} alt={course.name} style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, objectFit: 'cover' }} />
+                    <img src={getCourseFileUrl(course.logoUrl)} alt={course.name} style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, objectFit: 'cover' }} />
                   ) : (
                     <div style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, background: '#eaeaea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#777' }}>
                       <FontAwesomeIcon icon={faQuestion} />
@@ -682,7 +685,7 @@ const Teaching = () => {
                         onMouseOut={e => e.currentTarget.style.background = 'none'}
                         onClick={(e) => { e.stopPropagation(); handleStatusChange(course.id, 'published'); }}>
                           <FontAwesomeIcon icon={faCheck} style={{ marginRight: 8, fontSize: 12, color: '#28a745' }} /> 
-                          Опубликовать
+                          {t('editor.publish')}
                         </button>
                       )}
                       
@@ -800,14 +803,14 @@ const Teaching = () => {
               color: darkTheme ? '#fff' : '#333',
               marginBottom: 16
             }}>
-              {t('teaching.confirm_delete')}
+              {t('course.confirm_delete')}
             </h3>
             <p style={{ 
               color: darkTheme ? '#b6d4fe' : '#666',
               marginBottom: 20,
               lineHeight: 1.5
             }}>
-              {t('teaching.confirm_delete_description')}
+              {t('course.confirm_delete_description')}
             </p>
             <input 
               value={delInput} 
@@ -822,7 +825,7 @@ const Teaching = () => {
                 color: darkTheme ? '#eaf4fd' : '#333',
                 fontSize: 14
               }} 
-                              placeholder={t('teaching.enter_delete')}
+                              placeholder={t('course.enter_delete')}
             />
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
               <button 

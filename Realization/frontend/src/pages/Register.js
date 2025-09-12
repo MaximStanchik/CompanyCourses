@@ -36,7 +36,7 @@ const Register = () => {
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', padding: '2rem' }}>
-      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>{t('auth.register')}</h2>
+      <h2 style={{ textAlign: 'center', marginBottom: '2rem' }}>Регистрация</h2>
       
       {error && (
         <div style={{ 
@@ -58,7 +58,7 @@ const Register = () => {
           borderRadius: '4px', 
           marginBottom: '1rem' 
         }}>
-          {t('auth.verification_sent')}
+          Письмо с подтверждением отправлено на ваш email
         </div>
       )}
 
@@ -96,7 +96,7 @@ const Register = () => {
         </div>
 
         <div style={{ marginBottom: '1rem' }}>
-          <label style={{ display: 'block', marginBottom: '0.5rem' }}>{t('auth.confirm_password')}</label>
+          <label style={{ display: 'block', marginBottom: '0.5rem' }}>Подтвердите пароль</label>
           <input
             type="password"
             value={confirmPassword}
@@ -125,18 +125,18 @@ const Register = () => {
             opacity: loading ? 0.7 : 1
           }}
         >
-          {t('auth.register')}
+          {loading ? 'Загрузка...' : 'Зарегистрироваться'}
         </button>
       </form>
 
       <div style={{ marginTop: '2rem', textAlign: 'center' }}>
         <p>
-          {t('auth.already_have_account')}{' '}
+          Уже есть аккаунт?{' '}
           <a 
             href="/login" 
             style={{ color: '#007bff', textDecoration: 'none' }}
           >
-            {t('auth.login')}
+            Войти
           </a>
         </p>
       </div>

@@ -22,8 +22,8 @@ class NotificationService {
     }
   }
 
-  // Создать уведомления для всех пользователей курса
-  static async createNotificationForCourseUsers(courseId, title, message, type = 'info') {
+  // Создать уведомления для всех пользователей курса с переводами
+  static async createNotificationForCourseUsers(courseId, title, message, type = 'info', lang = 'en') {
     try {
       // Получаем всех пользователей, записанных на курс
       const enrollments = await DbClient.enrollment.findMany({
@@ -49,6 +49,47 @@ class NotificationService {
       return notifications;
     } catch (error) {
       console.error('Ошибка при создании уведомлений для пользователей курса:', error);
+      throw error;
+    }
+  }
+
+  // Создать уведомления для всех пользователей курса с ключами переводов
+  static async createNotificationForCourseUsers(courseId, translationKey, message, type = 'info') {
+    try {
+      console.log(`=== СОЗДАНИЕ УВЕДОМЛЕНИЙ С КЛЮЧАМИ ПЕРЕВОДОВ ===`);
+      console.log(`Курс ID: ${courseId}, Ключ перевода: ${translationKey}`);
+      
+      // Получаем всех пользователей, записанных на курс
+      const enrollments = await DbClient.enrollment.findMany({
+        where: { course_id: courseId },
+        include: { User: true }
+      });
+
+      console.log(`Найдено ${enrollments.length} записей на курс`);
+
+      const notifications = [];
+      for (const enrollment of enrollments) {
+        if (enrollment.User) {
+          console.log(`\n--- Обработка пользователя ${enrollment.User.id} (${enrollment.User.username}) ---`);
+          
+          // Создаем уведомление с ключом перевода в заголовке
+          const notification = await this.createNotification(
+            enrollment.User.id,
+            translationKey, // Используем ключ перевода как заголовок
+            message, // Используем оригинальное сообщение как fallback
+            type,
+            courseId
+          );
+          notifications.push(notification);
+          
+          console.log(`✅ Уведомление создано для пользователя ${enrollment.User.id} с ключом ${translationKey}`);
+        }
+      }
+
+      console.log(`\n=== ИТОГО: Создано ${notifications.length} уведомлений для курса ${courseId} ===`);
+      return notifications;
+    } catch (error) {
+      console.error('❌ Ошибка при создании уведомлений для пользователей курса:', error);
       throw error;
     }
   }
@@ -158,93 +199,84 @@ class NotificationService {
   }
 
   // Новые методы для уведомлений об изменениях в курсах
-  static async notifyModuleAdded(courseId, moduleName, adminName) {
+  static async notifyModuleAdded(courseId, moduleName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Добавлен новый модуль',
+      'module_added',
       `В курс добавлен новый модуль "${moduleName}".`,
-      'success',
-      courseId
+      'success'
     );
   }
 
-  static async notifyModuleDeleted(courseId, moduleName, adminName) {
+  static async notifyModuleDeleted(courseId, moduleName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Модуль удален',
+      'module_deleted',
       `Модуль "${moduleName}" был удален из курса.`,
-      'warning',
-      courseId
+      'warning'
     );
   }
 
-  static async notifyModuleModified(courseId, moduleName, adminName) {
+  static async notifyModuleModified(courseId, moduleName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Модуль изменен',
+      'module_modified',
       `Модуль "${moduleName}" был изменен.`,
-      'info',
-      courseId
+      'info'
     );
   }
 
-  static async notifyLessonAdded(courseId, lessonName, adminName) {
+  static async notifyLessonAdded(courseId, lessonName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Добавлен новый урок',
+      'lesson_added',
       `В курс добавлен новый урок "${lessonName}".`,
-      'success',
-      courseId
+      'success'
     );
   }
 
-  static async notifyLessonDeleted(courseId, lessonName, adminName) {
+  static async notifyLessonDeleted(courseId, lessonName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Урок удален',
+      'lesson_deleted',
       `Урок "${lessonName}" был удален из курса.`,
-      'warning',
-      courseId
+      'warning'
     );
   }
 
-  static async notifyLessonModified(courseId, lessonName, adminName) {
+  static async notifyLessonModified(courseId, lessonName, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Урок изменен',
+      'lesson_modified',
       `Урок "${lessonName}" был изменен.`,
-      'info',
-      courseId
+      'info'
     );
   }
 
-  static async notifyStepModified(courseId, lessonName, stepTitle, adminName) {
+  static async notifyStepModified(courseId, lessonName, stepTitle, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Шаг урока изменен',
+      'step_modified',
       `В уроке "${lessonName}" был изменен шаг "${stepTitle}".`,
-      'info',
-      courseId
+      'info'
     );
   }
 
-  static async notifyStepAdded(courseId, lessonName, stepTitle, adminName) {
+  static async notifyStepAdded(courseId, lessonName, stepTitle, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Добавлен новый шаг',
+      'step_added',
       `В урок "${lessonName}" добавлен новый шаг "${stepTitle}".`,
-      'success',
-      courseId
+      'success'
     );
   }
 
-  static async notifyStepDeleted(courseId, lessonName, stepTitle, adminName) {
+  static async notifyStepDeleted(courseId, lessonName, stepTitle, adminName, lang = 'en') {
     return await this.createNotificationForCourseUsers(
       courseId,
-      'Шаг удален',
+      'step_deleted',
       `Из урока "${lessonName}" был удален шаг "${stepTitle}".`,
-      'warning',
-      courseId
+      'warning'
     );
   }
 }

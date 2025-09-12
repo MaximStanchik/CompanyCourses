@@ -48,6 +48,7 @@ class enrollmentController {
                 level: true,
                 workload: true,
                 shortDescription: true,
+                language: true,
                 Category: {
                   select: {
                     id: true,

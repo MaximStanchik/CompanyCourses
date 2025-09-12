@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  # Frontend React приложение (HTTP версия)
+  frontend-http:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.http
+    container_name: company_courses_frontend_http
+    environment:
+      REACT_APP_API_URL: http://localhost:9000
+      REACT_APP_MINIO_URL: http://localhost:9075
+    ports:
+      - "3001:80"
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge 

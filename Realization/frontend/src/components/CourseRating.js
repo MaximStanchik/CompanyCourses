@@ -16,9 +16,23 @@ const CourseRating = ({ courseId, onRatingChange }) => {
   const [totalRatings, setTotalRatings] = useState(0);
   const [loading, setLoading] = useState(false);
 
+  // Функция для проверки роли администратора
+  const isAdmin = () => {
+    try {
+      const token = localStorage.getItem('jwtToken');
+      if (!token) return false;
+      const decoded = JSON.parse(atob(token.split('.')[1]));
+      return decoded.roles && decoded.roles.some(r => String(r).toUpperCase().includes('ADMIN'));
+    } catch (e) {
+      return false;
+    }
+  };
+
   useEffect(() => {
     loadRatingStats();
-    loadUserRating();
+    if (!isAdmin()) {
+      loadUserRating();
+    }
   }, [courseId]);
 
   const loadRatingStats = async () => {
@@ -46,11 +60,16 @@ const CourseRating = ({ courseId, onRatingChange }) => {
   };
 
   const handleRatingClick = async (rating) => {
+    if (isAdmin()) {
+      toast.info(t('course.admin_cannot_rate'));
+      return;
+    }
+
     try {
       setLoading(true);
       const token = localStorage.getItem('jwtToken');
       if (!token) {
-        // Пользователь не авторизован
+        toast.error(t('course.login_to_rate'));
         return;
       }
 
@@ -63,18 +82,17 @@ const CourseRating = ({ courseId, onRatingChange }) => {
 
       setUserRating(rating);
       await loadRatingStats();
-              // Оценка успешно отправлена
       
       if (onRatingChange) {
         onRatingChange(rating);
       }
     } catch (error) {
       console.error('Error submitting rating:', error);
-              if (error.response?.status === 403) {
-            // Пользователь не записан на курс
-        } else {
-            // Ошибка при отправке оценки
-        }
+      if (error.response?.status === 403) {
+        toast.error(t('course.not_enrolled_to_rate'));
+      } else {
+        toast.error(t('course.rating_error'));
+      }
     } finally {
       setLoading(false);
     }
@@ -85,6 +103,7 @@ const CourseRating = ({ courseId, onRatingChange }) => {
       const starValue = index + 1;
       const isFilled = starValue <= rating;
       const isHovered = interactive && starValue <= hoverRating;
+      const isAdminUser = isAdmin();
       
       return (
         <FontAwesomeIcon
@@ -93,13 +112,14 @@ const CourseRating = ({ courseId, onRatingChange }) => {
           style={{
             color: isFilled || isHovered ? '#ffc107' : '#e4e5e9',
             fontSize: interactive ? '24px' : '18px',
-            cursor: interactive ? 'pointer' : 'default',
+            cursor: interactive && !isAdminUser ? 'pointer' : 'default',
             marginRight: '2px',
-            transition: 'color 0.2s ease'
+            transition: 'color 0.2s ease',
+            opacity: isAdminUser && interactive ? 0.5 : 1
           }}
-          onMouseEnter={() => interactive && setHoverRating(starValue)}
-          onMouseLeave={() => interactive && setHoverRating(0)}
-          onClick={() => interactive && handleRatingClick(starValue)}
+          onMouseEnter={() => interactive && !isAdminUser && setHoverRating(starValue)}
+          onMouseLeave={() => interactive && !isAdminUser && setHoverRating(0)}
+          onClick={() => interactive && !isAdminUser && handleRatingClick(starValue)}
         />
       );
     });
@@ -130,7 +150,11 @@ const CourseRating = ({ courseId, onRatingChange }) => {
           fontSize: '14px',
           color: theme === 'dark' ? '#cccccc' : '#666666'
         }}>
-          {userRating > 0 ? t('course.you_rated', { rating: userRating }) : t('course.click_to_rate')}
+          {isAdmin() ? (
+            t('course.admin_cannot_rate')
+          ) : (
+            userRating > 0 ? t('course.you_rated', { rating: userRating }) : t('course.click_to_rate')
+          )}
         </div>
       </div>
 

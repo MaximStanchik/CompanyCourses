@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  # MinIO для хранения файлов
+  minio:
+    image: minio/minio:latest
+    container_name: company_courses_minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9075:9000"  # API порт
+      - "9001:9001"  # Console порт
+    networks:
+      - minio-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # MinIO Client для управления
+  minio-client:
+    image: minio/mc:latest
+    container_name: company_courses_minio_client
+    depends_on:
+      - minio
+    networks:
+      - minio-network
+    command: >
+      sh -c "
+        sleep 10 &&
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb local/uploads &&
+        mc mb local/avatars &&
+        mc mb local/courses &&
+        mc policy set public local/uploads &&
+        mc policy set public local/avatars &&
+        mc policy set public local/courses &&
+        echo 'MinIO buckets created successfully!' &&
+        tail -f /dev/null
+      "
+
+volumes:
+  minio_data:
+    driver: local
+
+networks:
+  minio-network:
+    driver: bridge 

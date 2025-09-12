@@ -73,11 +73,35 @@ const Login = (props) => {
   const handleResendVerification = async () => {
     setResendLoading(true);
     setResendSuccess(false);
-    // TODO: Replace with real API call
-    setTimeout(() => {
+    
+    console.log('Local email state:', email);
+    
+    if (!email) {
+      console.error('No email available for resend');
       setResendLoading(false);
-      setResendSuccess(true);
-    }, 1200);
+      return;
+    }
+    
+    try {
+      const response = await fetch('https://localhost:9000/auth/resend-verification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: email })
+      });
+      
+      if (response.ok) {
+        setResendSuccess(true);
+      } else {
+        const error = await response.json();
+        console.error('Error resending verification email:', error.message);
+      }
+    } catch (error) {
+      console.error('Error resending verification email:', error);
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -133,40 +157,7 @@ const Login = (props) => {
                       )}
                     </div>
                     
-                    <div className="form-group mt-2" style={{ display:'flex', alignItems:'center' }}>
-                      <label style={{ display:'flex', alignItems:'center', cursor:'pointer', gap:'10px', margin:0 }}>
-                        <input
-                          type="checkbox"
-                          id="remember-me"
-                          checked={checkbox1}
-                          onChange={(e) => setCheckbox1(e.target.checked)}
-                          style={{ display: 'none' }}
-                        />
-                        <span style={{
-                          width: '40px',
-                          height: '22px',
-                          background: checkbox1 ? '#4680ff' : '#e0e0e0',
-                          borderRadius: '22px',
-                          position: 'relative',
-                          transition: 'background 0.2s',
-                          display: 'inline-block',
-                          verticalAlign: 'middle',
-                        }}>
-                          <span style={{
-                            position: 'absolute',
-                            left: checkbox1 ? '20px' : '2px',
-                            top: '3px',
-                            width: '16px',
-                            height: '16px',
-                            background: '#fff',
-                            borderRadius: '50%',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                            transition: 'left 0.2s',
-                          }}></span>
-                        </span>
-                        Remember me
-                      </label>
-                    </div>
+                   
                     
                     <div className="auth-buttons mb-4">
                       <button className="btn btn-primary shadow-2 w-100 mb-2">

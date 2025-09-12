@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  backend2:
+    build: ./backend
+    container_name: company_courses_backend_2
+    environment:
+      DATABASE_URL: postgresql://admin12345:admin12345@host.docker.internal:5433/ItCourses
+      DB_HOST: host.docker.internal
+      DB_PORT: 5433
+      DB_USER: admin12345
+      DB_PASSWORD: admin12345
+      DB_NAME: ItCourses
+      MINIO_ENDPOINT: host.docker.internal
+      MINIO_PORT: 9075
+      MINIO_ACCESS_KEY: Maxim
+      MINIO_SECRET_KEY: 1337R1337R
+      MINIO_BUCKET: uploads
+      MINIO_USE_SSL: false
+      SECRET: your_jwt_secret
+      PORT: 9000
+      NODE_ENV: production
+      # Добавляем переменные для правильного подключения к MinIO
+      MINIO_HOST: host.docker.internal
+      MINIO_SERVICE_PORT: 9075
+      # SSL сертификаты
+      PRIVATE_KEY_PATH: /app/LAB.key
+      PRIMARY_CERT_PATH: /app/LAB.crt
+      # SMTP настройки
+      EMAIL_HOST: smtp.mail.yahoo.com
+      EMAIL_PORT: 587
+      EMAIL_USER: l_o_v_e.u@yahoo.com
+      EMAIL_PASS: "mcki kook jfar cdjx"
+      # Отладка MinIO
+      DEBUG_MINIO: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./backend/LAB.key:/app/LAB.key:ro
+      - ./backend/LAB.crt:/app/LAB.crt:ro
+      - ./backend/src:/app/src
+    restart: unless-stopped

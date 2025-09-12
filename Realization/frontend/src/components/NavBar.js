@@ -161,10 +161,10 @@ const NavBar = () => {
   // guestLinks
   const guestLinks = (
     <li>
-      <Link className="nav-link" to="/login">
+      <Link className="nav-link" to="/login" style={{ color: '#fff' }}>
         <div className="menu-item">
-          <FontAwesomeIcon icon={faSignIn} size="2x" />
-          <span>{t('navbar.login')}</span>
+          <FontAwesomeIcon icon={faSignIn} size="2x" style={{ color: '#fff', marginRight: 0 }} />
+          <span style={{ color: '#fff' }}>{t('navbar.login')}</span>
         </div>
       </Link>
     </li>
@@ -336,7 +336,7 @@ const NavBar = () => {
                           )}
                           <li style={{marginRight: '18px'}}>{LanguageSelect}</li>
                           <li style={{marginRight: '18px'}}>{ThemeToggle}</li>
-                          <li>{logoutLink}</li>
+                          <li>{isAuthenticated ? logoutLink : guestLinks}</li>
                         </ul>
                         <div className="Navbar__Link Navbar__Link-toggle" onClick={classToggle}>
                           <i className="fas fa-bars" />

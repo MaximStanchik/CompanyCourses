@@ -8,23 +8,18 @@ import {
   faBook, 
   faClock, 
   faArrowLeft,
-  faGraduationCap,
   faList,
-  faEye,
-  faTrash,
-  faBroom,
-  faExclamationTriangle
+  faEye
 } from '@fortawesome/free-solid-svg-icons';
 import axios from '../utils/axios';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
 import LessonViewer from '../components/LessonViewer';
-import ProgressDebugger from '../components/ProgressDebugger';
-import AdminCleanup from '../components/AdminCleanup';
-import AuthDebugger from '../components/AuthDebugger';
+
 import useTheme from '../hooks/useTheme';
 import '../admin/admin.css';
 import { useTranslation } from 'react-i18next';
+import { getAvatarUrl, getVideoUrl } from '../utils/minioUtils';
 
 const Course = () => {
   const { id } = useParams();
@@ -84,7 +79,7 @@ const Course = () => {
             return;
           }
 
-          const response = await axios.post(`/course/${courseId}/lesson/${lessonId}/progress`, 
+          const response = await axios.post(`https://localhost:9000/course/${courseId}/lesson/${lessonId}/progress`, 
             { progress }, 
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -100,26 +95,12 @@ const Course = () => {
       
       loadUserProgress().then(() => {
         setTimeout(() => {
-          const overallProgress = getOverallProgress();
-          console.log(`Обновляем MyTraining: ${overallProgress}%`);
-          
-          if (window.saveCourseProgress) {
-            window.saveCourseProgress(Number(id), overallProgress);
-          }
-          
-          if (window.updateMyTrainingProgress) {
-            window.updateMyTrainingProgress(Number(id), overallProgress);
-          }
+          console.log(`Прогресс будет обновлен автоматически через useEffect`);
         }, 100);
       });
     };
 
-    window.getCourseProgress = (courseId) => {
-      if (Number(courseId) === Number(id)) {
-        return getOverallProgress();
-      }
-      return 0;
-    };
+
 
     window.calculateCourseProgress = async (courseId, userId) => {
       try {
@@ -143,87 +124,104 @@ const Course = () => {
         console.log(`Загружаем прогресс для курса ${validCourseId}, пользователя ${validUserId}`);
 
         // Загружаем прогресс пользователя
-        const progressResponse = await axios.get(`/course/${validCourseId}/progress/${validUserId}`, {
+        const progressResponse = await axios.get(`https://localhost:9000/course/${validCourseId}/progress/${validUserId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
         // Загружаем полный syllabus
-        const fullSyllabusResponse = await axios.get(`/course/${validCourseId}/full-syllabus`, {
+        const fullSyllabusResponse = await axios.get(`https://localhost:9000/course/${validCourseId}/full-syllabus`, {
           headers: { Authorization: `Bearer ${token}` }
         });
 
         const { stepCompletions, testAttempts } = progressResponse.data;
-        const modules = fullSyllabusResponse.data.modules || [];
+        const fullSyllabusModules = fullSyllabusResponse.data.modules || [];
 
-        if (!Array.isArray(modules) || modules.length === 0) return 100;
-
+        // Если нет модулей, возвращаем 0% (нечего проходить)
+        if (!Array.isArray(fullSyllabusModules) || fullSyllabusModules.length === 0) {
+          console.log(`Нет модулей, возвращаем 0% (нечего проходить)`);
+          return 0;
+        }
+        
         console.log(`\n=== РАСЧЕТ ОБЩЕГО ПРОГРЕССА КУРСА ${validCourseId} ===`);
-        console.log(`Найдено модулей: ${modules.length}`);
+        console.log(`Найдено модулей: ${fullSyllabusModules.length}`);
         console.log(`Данные о шагах: ${stepCompletions?.length || 0} завершенных шагов`);
         console.log(`Данные о тестах: ${testAttempts?.length || 0} попыток тестов`);
 
         let totalModuleProgress = 0;
         let moduleCount = 0;
 
-        for (const module of modules) {
+        for (const module of fullSyllabusModules) {
           let moduleProgress = 0;
           let lessonCount = 0;
+          let lessonsWithSteps = 0;
 
           if (Array.isArray(module.lessons)) {
-            for (const lesson of module.lessons) {
-              let lessonProgress = 0;
-              let stepCount = 0;
+            // Если в модуле нет уроков, пропускаем модуль
+            if (module.lessons.length === 0) {
+              console.log(`Модуль ${module.id} (${module.title}): НЕТ УРОКОВ - пропускаем в расчете`);
+              continue; // Пропускаем этот модуль
+            } else {
+              for (const lesson of module.lessons) {
+                let lessonProgress = 0;
+                let stepCount = 0;
 
-              if (Array.isArray(lesson.steps)) {
-                for (let i = 0; i < lesson.steps.length; i++) {
-                  const step = lesson.steps[i];
-                  const stepCompletion = stepCompletions?.find(sc => 
-                    sc.lessonId === lesson.id && sc.stepIndex === i
-                  );
-                  const testAttempt = testAttempts?.find(ta => 
-                    ta.lessonId === lesson.id && ta.stepIndex === i
-                  );
+                if (Array.isArray(lesson.steps) && lesson.steps.length > 0) {
+                  lessonsWithSteps++;
+                  for (let i = 0; i < lesson.steps.length; i++) {
+                    const step = lesson.steps[i];
+                    const stepCompletion = stepCompletions?.find(sc => 
+                      sc.lessonId === lesson.id && sc.stepIndex === i
+                    );
+                    const testAttempt = testAttempts?.find(ta => 
+                      ta.lessonId === lesson.id && ta.stepIndex === i
+                    );
 
-                  if (step.type === 'test' || step.type === 'quiz') {
-                    if (testAttempt) {
-                      const score = testAttempt.lastScore || 0;
-                      // Добавляем к прогрессу только если результат больше 0%
-                      if (score > 0) {
-                        lessonProgress += score;
-                        console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): ${score}%`);
+                    if (step.type === 'test' || step.type === 'quiz') {
+                      if (testAttempt) {
+                        const score = testAttempt.lastScore || 0;
+                        // Добавляем к прогрессу только если результат больше 0%
+                        if (score > 0) {
+                          lessonProgress += score;
+                          console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): ${score}%`);
+                        } else {
+                          console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): ${score}% - не учитываем в прогрессе`);
+                        }
                       } else {
-                        console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): ${score}% - не учитываем в прогрессе`);
+                        console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): нет попыток`);
                       }
                     } else {
-                      console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type}): нет попыток`);
+                      if (stepCompletion) {
+                        lessonProgress += 100;
+                        console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type || 'text'}): завершен`);
+                      } else {
+                        console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type || 'text'}): не завершен`);
+                      }
                     }
-                  } else {
-                    if (stepCompletion) {
-                      lessonProgress += 100;
-                      console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type || 'text'}): завершен`);
-                    } else {
-                      console.log(`    Урок ${lesson.id}, шаг ${i} (${step.type || 'text'}): не завершен`);
-                    }
+                    stepCount++;
                   }
-                  stepCount++;
+                } else {
+                  console.log(`  Урок ${lesson.id} (${lesson.name}): НЕТ ШАГОВ - пропускаем в расчете`);
                 }
-              }
 
-              if (stepCount > 0) {
-                const lessonAvg = Math.round(lessonProgress / stepCount);
-                moduleProgress += lessonAvg;
-                console.log(`  Урок ${lesson.id} (${lesson.name}): ${lessonAvg}% (${lessonProgress}/${stepCount} шагов)`);
+                if (stepCount > 0) {
+                  const lessonAvg = Math.round(lessonProgress / stepCount);
+                  moduleProgress += lessonAvg;
+                  console.log(`  Урок ${lesson.id} (${lesson.name}): ${lessonAvg}% (${lessonProgress}/${stepCount} шагов)`);
+                }
+                lessonCount++;
               }
-              lessonCount++;
             }
           }
 
-          if (lessonCount > 0) {
-            const moduleAvg = Math.round(moduleProgress / lessonCount);
+          // Учитываем модуль только если у него есть уроки с шагами
+          if (lessonsWithSteps > 0) {
+            const moduleAvg = Math.round(moduleProgress / lessonsWithSteps);
             totalModuleProgress += moduleAvg;
-            console.log(`Модуль ${module.id} (${module.title}): ${moduleAvg}% (${moduleProgress}/${lessonCount} уроков)`);
+            console.log(`Модуль ${module.id} (${module.title}): ${moduleAvg}% (${moduleProgress}/${lessonsWithSteps} уроков с шагами)`);
+            moduleCount++;
+          } else {
+            console.log(`Модуль ${module.id} (${module.title}): НЕТ УРОКОВ С ШАГАМИ - пропускаем в расчете`);
           }
-          moduleCount++;
         }
 
         if (moduleCount > 0) {
@@ -233,6 +231,8 @@ const Course = () => {
           return Math.max(0, Math.min(100, averageProgress));
         }
 
+        // Если нет модулей с уроками, возвращаем 0% (нечего проходить)
+        console.log(`Нет модулей с уроками, возвращаем 0% (нечего проходить)`);
         return 0;
       } catch (error) {
         console.error(`Ошибка при расчете прогресса курса ${courseId}:`, error);
@@ -240,17 +240,7 @@ const Course = () => {
       }
     };
 
-    window.getCurrentCourseProgress = (courseId) => {
-      if (Number(courseId) === Number(id)) {
-        return getOverallProgress();
-      }
-      return null; 
-    };
 
-    const currentProgress = getOverallProgress();
-    if (window.saveCourseProgress) {
-      window.saveCourseProgress(Number(id), currentProgress);
-    }
 
     window.updateUserProgress = () => {
       console.log('Обновляем userProgress из window.updateUserProgress');
@@ -300,7 +290,7 @@ const Course = () => {
       
       console.log(`Загружаем прогресс для курса ${validCourseId}, пользователя ${validUserId}`);
       
-      const progressResponse = await axios.get(`/course/${validCourseId}/progress/${validUserId}`, {
+      const progressResponse = await axios.get(`https://localhost:9000/course/${validCourseId}/progress/${validUserId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -331,7 +321,7 @@ const Course = () => {
         return;
       }
 
-      const courseResponse = await axios.get(`/course/${id}`, {
+      const courseResponse = await axios.get(`https://localhost:9000/course/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCourse(courseResponse.data);
@@ -340,7 +330,7 @@ const Course = () => {
       let allLessons = [];
       
       try {
-        const fullSyllabusResponse = await axios.get(`/course/${id}/full-syllabus`, {
+        const fullSyllabusResponse = await axios.get(`https://localhost:9000/course/${id}/full-syllabus`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -349,9 +339,34 @@ const Course = () => {
         modulesWithLessons = syllabusData.modules || [];
         allLessons = syllabusData.modules?.flatMap(m => m.lessons || []) || [];
         
+        console.log('=== FULL SYLLABUS ДАННЫЕ ===');
         console.log('Syllabus data:', syllabusData);
         console.log('Modules from full syllabus:', modulesWithLessons);
         console.log('All lessons from full syllabus:', allLessons);
+        
+        // Проверяем названия модулей из full-syllabus
+        if (modulesWithLessons.length > 0) {
+          console.log('=== ПРОВЕРКА НАЗВАНИЙ МОДУЛЕЙ ИЗ FULL-SYLLABUS ===');
+          modulesWithLessons.forEach((module, index) => {
+            console.log(`Модуль ${index + 1} из full-syllabus:`, {
+              id: module.id,
+              title: module.title,
+              description: module.description,
+              order: module.order,
+              lessonsCount: module.lessons?.length || 0
+            });
+            
+            // Проверяем, есть ли проблемы с названием модуля
+            if (module.title && (module.title.startsWith('Модуль ') || module.title.includes('Модуль с ID'))) {
+              console.log(`⚠️ Модуль ${module.id} из full-syllabus имеет временное название: "${module.title}"`);
+            } else if (module.title) {
+              console.log(`✅ Модуль ${module.id} из full-syllabus имеет правильное название: "${module.title}"`);
+            } else {
+              console.log(`❌ Модуль ${module.id} из full-syllabus не имеет названия`);
+            }
+          });
+          console.log('=== КОНЕЦ ПРОВЕРКИ НАЗВАНИЙ МОДУЛЕЙ ===');
+        }
         
         if (allLessons.length > 0) {
           console.log('=== ДАННЫЕ УРОКОВ ИЗ FULL-SYLLABUS ===');
@@ -380,97 +395,77 @@ const Course = () => {
         if (allLessons.length === 0) {
           console.log('No lessons in full-syllabus, loading lessons separately...');
           
-          // Load lessons from database
+          // Load lessons from database using correct endpoint
           let lessons = [];
           
           try {
-            const lessonsResponse = await axios.get(`/course/${id}/lessons`, {
+            // Используем правильный endpoint /lessons с фильтрацией по курсу (как в SyllabusEditor)
+            const lessonsResponse = await axios.get(`https://localhost:9000/lessons?course=${id}`, {
               headers: { Authorization: `Bearer ${token}` }
             });
             
             console.log('Lessons API response:', lessonsResponse);
             lessons = lessonsResponse.data || [];
-            console.log('Loaded lessons from /course/:id/lessons:', lessons.length);
+            console.log('Loaded lessons from /lessons?course=:', lessons.length);
             
-            // Convert lessons to proper format
+            // Convert lessons to proper format with real moduleId
             lessons = lessons.map(lesson => ({
               id: lesson.id,
-              name: lesson.title || lesson.name || `Lesson ${lesson.id}`,
-              title: lesson.title || lesson.name || `Lesson ${lesson.id}`,
+              name: lesson.name || lesson.title || `Lesson ${lesson.id}`,
+              title: lesson.name || lesson.title || `Lesson ${lesson.id}`,
               content: lesson.content || '',
-              videoLink: lesson.videoUrl || lesson.videoLink || null,
-              videoUrl: lesson.videoUrl || lesson.videoLink || null,
+              videoLink: lesson.videoLink || null,
+              videoUrl: lesson.videoLink ? getVideoUrl(lesson.videoLink) : null,
               type: 'video',
-              steps: lesson.steps || []
+              steps: lesson.steps || [],
+              moduleId: lesson.moduleId || null, // Используем реальный moduleId из базы данных
+              order: lesson.order || 0
             }));
             
-            console.log('Converted lessons:', lessons.length);
+            console.log('Converted lessons with real moduleId:', lessons.length);
+            console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId).length);
+            console.log('Lessons without moduleId:', lessons.filter(l => !l.moduleId).length);
+            
+            // Дополнительная отладочная информация
+            if (lessons.length > 0) {
+              console.log('Sample lesson structure:', lessons[0]);
+              console.log('Lesson IDs:', lessons.map(l => l.id));
+              console.log('Lesson names:', lessons.map(l => l.title || l.name));
+              console.log('Lesson moduleIds:', lessons.map(l => l.moduleId));
+            }
           } catch (lessonsError) {
-            console.warn('Failed to load lessons from /course/:id/lessons:', lessonsError);
+            console.warn('Failed to load lessons from /lessons:', lessonsError);
             lessons = [];
           }
           
           console.log('Final lessons loaded:', lessons);
           console.log('Lessons count:', lessons.length);
-          console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId || l.module_id).length);
-          
-          // Дополнительная отладочная информация
-          if (lessons.length > 0) {
-            console.log('Sample lesson structure:', lessons[0]);
-            console.log('Lesson IDs:', lessons.map(l => l.id));
-            console.log('Lesson names:', lessons.map(l => l.title || l.name));
-            console.log('Lesson moduleIds:', lessons.map(l => l.moduleId || l.module_id));
-          }
           
           // --- Раскладываем уроки по модулям ---
-          if (modulesWithLessons.length === 0 && lessons.length > 0) {
-            // Создаем модули автоматически если их нет
-            const lessonsPerModule = 3;
-            const numberOfModules = Math.ceil(lessons.length / lessonsPerModule);
-            
+          if (modulesWithLessons.length === 0) {
             modulesWithLessons = [];
-            for (let i = 0; i < numberOfModules; i++) {
-              const moduleLessons = lessons.slice(i * lessonsPerModule, (i + 1) * lessonsPerModule);
-              modulesWithLessons.push({
-                id: `temp_module_${i + 1}`,
-                title: `Module ${i + 1}`,
-                description: `Auto-generated module ${i + 1}`,
-                order: i + 1,
-                lessons: moduleLessons
-              });
-            }
+            console.log('No modules found - admin should create them manually');
           } else if (modulesWithLessons.length > 0) {
-            // Используем существующие модули и распределяем уроки по moduleId
-            const lessonsByModule = {};
-            
-            // Группируем уроки по moduleId
-            lessons.forEach(lesson => {
-              const moduleId = lesson.moduleId || lesson.module_id;
-              if (moduleId) {
-                if (!lessonsByModule[moduleId]) {
-                  lessonsByModule[moduleId] = [];
+            console.log('=== ПРИВЯЗКА УРОКОВ К МОДУЛЯМ ===');
+            modulesWithLessons = modulesWithLessons.map(module => {
+              // Находим уроки для этого модуля по реальному moduleId
+              const moduleLessons = lessons.filter(lesson => {
+                const lessonModuleId = lesson.moduleId;
+                const matches = lessonModuleId && Number(lessonModuleId) === Number(module.id);
+                if (matches) {
+                  console.log(`✅ Урок "${lesson.title || lesson.name}" (ID: ${lesson.id}) привязан к модулю ${module.id}`);
                 }
-                lessonsByModule[moduleId].push(lesson);
-              }
-            });
-            
-            // Распределяем уроки по модулям
-            modulesWithLessons = modulesWithLessons.map(module => ({
-              ...module,
-              lessons: lessonsByModule[module.id] || []
-            }));
-            
-            // Если есть уроки без moduleId, распределяем их по модулям
-            const unassignedLessons = lessons.filter(lesson => !lesson.moduleId && !lesson.module_id);
-            if (unassignedLessons.length > 0) {
-              const lessonsPerModule = Math.ceil(unassignedLessons.length / modulesWithLessons.length);
-              unassignedLessons.forEach((lesson, index) => {
-                const moduleIndex = Math.floor(index / lessonsPerModule);
-                if (modulesWithLessons[moduleIndex]) {
-                  modulesWithLessons[moduleIndex].lessons.push(lesson);
-                }
+                return matches;
               });
-            }
+              
+              console.log(`Модуль ${module.id} (${module.title}): найдено ${moduleLessons.length} уроков`);
+              
+              return {
+                ...module,
+                lessons: moduleLessons
+              };
+            });
+            console.log('=== КОНЕЦ ПРИВЯЗКИ УРОКОВ ===');
           }
           
           allLessons = lessons || [];
@@ -482,14 +477,39 @@ const Course = () => {
         // Fallback: загружаем модули и уроки отдельно
         let modules = [];
         try {
-          const modulesResponse = await axios.get(`/course/${id}/modules`, {
+          const modulesResponse = await axios.get(`https://localhost:9000/course/${id}/modules`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           
+          console.log('=== МОДУЛИ ИЗ /course/:id/modules ===');
           console.log('Modules API response:', modulesResponse);
           modules = modulesResponse.data || [];
           console.log('Loaded modules:', modules);
           console.log('Modules count:', modules.length);
+          
+          // Дополнительная отладочная информация для модулей
+          if (modules.length > 0) {
+            console.log('=== ДЕТАЛЬНАЯ ИНФОРМАЦИЯ О МОДУЛЯХ ИЗ API ===');
+            modules.forEach((module, index) => {
+              console.log(`Module ${index + 1}:`, {
+                id: module.id,
+                title: module.title,
+                description: module.description,
+                order: module.order,
+                lessons: module.lessons || []
+              });
+              
+              // Проверяем, есть ли проблемы с названием модуля
+              if (module.title && (module.title.startsWith('Модуль ') || module.title.includes('Модуль с ID'))) {
+                console.log(`⚠️ Модуль ${module.id} имеет временное название: "${module.title}"`);
+              } else if (module.title) {
+                console.log(`✅ Модуль ${module.id} имеет правильное название: "${module.title}"`);
+              } else {
+                console.log(`❌ Модуль ${module.id} не имеет названия`);
+              }
+            });
+            console.log('=== КОНЕЦ ИНФОРМАЦИИ О МОДУЛЯХ ===');
+          }
         } catch (modulesError) {
           console.warn('Failed to load modules, using empty array');
           modules = [];
@@ -499,7 +519,7 @@ const Course = () => {
         let lessons = [];
         
         try {
-          const lessonsResponse = await axios.get(`/course/${id}/lessons`, {
+          const lessonsResponse = await axios.get(`https://localhost:9000/course/${id}/lessons`, {
             headers: { Authorization: `Bearer ${token}` }
           });
           
@@ -514,7 +534,7 @@ const Course = () => {
             title: lesson.title || lesson.name || `Lesson ${lesson.id}`,
             content: lesson.content || '',
             videoLink: lesson.videoUrl || lesson.videoLink || null,
-            videoUrl: lesson.videoUrl || lesson.videoLink || null,
+            videoUrl: (lesson.videoUrl || lesson.videoLink) ? getVideoUrl(lesson.videoUrl || lesson.videoLink) : null,
             type: 'video',
             steps: lesson.steps || []
           }));
@@ -528,6 +548,7 @@ const Course = () => {
         console.log('Final lessons loaded:', lessons);
         console.log('Lessons count:', lessons.length);
         console.log('Lessons with moduleId:', lessons.filter(l => l.moduleId || l.module_id).length);
+        console.log('Lessons without moduleId:', lessons.filter(l => !(l.moduleId || l.module_id)).length);
         
         // Дополнительная отладочная информация
         if (lessons.length > 0) {
@@ -535,11 +556,17 @@ const Course = () => {
           console.log('Lesson IDs:', lessons.map(l => l.id));
           console.log('Lesson names:', lessons.map(l => l.title || l.name));
           console.log('Lesson moduleIds:', lessons.map(l => l.moduleId || l.module_id));
+          
+          // Показываем уроки без moduleId
+          const orphanedLessons = lessons.filter(l => !(l.moduleId || l.module_id));
+          if (orphanedLessons.length > 0) {
+            console.log('⚠️ Уроки без привязки к модулям:', orphanedLessons.map(l => ({ id: l.id, title: l.title || l.name })));
+          }
         }
         
         // --- Раскладываем уроки по модулям ---
         if (modules.length === 0 && lessons.length > 0) {
-          // Создаем модули автоматически если их нет
+          // Создаем модули автоматически только если их действительно нет в API
           const lessonsPerModule = 3;
           const numberOfModules = Math.ceil(lessons.length / lessonsPerModule);
           
@@ -548,44 +575,37 @@ const Course = () => {
             const moduleLessons = lessons.slice(i * lessonsPerModule, (i + 1) * lessonsPerModule);
             modulesWithLessons.push({
               id: `temp_module_${i + 1}`,
-              title: `Module ${i + 1}`,
-              description: `Auto-generated module ${i + 1}`,
+              title: `Модуль ${i + 1}`,
+              description: `Автоматически созданный модуль ${i + 1}`,
               order: i + 1,
               lessons: moduleLessons
             });
           }
-        } else if (modules.length > 0) {
-          // Используем существующие модули и распределяем уроки по moduleId
-          const lessonsByModule = {};
-          
-          // Группируем уроки по moduleId
-          lessons.forEach(lesson => {
-            const moduleId = lesson.moduleId || lesson.module_id;
-            if (moduleId) {
-              if (!lessonsByModule[moduleId]) {
-                lessonsByModule[moduleId] = [];
+        } else if (modulesWithLessons.length > 0) {
+          // Используем существующие модули из API (даже если они пустые)
+          console.log('=== ПРИВЯЗКА УРОКОВ К МОДУЛЯМ ===');
+          modulesWithLessons = modulesWithLessons.map(module => {
+            // Находим уроки для этого модуля
+            const moduleLessons = lessons.filter(lesson => {
+              const lessonModuleId = lesson.moduleId || lesson.module_id;
+              const matches = lessonModuleId && Number(lessonModuleId) === Number(module.id);
+              if (matches) {
+                console.log(`✅ Урок "${lesson.title || lesson.name}" (ID: ${lesson.id}) привязан к модулю ${module.id}`);
               }
-              lessonsByModule[moduleId].push(lesson);
-            }
-          });
-          
-          // Распределяем уроки по модулям
-          modulesWithLessons = modules.map(module => ({
-            ...module,
-            lessons: lessonsByModule[module.id] || []
-          }));
-          
-          // Если есть уроки без moduleId, распределяем их по модулям
-          const unassignedLessons = lessons.filter(lesson => !lesson.moduleId && !lesson.module_id);
-          if (unassignedLessons.length > 0) {
-            const lessonsPerModule = Math.ceil(unassignedLessons.length / modulesWithLessons.length);
-            unassignedLessons.forEach((lesson, index) => {
-              const moduleIndex = Math.floor(index / lessonsPerModule);
-              if (modulesWithLessons[moduleIndex]) {
-                modulesWithLessons[moduleIndex].lessons.push(lesson);
-              }
+              return matches;
             });
-          }
+            
+            console.log(`Модуль ${module.id} (${module.title}): найдено ${moduleLessons.length} уроков`);
+            
+            // Возвращаем модуль с его реальным названием, даже если уроков нет
+            return {
+              ...module,
+              lessons: moduleLessons
+            };
+          });
+          console.log('=== КОНЕЦ ПРИВЯЗКИ УРОКОВ ===');
+          
+          console.log('Using existing modules from API with lessons assigned by moduleId');
         } else {
           modulesWithLessons = [];
         }
@@ -594,6 +614,14 @@ const Course = () => {
       }
 
       // Устанавливаем данные
+      console.log('=== ПЕРЕД setModules ===');
+      console.log('modulesWithLessons перед setModules:', modulesWithLessons);
+      console.log('Проверяем названия модулей:');
+      modulesWithLessons.forEach((module, index) => {
+        console.log(`  Модуль ${index + 1}: ID=${module.id}, Title="${module.title}", Description="${module.description}"`);
+      });
+      console.log('=== КОНЕЦ ПРОВЕРКИ ===');
+      
       setModules(modulesWithLessons);
       setLessons(allLessons);
 
@@ -606,14 +634,20 @@ const Course = () => {
       }
       
       // Дополнительная отладочная информация для модулей
+      console.log('=== ДЕТАЛЬНАЯ ИНФОРМАЦИЯ О МОДУЛЯХ ===');
       modulesWithLessons.forEach((module, index) => {
         console.log(`Module ${index + 1} (${module.id}): "${module.title}" - ${module.lessons?.length || 0} lessons`);
         if (module.lessons && module.lessons.length > 0) {
           module.lessons.forEach((lesson, lessonIndex) => {
             console.log(`  Lesson ${lessonIndex + 1}: ${lesson.title || lesson.name} (ID: ${lesson.id})`);
+            console.log(`    Steps: ${lesson.steps?.length || 0}`);
+            console.log(`    ModuleId: ${lesson.moduleId || lesson.module_id || 'НЕ ПРИВЯЗАН'}`);
           });
+        } else {
+          console.log(`  ⚠️ Модуль ${module.id} не имеет уроков!`);
         }
       });
+      console.log('=== КОНЕЦ ИНФОРМАЦИИ О МОДУЛЯХ ===');
 
       // Загружаем прогресс пользователя
       await loadUserProgress();
@@ -625,18 +659,7 @@ const Course = () => {
 
       // Синхронизируем прогресс с MyTraining после загрузки данных
       setTimeout(() => {
-        const overallProgress = getOverallProgress();
-        console.log(`Синхронизируем прогресс с MyTraining: ${overallProgress}%`);
-        if (window.updateMyTrainingProgress) {
-          window.updateMyTrainingProgress(Number(id), overallProgress);
-        } else {
-          console.log('Функция updateMyTrainingProgress не найдена');
-          // localStorage.setItem('courseProgressUpdate', JSON.stringify({ 
-          //   courseId: Number(id), 
-          //   progress: overallProgress, 
-          //   ts: Date.now() 
-          // }));
-        }
+        console.log(`Прогресс будет обновлен автоматически через useEffect`);
       }, 500);
 
     } catch (error) {
@@ -696,7 +719,7 @@ const Course = () => {
       // Обновим список /course/:id/lessons и попробуем снова (без обращения к /lessons/:id)
       console.log('Обновляем список уроков...');
       const token = localStorage.getItem('jwtToken');
-      const refreshed = await axios.get(`/course/${id}/lessons`, {
+      const refreshed = await axios.get(`https://localhost:9000/course/${id}/lessons`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       const list = refreshed.data || [];
@@ -738,64 +761,29 @@ const Course = () => {
       const currentModule = modules.find(m => m.id === selectedLesson?.moduleId);
       if (currentModule) {
         const currentLessons = getLessonsForModule(currentModule.id);
-        const completed = currentLessons.filter(l => isLessonCompleted(l.id)).length + (isValidDbId ? (isLessonCompleted(numericId) ? 0 : 1) : 0);
+        const completed = 0;
         moduleKey = String(currentModule.id);
-        moduleProgress = currentLessons.length > 0 ? Math.round((completed / currentLessons.length) * 100) : 100;
+        moduleProgress = 0;
         console.log(`Прогресс модуля ${currentModule.id}: ${completed}/${currentLessons.length} = ${moduleProgress}%`);
       }
 
-      // Рассчитываем локальный прогресс курса
-      const overallProgress = getOverallProgress();
-      console.log(`Локальный прогресс курса: ${overallProgress}%`);
-      
       if (isValidDbId) {
-        const resp = await axios.post(`/course/${id}/lesson/${numericId}/complete`, { moduleKey, moduleProgress }, {
+        const resp = await axios.post(`https://localhost:9000/course/${id}/lesson/${numericId}/complete`, { moduleKey, moduleProgress }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (typeof resp.data?.totalProgress === 'number') {
           console.log(`Получен новый прогресс с сервера: ${resp.data.totalProgress}%`);
           setUserProgress(prev => ({ ...prev, totalProgress: resp.data.totalProgress }));
           
-          // Обновляем прогресс в MyTraining
-          if (window.updateMyTrainingProgress) {
-            const overallProgress = getOverallProgress();
-            console.log(`Вызываем updateMyTrainingProgress для курса ${id} с прогрессом ${overallProgress}%`);
-            window.updateMyTrainingProgress(Number(id), overallProgress);
-          } else {
-            console.log('Функция updateMyTrainingProgress не найдена');
-            // localStorage.setItem('courseProgressUpdate', JSON.stringify({ 
-            //   courseId: Number(id), 
-            //   progress: resp.data.totalProgress, 
-            //   ts: Date.now() 
-            // }));
-          }
+          // Прогресс обновится автоматически через useEffect
+          console.log(`Прогресс будет обновлен автоматически через useEffect`);
         } else {
-          // Если сервер не вернул прогресс, используем локальный расчет
-          console.log(`Сервер не вернул прогресс, используем локальный: ${overallProgress}%`);
-          if (window.updateMyTrainingProgress) {
-            window.updateMyTrainingProgress(Number(id), overallProgress);
-          } else {
-            console.log('Функция updateMyTrainingProgress не найдена');
-            // localStorage.setItem('courseProgressUpdate', JSON.stringify({ 
-            //   courseId: Number(id), 
-            //   progress: overallProgress, 
-            //   ts: Date.now() 
-            // }));
-          }
+          // Прогресс обновится автоматически через useEffect
+          console.log(`Прогресс будет обновлен автоматически через useEffect`);
         }
       } else {
-        // Если ID невалиден, используем локальный прогресс
-        console.log(`ID урока невалиден, используем локальный прогресс: ${overallProgress}%`);
-        if (window.updateMyTrainingProgress) {
-          window.updateMyTrainingProgress(Number(id), overallProgress);
-        } else {
-          console.log('Функция updateMyTrainingProgress не найдена');
-          // localStorage.setItem('courseProgressUpdate', JSON.stringify({ 
-          //   courseId: Number(id), 
-          //   progress: overallProgress, 
-          //   ts: Date.now() 
-          // }));
-        }
+        // Прогресс обновится автоматически через useEffect
+        console.log(`Прогресс будет обновлен автоматически через useEffect`);
       }
       
       // Обновляем прогресс
@@ -810,7 +798,7 @@ const Course = () => {
         setUserProgress(prev => ({ ...prev }));
       }, 100);
 
-      broadcastCourseProgress(getOverallProgress());
+
 
     } catch (error) {
       console.error('Error completing lesson:', error);
@@ -820,19 +808,8 @@ const Course = () => {
         completedLessonIds: Array.from(new Set([...(prev?.completedLessonIds || []).map(normalizeLessonId), normalizeLessonId(lessonId)]))
       }));
       
-      // Обновляем MyTraining с локальным прогрессом даже при ошибке
-      const overallProgress = getOverallProgress();
-      console.log(`Ошибка при завершении урока, используем локальный прогресс: ${overallProgress}%`);
-      if (window.updateMyTrainingProgress) {
-        window.updateMyTrainingProgress(Number(id), overallProgress);
-      } else {
-        console.log('Функция updateMyTrainingProgress не найдена');
-        // localStorage.setItem('courseProgressUpdate', JSON.stringify({ 
-        //   courseId: Number(id), 
-        //   progress: overallProgress, 
-        //   ts: Date.now() 
-        // }));
-      }
+      // Прогресс обновится автоматически через useEffect
+      console.log(`Прогресс будет обновлен автоматически через useEffect`);
     }
   };
 
@@ -854,7 +831,7 @@ const Course = () => {
         return;
       }
 
-      const response = await axios.delete(`/course/${id}/reset-progress`, {
+      const response = await axios.delete(`https://localhost:9000/course/${id}/reset-progress`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -863,10 +840,8 @@ const Course = () => {
       // Обновляем прогресс
       await loadUserProgress();
       
-      // Обновляем общий прогресс курса
-      if (window.updateMyTrainingProgress) {
-        window.updateMyTrainingProgress(Number(id), 0);
-      }
+      // Прогресс обновится автоматически через useEffect
+      console.log(`Прогресс будет обновлен автоматически через useEffect`);
       
       // Показываем уведомление
       alert(t('course.reset_progress_success', { defaultValue: 'Прогресс курса успешно сброшен!' }));
@@ -896,7 +871,7 @@ const Course = () => {
       }
 
       // Принудительно удаляем ВСЕ записи stepCompletion
-      const response = await axios.delete(`/course/${id}/force-clean-all`, {
+      const response = await axios.delete(`https://localhost:9000/course/${id}/force-clean-all`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -908,7 +883,7 @@ const Course = () => {
         const step = steps[i];
         if (step.type !== 'test' && step.type !== 'quiz') {
           console.log(`Восстанавливаем шаг ${i} (тип: ${step.type})`);
-          await axios.post(`/course/${id}/lesson/${selectedLesson.id}/step/${i}/complete`, 
+          await axios.post(`https://localhost:9000/course/${id}/lesson/${selectedLesson.id}/step/${i}/complete`, 
             { lessonProgress: 0 }, 
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -978,7 +953,7 @@ const Course = () => {
         console.log(`Отправляем запрос на /course/${id}/lesson/${numericId}/step/${stepIndex}/complete`);
         console.log(`Данные запроса:`, { lessonProgress, ...(payload || {}) });
 
-        const resp = await axios.post(`/course/${id}/lesson/${numericId}/step/${stepIndex}/complete`, { lessonProgress, ...(payload || {}) }, {
+        const resp = await axios.post(`https://localhost:9000/course/${id}/lesson/${numericId}/step/${stepIndex}/complete`, { lessonProgress, ...(payload || {}) }, {
           headers: { Authorization: `Bearer ${token}` }
         });
         
@@ -1038,13 +1013,8 @@ const Course = () => {
             // Вызываем handleLessonComplete для обновления общего прогресса
             await handleLessonComplete(lessonId);
           } else {
-            // Если урок не завершен, но прогресс изменился, обновляем MyTraining
-            const overallProgress = getOverallProgress();
-            if (window.updateMyTrainingProgress) {
-              window.updateMyTrainingProgress(Number(id), overallProgress);
-            } else {
-              console.log('Функция updateMyTrainingProgress не найдена');
-            }
+            // Прогресс обновится автоматически через useEffect
+            console.log(`Прогресс будет обновлен автоматически через useEffect`);
           }
         }
       }
@@ -1065,8 +1035,11 @@ const Course = () => {
     // Просто возвращаем уроки из модуля
     const mod = modules.find(m => m.id === moduleId);
     if (!mod || !Array.isArray(mod.lessons)) {
+      console.log(`getLessonsForModule: модуль ${moduleId} не найден или не имеет уроков`);
       return [];
     }
+    
+    console.log(`getLessonsForModule: модуль ${moduleId} имеет ${mod.lessons.length} уроков`);
     
     return mod.lessons.map((lesson, idx) => ({
       id: lesson.id,
@@ -1081,27 +1054,7 @@ const Course = () => {
     }));
   };
 
-  const getModuleProgressPercent = (moduleId) => {
-    const moduleLessons = getLessonsForModule(moduleId);
-    if (!Array.isArray(moduleLessons) || moduleLessons.length === 0) return 100;
-    
-    console.log(`\n=== РАСЧЕТ ПРОГРЕССА МОДУЛЯ ${moduleId} ===`);
-    console.log(`Уроки в модуле:`, moduleLessons.map(l => ({ id: l.id, title: l.title })));
-    
-    // Считаем общий прогресс по урокам модуля
-    let totalProgress = 0;
-    for (const lesson of moduleLessons) {
-      const lessonProgress = getLessonProgress(lesson.id);
-      totalProgress += lessonProgress;
-      console.log(`Урок ${lesson.id} (${lesson.title}) в модуле ${moduleId}: ${lessonProgress}%`);
-    }
-    
-    const averageProgress = Math.round(totalProgress / moduleLessons.length);
-    console.log(`Модуль ${moduleId}: общий прогресс ${averageProgress}% (${totalProgress}/${moduleLessons.length})`);
-    console.log(`=== КОНЕЦ РАСЧЕТА ПРОГРЕССА МОДУЛЯ ${moduleId} ===\n`);
-    
-    return averageProgress;
-  };
+
 
   const getServerCompletedStepIndices = (lessonId) => {
     const stepCompletions = Array.isArray(userProgress.stepCompletions) ? userProgress.stepCompletions : [];
@@ -1117,165 +1070,23 @@ const Course = () => {
     return 0;
   };
 
-  // Функция для получения прогресса конкретного урока из базы данных
-  const getLessonProgress = (lid) => {
-    const lesson = lessons.find(l => l.id === lid);
-    if (!lesson) {
-      return 0;
-    }
-    
-    const totalSteps = lesson.steps.length;
-    
-    if (totalSteps === 0) {
-      return 0;
-    }
-    
-    // Получаем завершенные шаги и попытки тестов для этого урока
-    const lessonStepCompletions = userProgress?.stepCompletions?.filter(sc => sc.lessonId === lid) || [];
-    const lessonTestAttempts = userProgress?.testAttempts?.filter(ta => ta.lessonId === lid) || [];
-    
-    // Считаем завершенные шаги (исключая тестовые шаги)
-    const completedStepIndices = new Set();
-    console.log(`=== АНАЛИЗ STEP COMPLETIONS ДЛЯ УРОКА ${lid} ===`);
-    console.log('lessonStepCompletions:', lessonStepCompletions);
-    lessonStepCompletions.forEach(sc => {
-      // Проверяем, является ли шаг тестовым
-      const step = lesson.steps[sc.stepIndex];
-      console.log(`Шаг ${sc.stepIndex}:`, step);
-      if (step && step.type !== 'test' && step.type !== 'quiz') {
-        // Добавляем только нетекстовые шаги (исключаем 'test' и 'quiz')
-        completedStepIndices.add(sc.stepIndex);
-        console.log(`✅ Добавляем нетекстовый шаг ${sc.stepIndex}`);
-      } else {
-        console.log(`❌ Исключаем тестовый шаг ${sc.stepIndex} (тип: ${step?.type})`);
-      }
-    });
-    console.log(`Итоговые завершенные шаги:`, Array.from(completedStepIndices));
-    console.log(`=== КОНЕЦ АНАЛИЗА ===`);
-    
-    // Добавляем прогресс от тестов (для всех тестов, включая 0%)
-    let totalTestProgress = 0;
-    lessonTestAttempts.forEach(ta => {
-      // Для тестовых шагов прогресс = (результат теста / 100) / общее количество шагов
-      // Например: тест 50% = (50/100) / 4 = 0.5 / 4 = 0.125
-      const testProgress = (ta.lastScore / 100) / totalSteps;
-      totalTestProgress += testProgress;
-    });
-    
-    const completedCount = completedStepIndices.size + totalTestProgress;
-    const progress = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
-    
-    console.log(`getLessonProgress ${lid}: ${completedStepIndices.size} завершенных шагов + ${totalTestProgress.toFixed(2)} от тестов = ${completedCount.toFixed(2)}/${totalSteps} = ${progress}%`);
-    
 
-    
-    return progress;
-  };
 
-  // Функция для определения цвета прогресса
-  const getProgressColor = (percent) => {
-    if (percent >= 90) return '#28a745'; // Зеленый для высокого прогресса
-    if (percent >= 70) return '#17a2b8'; // Синий для хорошего прогресса
-    if (percent >= 50) return '#ffc107'; // Желтый для среднего прогресса
-    if (percent >= 25) return '#fd7e14'; // Оранжевый для низкого прогресса
-    return '#dc3545'; // Красный для очень низкого прогресса
-  };
 
-  const isLessonCompleted = (lessonId) => {
-    const progress = getLessonProgress(lessonId);
-    return progress >= 100;
-  };
+
+
 
   const isLessonAccessible = (lesson, moduleIndex, lessonIndex) => {
     return true;
   };
 
-  const getOverallProgress = () => {
-    if (!modules || modules.length === 0) return 0;
-    
-    let totalSteps = 0;
-    let completedSteps = 0;
-    
-    for (const module of modules) {
-      const moduleLessons = getLessonsForModule(module.id);
-      
-      for (const lesson of moduleLessons) {
-        // Получаем количество шагов в уроке
-        const lessonSteps = lesson.steps || [];
-        totalSteps += lessonSteps.length;
-        
-        // Используем getLessonProgress для правильного расчета прогресса урока
-        const lessonProgress = getLessonProgress(lesson.id);
-        const lessonCompletedSteps = (lessonProgress / 100) * lessonSteps.length;
-        completedSteps += lessonCompletedSteps;
-        
-        console.log(`Урок ${lesson.id}: ${lessonProgress}% прогресс, ${lessonCompletedSteps.toFixed(2)}/${lessonSteps.length} шагов`);
-        
 
-      }
-    }
-    
-    const overallProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    console.log(`Общий прогресс: ${completedSteps.toFixed(2)}/${totalSteps} шагов = ${overallProgress}%`);
-    return overallProgress;
-  };
 
-  const broadcastCourseProgress = (progressValue) => {
-    try {
-      // localStorage.setItem('courseProgressUpdate', JSON.stringify({ courseId: Number(id), progress: progressValue, ts: Date.now() }));
-    } catch {}
-  };
 
-  // Автоматическое сохранение прогресса курса при каждом изменении
-  useEffect(() => {
-    if (id && userProgress && Object.keys(userProgress).length > 0) {
-      const overallProgress = getOverallProgress();
-      console.log(`Автоматическое сохранение прогресса курса ${id}: ${overallProgress}%`);
-      
-      // Сохраняем общий прогресс курса в БД
-      saveCourseProgressToDB(overallProgress);
-      
-      // Сохраняем общий прогресс курса
-      if (window.saveCourseProgress) {
-        window.saveCourseProgress(Number(id), overallProgress);
-      }
-      
-      // Синхронизируем с MyTraining
-      if (window.updateMyTrainingProgress) {
-        window.updateMyTrainingProgress(Number(id), overallProgress);
-      }
-    }
-  }, [userProgress, id]);
 
-  const saveCourseProgressToDB = async (progress) => {
-    try {
-      const token = localStorage.getItem('jwtToken');
-      if (!token || !id) {
-        console.log('Пропускаем сохранение прогресса курса - нет токена или ID курса');
-        return;
-      }
 
-      console.log(`=== СОХРАНЕНИЕ ПРОГРЕССА КУРСА ===`);
-      console.log(`Курс ID: ${id}`);
-      console.log(`Прогресс: ${progress}%`);
-      
-      const response = await axios.post(`/course/${id}/progress`, 
-        { progress }, 
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      
-      console.log(`Прогресс курса ${id} сохранен в БД:`, response.data);
-      console.log(`=== КОНЕЦ СОХРАНЕНИЯ ПРОГРЕССА КУРСА ===`);
-    } catch (error) {
-      console.error('Ошибка при сохранении прогресса курса в БД:', error);
-      console.error('Детали ошибки:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
-      });
-    }
-  };
+
+
 
   // Принудительная загрузка данных при изменении selectedLesson
   useEffect(() => {
@@ -1286,6 +1097,19 @@ const Course = () => {
       }, 100);
     }
   }, [selectedLesson, id]);
+
+  // Отслеживаем изменения в modules
+  useEffect(() => {
+    console.log('=== STATE MODULES ИЗМЕНИЛСЯ ===');
+    console.log('Новые modules:', modules);
+    if (modules.length > 0) {
+      console.log('Проверяем названия модулей в state:');
+      modules.forEach((module, index) => {
+        console.log(`  State Модуль ${index + 1}: ID=${module.id}, Title="${module.title}", Description="${module.description}"`);
+      });
+    }
+    console.log('=== КОНЕЦ ПРОВЕРКИ STATE ===');
+  }, [modules]);
 
   if (loading) {
     return (
@@ -1339,9 +1163,7 @@ const Course = () => {
       color: theme === 'dark' ? '#ffffff' : '#333333'
     }}>
               <NavBar />
-        <ProgressDebugger courseId={id} userProgress={userProgress} modules={modules} getLessonsForModule={getLessonsForModule} getLessonProgress={getLessonProgress} getModuleProgressPercent={getModuleProgressPercent} />
-        <AdminCleanup courseId={id} />
-        <AuthDebugger />
+
       
       <div style={{ 
         maxWidth: '1400px', 
@@ -1386,50 +1208,8 @@ const Course = () => {
               </h1>
             </div>
             
-            {/* Кнопка сброса прогресса */}
-            <button
-              onClick={resetCourseProgress}
-              style={{
-                background: '#dc3545',
-                border: 'none',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                padding: '8px 16px',
-                borderRadius: '6px',
-                transition: 'background 0.2s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-              onMouseOver={(e) => e.target.style.background = '#c82333'}
-              onMouseOut={(e) => e.target.style.background = '#dc3545'}
-              title="Сбросить весь прогресс курса"
-            >
-              <FontAwesomeIcon icon={faTrash} />
-              {t('course.reset_progress')}
-            </button>
-            <button
-              onClick={forceCleanTestCompletions}
-              style={{
-                background: '#dc3545',
-                color: 'white',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '8px 16px',
-                cursor: 'pointer',
-                fontSize: '0.9rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}
-              onMouseOver={(e) => e.target.style.background = '#c82333'}
-              onMouseOut={(e) => e.target.style.background = '#dc3545'}
-              title="Принудительно исправить прогресс 388%"
-            >
-              <FontAwesomeIcon icon={faExclamationTriangle} />
-              Исправить прогресс
-            </button>
+
+
 
           </div>
 
@@ -1458,42 +1238,10 @@ const Course = () => {
                 <span>{course.duration} {t('course.hours') || 'часов'}</span>
               </div>
             )}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <FontAwesomeIcon icon={faGraduationCap} style={{ color: '#17a2b8' }} />
-              <span>{getOverallProgress()}% {t('course.completed')}</span>
-            </div>
+
           </div>
 
-          {/* Прогресс-бар */}
-          <div style={{ marginTop: '20px' }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              marginBottom: '8px'
-            }}>
-              <span style={{ fontSize: '0.9rem', color: theme === 'dark' ? '#cccccc' : '#666666' }}>
-                {t('course.progress') || 'Прогресс'}
-              </span>
-              <span style={{ fontSize: '0.9rem', fontWeight: '600' }}>
-                {getOverallProgress()}%
-              </span>
-            </div>
-            <div style={{ 
-              width: '100%', 
-              height: '8px', 
-              background: theme === 'dark' ? '#404040' : '#e9ecef',
-              borderRadius: '4px',
-              overflow: 'hidden'
-            }}>
-              <div style={{ 
-                width: `${getOverallProgress()}%`, 
-                height: '100%', 
-                background: '#28a745',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-          </div>
+
         </div>
 
         {selectedLesson ? (
@@ -1529,7 +1277,7 @@ const Course = () => {
                   onMouseOver={(e) => e.target.style.background = theme === 'dark' ? '#404040' : '#f8f9fa'}
                   onMouseOut={(e) => e.target.style.background = 'transparent'}
                 >
-                  {t('course.back_to_module', { defaultValue: 'Вернуться к модулям' })}
+                  {t('course.back_to_module')}
                 </button>
               </div>
             </div>
@@ -1613,7 +1361,7 @@ const Course = () => {
               marginBottom: '20px',
               color: theme === 'dark' ? '#ffffff' : '#333333'
             }}>
-              {t('course.modules') || 'Модули'}
+              {t('course.modules')}
             </h2>
 
             {modules.length === 0 ? (
@@ -1630,7 +1378,6 @@ const Course = () => {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
               {modules.map((module, moduleIndex) => {
                 const moduleLessons = getLessonsForModule(module.id);
-                const moduleProgress = getModuleProgressPercent(module.id);
 
                 return (
                   <div
@@ -1669,26 +1416,27 @@ const Course = () => {
                       }}>
                         {module.title}
                       </h3>
-                      <span style={{ 
-                        fontSize: '0.8rem',
-                        padding: '4px 8px',
-                        borderRadius: '12px',
-                        background: getProgressColor(moduleProgress),
-                        color: 'white',
-                        fontWeight: '500'
-                      }}>
-                        {moduleProgress}%
-                      </span>
                     </div>
 
-                    <p style={{ 
+                    {/* Отображение порядка модуля */}
+                    <div style={{ 
+                      fontSize: '0.85rem',
+                      color: theme === 'dark' ? '#999999' : '#666666',
+                      marginBottom: '8px',
+                      fontStyle: 'italic'
+                    }}>
+                      Модуль {module.order || (moduleIndex + 1)}
+                    </div>
+
+                    {/* Убираем описание модуля */}
+                    {/* <p style={{ 
                       fontSize: '0.9rem',
                       color: theme === 'dark' ? '#cccccc' : '#666666',
                       marginBottom: '10px',
                       lineHeight: '1.4'
                     }}>
                       {module.description}
-                    </p>
+                    </p> */}
 
                     <div style={{ 
                       display: 'flex', 
@@ -1698,24 +1446,6 @@ const Course = () => {
                       color: theme === 'dark' ? '#999999' : '#888888'
                     }}>
                       <span>{moduleLessons.length} {t('course.lessons') || 'уроков'}</span>
-                      <span>{moduleLessons.filter(lesson => isLessonCompleted(lesson.id)).length} {t('course.completed')}</span>
-                    </div>
-
-                    {/* Прогресс модуля */}
-                    <div style={{ 
-                      width: '100%', 
-                      height: '4px', 
-                      background: theme === 'dark' ? '#404040' : '#e9ecef',
-                      borderRadius: '2px',
-                      marginTop: '8px',
-                      overflow: 'hidden'
-                    }}>
-                      <div style={{ 
-                        width: `${moduleProgress}%`, 
-                        height: '100%', 
-                        background: getProgressColor(moduleProgress),
-                        transition: 'width 0.3s ease'
-                      }} />
                     </div>
                   </div>
                 );
@@ -1742,6 +1472,16 @@ const Course = () => {
                   {selectedModule.title}
                 </h2>
 
+                {/* Отображение порядка модуля */}
+                <div style={{ 
+                  fontSize: '1rem',
+                  color: theme === 'dark' ? '#999999' : '#666666',
+                  marginBottom: '20px',
+                  fontStyle: 'italic'
+                }}>
+                  Модуль {selectedModule.order || 'N/A'}
+                </div>
+
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                   {getLessonsForModule(selectedModule.id).length === 0 && (
                     <div style={{
@@ -1751,14 +1491,13 @@ const Course = () => {
                       borderRadius: '8px',
                       color: theme === 'dark' ? '#cccccc' : '#666666'
                     }}>
-                      {t('course.no_lessons_in_module', { defaultValue: 'В этом модуле пока нет уроков.' })}
+                      {t('lessons.no_lessons_in_module')}
                     </div>
                   )}
                   {getLessonsForModule(selectedModule.id).map((lesson, lessonIndex) => {
                     const moduleIndex = modules.findIndex(m => m.id === selectedModule.id);
-                    const isCompleted = isLessonCompleted(lesson.id);
-                    const isAccessible = isLessonAccessible(lesson, moduleIndex, lessonIndex);
-                    const lessonProgress = getLessonProgress(lesson.id);
+                    const isCompleted = false;
+                    const isAccessible = true;
 
                     return (
                       <div
@@ -1816,14 +1555,7 @@ const Course = () => {
                             </h3>
                           </div>
                           
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                            <span style={{ 
-                              fontSize: '0.8rem',
-                              color: theme === 'dark' ? '#cccccc' : '#666666'
-                            }}>
-                              {lesson.duration || 0} {t('course.minutes')}
-                            </span>
-                          </div>
+                          
                         </div>
 
                         {/* Описание урока: для видео показываем описание; для тестов можно отображать краткий текст */}
@@ -1839,43 +1571,7 @@ const Course = () => {
                           />
                         )}
 
-                        {/* Прогресс-бар урока и шагов (по данным сервера) */}
-                        <div style={{ marginBottom: '10px' }}>
-                          <div style={{ 
-                            display: 'flex', 
-                            justifyContent: 'space-between', 
-                            alignItems: 'center',
-                            marginBottom: '5px'
-                          }}>
-                            <span style={{ 
-                              fontSize: '0.8rem',
-                              color: theme === 'dark' ? '#cccccc' : '#666666'
-                            }}>
-                              {t('course.progress')}
-                            </span>
-                            <span style={{ 
-                              fontSize: '0.8rem',
-                              fontWeight: '600',
-                              color: getProgressColor(lessonProgress)
-                            }}>
-                              {lessonProgress}%
-                            </span>
-                          </div>
-                          <div style={{ 
-                            width: '100%', 
-                            height: '6px', 
-                            background: theme === 'dark' ? '#404040' : '#e9ecef',
-                            borderRadius: '3px',
-                            overflow: 'hidden'
-                          }}>
-                            <div style={{ 
-                              width: `${lessonProgress}%`, 
-                              height: '100%', 
-                              background: getProgressColor(lessonProgress),
-                              transition: 'width 0.3s ease'
-                            }} />
-                          </div>
-                        </div>
+                       
 
                         {/* Gating message removed: all lessons are accessible */}
                       </div>
@@ -1903,10 +1599,10 @@ const Course = () => {
                   marginBottom: '10px',
                   color: theme === 'dark' ? '#ffffff' : '#333333'
                 }}>
-                  {t('course.select_module') || 'Выберите модуль'}
+                  {t('course.select_module') }
                 </h3>
                 <p>
-                  {t('course.select_module_description') || 'Выберите модуль из списка слева, чтобы просмотреть уроки'}
+                  {t('course.select_module_description')}
                 </p>
               </div>
             )}

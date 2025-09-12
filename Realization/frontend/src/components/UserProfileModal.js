@@ -45,13 +45,21 @@ const UserProfileModal = ({ open, onClose, user = {}, profile = {}, dark = false
 					)}
 					{profile.bio && <div style={{ fontStyle: 'italic', maxWidth: 360 }}>{profile.bio}</div>}
 				</div>
+				{/* info rows */}
 				<div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginTop: 16, fontSize: 14, justifyItems: 'center' }}>
 					{profile.city && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faMapMarkerAlt} /> {profile.city}</div>}
 					{profile.country && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faFlag} /> {profile.country}</div>}
 					{profile.company && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faBuilding} /> {profile.company}</div>}
 					{profile.position && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faBriefcase} /> {profile.position}</div>}
 					{profile.jobTitle && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faIdBadge} /> {profile.jobTitle}</div>}
-					{profile.goal && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faBullseye} /> {profile.goal}</div>}
+					{profile.goal && (
+						<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+							<div style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700 }}>
+								<FontAwesomeIcon icon={faBullseye} /> Профессиональная или личная цель:
+							</div>
+							<div style={{ color: dark ? '#cfd8dc' : '#666', textAlign: 'center', lineHeight: '1.4' }}>{profile.goal}</div>
+						</div>
+					)}
 					{profile.status && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><FontAwesomeIcon icon={faInfoCircle} /> {profile.status}</div>}
 				</div>
 				{!skillsFirst && <SkillsBlock />}

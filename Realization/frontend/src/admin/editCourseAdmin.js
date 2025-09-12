@@ -17,10 +17,15 @@ import {
   faUpload,
   faImage,
   faVideo,
-  faEdit
+  faEdit,
+  faPlus,
+  faPlay,
+  faBan
 } from '@fortawesome/free-solid-svg-icons';
 import axios from '../utils/axios';
 import CategorySelectorModal from '../components/CategorySelectorModal';
+import { getCourseFileUrl, getVideoUrl } from '../utils/minioUtils';
+import { languageOptions } from '../utils/languageOptions';
 
 export default function EditCourse() {
   const { theme } = useTheme();
@@ -36,100 +41,13 @@ export default function EditCourse() {
   const [learningFormat, setLearningFormat] = useState('');
   const [categories, setCategories] = useState([]);
   const [categoryNames, setCategoryNames] = useState({}); 
-  const [lang, setLang] = useState('Русский');
+  const [lang, setLang] = useState('ru');
   const [level, setLevel] = useState('');
   const [acquiredAssets, setAcquiredAssets] = useState(''); 
   const [langDropdownOpen, setLangDropdownOpen] = useState(false);
   const [courseStatus, setCourseStatus] = useState('draft'); 
   
-  const languageOptions = [
-    { value: 'be', label: 'беларуская' },
-    { value: 'de', label: 'Deutsch' },
-    { value: 'en', label: 'English' },
-    { value: 'es', label: 'español' },
-    { value: 'pt', label: 'Português' },
-    { value: 'ru', label: 'Русский' },
-    { value: 'uk', label: 'Українська' },
-    { value: 'zh', label: '简体中文' },
-    { value: 'af', label: 'Afrikaans' },
-    { value: 'ar', label: 'العربيّة' },
-    { value: 'ast', label: 'asturianu' },
-    { value: 'az', label: 'Azərbaycanca' },
-    { value: 'bg', label: 'български' },
-    { value: 'bn', label: 'বাংলা' },
-    { value: 'br', label: 'brezhoneg' },
-    { value: 'bs', label: 'bosanski' },
-    { value: 'ca', label: 'català' },
-    { value: 'cs', label: 'česky' },
-    { value: 'cy', label: 'Cymraeg' },
-    { value: 'da', label: 'dansk' },
-    { value: 'el', label: 'Ελληνικά' },
-    { value: 'en-AU', label: 'Australian English' },
-    { value: 'en-GB', label: 'British English' },
-    { value: 'eo', label: 'Esperanto' },
-    { value: 'es-AR', label: 'español de Argentina' },
-    { value: 'es-CO', label: 'español de Colombia' },
-    { value: 'es-MX', label: 'español de Mexico' },
-    { value: 'es-NI', label: 'español de Nicaragua' },
-    { value: 'es-VE', label: 'español de Venezuela' },
-    { value: 'et', label: 'eesti' },
-    { value: 'eu', label: 'Basque' },
-    { value: 'fa', label: 'فارسی' },
-    { value: 'fi', label: 'suomi' },
-    { value: 'fr', label: 'français' },
-    { value: 'fy', label: 'frysk' },
-    { value: 'ga', label: 'Gaeilge' },
-    { value: 'gd', label: 'Gàidhlig' },
-    { value: 'gl', label: 'galego' },
-    { value: 'he', label: 'עברית' },
-    { value: 'hi', label: 'Hindi' },
-    { value: 'hr', label: 'Hrvatski' },
-    { value: 'hu', label: 'Magyar' },
-    { value: 'ia', label: 'Interlingua' },
-    { value: 'id', label: 'Bahasa Indonesia' },
-    { value: 'io', label: 'ido' },
-    { value: 'is', label: 'Íslenska' },
-    { value: 'it', label: 'italiano' },
-    { value: 'ja', label: '日本語' },
-    { value: 'ka', label: 'ქართული' },
-    { value: 'kk', label: 'Қазақ' },
-    { value: 'km', label: 'Khmer' },
-    { value: 'kn', label: 'Kannada' },
-    { value: 'ko', label: '한국어' },
-    { value: 'lb', label: 'Lëtzebuergesch' },
-    { value: 'lt', label: 'Lietuviškai' },
-    { value: 'lv', label: 'latviešu' },
-    { value: 'mk', label: 'Македонски' },
-    { value: 'ml', label: 'Malayalam' },
-    { value: 'mn', label: 'Mongolian' },
-    { value: 'mr', label: 'मराठी' },
-    { value: 'my', label: 'မြန်မာဘာသာ' },
-    { value: 'nb', label: 'norsk (bokmål)' },
-    { value: 'ne', label: 'नेपाली' },
-    { value: 'nl', label: 'Nederlands' },
-    { value: 'nn', label: 'norsk (nynorsk)' },
-    { value: 'os', label: 'Ирон' },
-    { value: 'pa', label: 'Punjabi' },
-    { value: 'pl', label: 'polski' },
-    { value: 'pt-BR', label: 'Português Brasileiro' },
-    { value: 'ro', label: 'Română' },
-    { value: 'sk', label: 'Slovensky' },
-    { value: 'sl', label: 'Slovenščina' },
-    { value: 'sq', label: 'shqip' },
-    { value: 'sr', label: 'српски' },
-    { value: 'sr-Latn', label: 'srpski (latinica)' },
-    { value: 'sv', label: 'svenska' },
-    { value: 'sw', label: 'Kiswahili' },
-    { value: 'ta', label: 'தமிழ்' },
-    { value: 'te', label: 'తెలుగు' },
-    { value: 'th', label: 'ภาษาไทย' },
-    { value: 'tr', label: 'Türkçe' },
-    { value: 'tt', label: 'Татарча' },
-    { value: 'udm', label: 'Удмурт' },
-    { value: 'ur', label: 'اردو' },
-    { value: 'vi', label: 'Tiếng Việt' },
-    { value: 'zh-TW', label: '繁體中文' },
-  ];
+
 
   const [logoHover, setLogoHover] = useState(false);
   const [videoHover, setVideoHover] = useState(false);
@@ -318,16 +236,9 @@ const restoreSelection = (editorType) => {
 
   const uploadFile = async (file, type)=>{
     if(!file) return;
-    // Проверяем что файл действительно существует
+    
     if (!file.name || file.size === 0) {
       alert('Выбранный файл недействителен');
-      return;
-    }
-    
-    // Проверяем размер файла на фронтенде
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert(`Файл слишком большой. Максимальный размер: 10MB`);
       return;
     }
     
@@ -343,15 +254,18 @@ const restoreSelection = (editorType) => {
         }
       });
       
+      console.log('📤 Upload response:', res.data);
+      
       if(type==='logo') {
+        console.log('🖼️ Setting logoUrl to:', res.data.url);
         setLogoUrl(res.data.url);
-        setDirty(true); // Помечаем что есть несохраненные изменения
+        setDirty(true);
       } else if(type==='intro') {
+        console.log('🎬 Setting introUrl to:', res.data.url);
         setIntroUrl(res.data.url);
-        setDirty(true); // Помечаем что есть несохраненные изменения
+        setDirty(true);
       }
       
-      // Показываем сообщение об успешной загрузке
       const typeNames = { logo: 'Логотип', intro: 'Вступительное видео', image: 'Изображение' };
       alert(`${typeNames[type] || type} успешно загружен!`);
     }catch(err){
@@ -482,7 +396,7 @@ const restoreSelection = (editorType) => {
       }
       
       setDirty(false);
-      alert('Курс успешно сохранен!');
+      alert(t('courses.save_success'));
     } catch (error) {
       console.error('Failed to save course:', error);
       if (error.response?.status === 401) {
@@ -740,14 +654,6 @@ const isInsideLink = (element) => {
     // Проверяем что файл действительно существует
     if (!file.name || file.size === 0) {
       alert('Выбранный файл недействителен');
-      e.target.value = '';
-      return;
-    }
-    
-    // Проверяем размер файла
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert('Файл слишком большой. Максимальный размер: 10MB');
       e.target.value = '';
       return;
     }
@@ -1135,7 +1041,7 @@ const isInsideLink = (element) => {
         setRequirements(course.requirements || '');
         setLearningFormat(course.learningFormat || '');
         setTargeting(course.targeting || '');
-        setLang(course.language || 'Русский');
+        setLang(course.language || 'ru');
         setLevel(course.level || '');
         setAcquiredAssets(course.acquiredAssets || ''); // Что Вы получаете
         setCourseStatus(course.status || 'draft'); // Set course status
@@ -1150,11 +1056,11 @@ const isInsideLink = (element) => {
         }
         
         // Устанавливаем URL для логотипа и видео если они есть и не являются blob URL'ами
-        if (course.logoUrl && !course.logoUrl.startsWith('blob:')) {
-          setLogoUrl(course.logoUrl);
-        }
+            if (course.logoUrl && !course.logoUrl.startsWith('blob:')) {
+      setLogoUrl(getCourseFileUrl(course.logoUrl));
+    }
         if (course.introUrl && !course.introUrl.startsWith('blob:')) {
-          setIntroUrl(course.introUrl);
+          setIntroUrl(getVideoUrl(course.introUrl));
         }
         
         // CKEditor-поля инициализируются из state ниже через useEffect
@@ -1221,10 +1127,10 @@ const isInsideLink = (element) => {
       );
       
       setCourseStatus(newStatus);
-      alert(`${t('course.status_changed')} ${newStatus === 'published' ? t('course.status.published') : t('course.status.unpublished')}`);
+      alert(`${t('courses.status_changed')} ${newStatus === 'published' ? t('courses.status.published') : t('courses.status.unpublished')}`);
     } catch (error) {
       console.error('Failed to update course status:', error);
-      alert(t('course.status_change_error'));
+              alert(t('courses.status_change_error'));
     }
   };
 
@@ -1557,23 +1463,23 @@ const isInsideLink = (element) => {
       `}</style>
         <NavBar />
       <div style={{ display: 'flex', flex: 1, minHeight: 'calc(100vh - 60px)' }}>
-        <TeachNavMenu variant="editcourse" onSectionChange={setSection} />
+        <TeachNavMenu variant="editcourse" id={id} onSectionChange={setSection} />
         <main className="marco-layout" style={{ flex: 1, background: 'var(--teach-bg)', padding: 32, display: 'flex', alignItems: 'flex-start', color: 'var(--text-color)' }}>
           {/* section content start */}
           {section === 'info' && (
             <div style={showEditInfo ? { width: '100%' } : { maxWidth: 540, width: '100%' }}>
               {!showEditInfo ? (
                 <>
-                  <h1 style={{ marginBottom: 18, color: dark ? '#fff' : '#222', transition: 'color 0.22s' }}>{t('course.about')}</h1>
+                  <h1 style={{ marginBottom: 18, color: dark ? '#fff' : '#222', transition: 'color 0.22s' }}>{t('courses.about')}</h1>
                   <div className="course-info__actions" style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
                     <a href="#" className="button has-icon teach-nav-link anim-btn" data-qa="course-info__edit-btn" style={{ display: 'flex', alignItems: 'center', gap: 8, background: dark ? 'rgba(68,133,237,0.12)' : '#fff', border: `1.5px solid #4485ed`, borderRadius: 6, padding: '10px 22px', fontWeight: 600, color: dark ? '#eaf4fd' : '#4485ed', textDecoration: 'none', fontSize: 16, boxShadow: dark ? 'none' : '0 2px 4px rgba(0,0,0,0.04)', transition:'background 0.18s, color 0.18s' }} onMouseOver={e=>{e.currentTarget.style.background = '#4485ed'; e.currentTarget.style.color='#fff';}} onMouseOut={e=>{e.currentTarget.style.background = dark ? 'rgba(68,133,237,0.12)' : '#fff'; e.currentTarget.style.color = dark ? '#eaf4fd' : '#4485ed';}} onClick={e => {e.preventDefault(); setShowEditInfo(true);}}>
                       <FontAwesomeIcon icon={faPen} />
-                      <span>{t('course.edit_description')}</span>
+                                              <span>{t('courses.edit_description')}</span>
                     </a>
                     {(courseStatus === 'draft' || courseStatus === 'inactive') && (
                       <a href="#" className="button has-icon teach-nav-link anim-btn" style={{ display: 'flex', alignItems: 'center', gap: 8, background: dark ? 'rgba(68,133,237,0.12)' : '#fff', border: `1.5px solid #4485ed`, borderRadius: 6, padding: '10px 22px', fontWeight: 600, color: dark ? '#eaf4fd' : '#4485ed', textDecoration: 'none', fontSize: 16, boxShadow: dark ? 'none' : '0 2px 4px rgba(0,0,0,0.04)', transition:'background 0.18s, color 0.18s', cursor: 'pointer' }} onMouseOver={e=>{e.currentTarget.style.background = '#4485ed'; e.currentTarget.style.color='#fff';}} onMouseOut={e=>{e.currentTarget.style.background = dark ? 'rgba(68,133,237,0.12)' : '#fff'; e.currentTarget.style.color = dark ? '#eaf4fd' : '#4485ed';}} onClick={e => {e.preventDefault(); handleStatusChange('published');}}>
                         <FontAwesomeIcon icon={faGlobe} />
-                        <span>{t('course.publish')}</span>
+                        <span>{t('courses.publish')}</span>
                       </a>
                     )}
                     {(courseStatus === 'published') && (
@@ -1591,17 +1497,17 @@ const isInsideLink = (element) => {
                       style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--teach-tile-bg)', border: '1.5px solid var(--border-color)', borderRadius: 6, padding: '10px 22px', fontWeight: 600, color: 'var(--teach-link-color)', textDecoration: 'none', fontSize: 16, transition:'background 0.18s, color 0.18s', boxShadow: 'none' }}
                     >
                       <FontAwesomeIcon icon={faEye} />
-                      <span>{t('course.open_promo')}</span>
+                      <span>{t('courses.open_promo')}</span>
                     </a>
                   </div>
                   <div style={{ color: 'var(--text-color)', opacity: 0.85, fontSize: 16, marginTop: 12, transition:'color 0.22s' }}>
-                    {t('course.add_info_placeholder')}
+                    {t('courses.add_info_placeholder')}
                   </div>
                 </>
               ) : (
                 <div style={{ background: 'var(--teach-tile-bg)', borderRadius: 12, boxShadow: '0 2px 8px rgba(0,0,0,0.08)', padding: 0 }}>
                   <header className="marco-layout__header" data-marco-full-height-sidebar="" style={{ padding: '24px 24px 0 24px' }}>
-                    <h1 style={{ color: 'var(--text-color)' }}>{t('course.about')}</h1>
+                    <h1 style={{ color: 'var(--text-color)' }}>{t('courses.about')}</h1>
                   </header>
                   <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: 24 }}>
                     <div
@@ -1620,16 +1526,16 @@ const isInsideLink = (element) => {
                       }}
                     >
                       {logoUrl ? (
-                        <img src={logoUrl} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        <img src={getCourseFileUrl(logoUrl)} alt="logo" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
                       ):(
                       <div className="course-info-editor__upload-widget-inner" style={{ color: 'var(--teach-link-color)', transition:'color 0.18s' }}>
-                        <span className="svg-icon img-placeholder_icon course-info-editor__upload-widget-icon" style={{ display: 'inline-block', marginBottom: 8 }}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-                            <use xlinkHref="https://cdn.stepik.net/static/frontend-build/icons.svg#img-placeholder"></use>
-                          </svg>
-                        </span>
-                        <div className="course-info-editor__upload-widget-label" style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-color)' }}>{logoHover ? t('common.upload') : t('course.logo')}</div>
-                        <div className="course-info-editor__upload-widget-text" style={{ color: 'var(--text-color)' }}>{t('course.logo_hint')}</div>
+                        <FontAwesomeIcon 
+                          icon={faImage} 
+                          size="3x" 
+                          style={{ marginBottom: 8, opacity: 0.7 }} 
+                        />
+                        <div className="course-info-editor__upload-widget-label" style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-color)' }}>{logoHover ? t('common.upload') : t('courses.logo')}</div>
+                        <div className="course-info-editor__upload-widget-text" style={{ color: 'var(--text-color)' }}>{t('courses.logo_hint')}</div>
                       </div>) }
                       <input type="file" accept="image/png,image/jpeg" ref={logoInputRef} style={{ display:'none' }} onChange={e=>{ 
                         const f=e.target.files[0]; 
@@ -1650,7 +1556,7 @@ const isInsideLink = (element) => {
                           fontSize: '14px',
                           zIndex: 10
                         }}>
-                          {t('course.loading')}
+                          {t('courses.loading')}
                         </div>
                       )}
                     </div>
@@ -1670,16 +1576,75 @@ const isInsideLink = (element) => {
                       }}
                     >
                       {introUrl ? (
-                        <video src={introUrl} style={{ width:'100%', height:'100%', objectFit:'cover' }} muted controls />
+                        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                          <video 
+                            src={getVideoUrl(introUrl)} 
+                            style={{ width:'100%', height:'100%', objectFit:'cover' }} 
+                            muted 
+                            controls 
+                            onLoadStart={() => console.log('🎬 Video load started:', getVideoUrl(introUrl))}
+                            onLoadedData={() => console.log('✅ Video loaded successfully')}
+                            onError={(e) => {
+                              const videoElement = e.target;
+                              console.error('Video error:', e);
+                              console.error('Video error details:', {
+                                currentSrc: videoElement.currentSrc,
+                                networkState: videoElement.networkState,
+                                readyState: videoElement.readyState,
+                                error: videoElement.error
+                              });
+                              
+                              if (videoElement.error) {
+                                const error = videoElement.error;
+                                console.error('Video error code:', error.code);
+                                console.error('Video error message:', error.message);
+                              }
+                              
+                              e.target.style.display = 'none';
+                              e.target.nextSibling.style.display = 'flex';
+                            }}
+                            onLoad={() => console.log('Video loaded successfully')}
+                          />
+                          <div style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            background: dark ? '#2d2d2d' : '#f8f9fa',
+                            border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+                            borderRadius: 8,
+                            display: 'none',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'column',
+                            color: dark ? '#ffffff' : '#666666'
+                          }}>
+                            <FontAwesomeIcon 
+                              icon={faPlay} 
+                              style={{ 
+                                fontSize: '2rem', 
+                                marginBottom: '10px', 
+                                opacity: 0.5 
+                              }} 
+                            />
+                            <h4 style={{ margin: '0 0 5px 0', fontSize: '14px' }}>
+                              {t('courses.video_unavailable')}
+                            </h4>
+                            <p style={{ fontSize: '12px', margin: '0', textAlign: 'center', opacity: 0.8 }}>
+                              {t('courses.video_load_error')}
+                            </p>
+                          </div>
+                        </div>
                       ):(
                       <div className="course-info-editor__upload-widget-inner" style={{ color: 'var(--teach-link-color)', transition:'color 0.18s' }}>
-                        <span className="svg-icon play-button_icon course-info-editor__upload-widget-icon" style={{ display: 'inline-block', marginBottom: 8 }}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64">
-                            <use xlinkHref="https://cdn.stepik.net/static/frontend-build/icons.svg#play-button"></use>
-                          </svg>
-                        </span>
-                        <div className="course-info-editor__upload-widget-label" style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-color)' }}>{videoHover ? t('course.add_intro_video') : t('course.intro_video')}</div>
-                        <div className="course-info-editor__upload-widget-text" style={{ color: 'var(--text-color)' }}>{t('course.video_limit_hint')}</div>
+                        <FontAwesomeIcon 
+                          icon={faPlay} 
+                          size="3x" 
+                          style={{ marginBottom: 8, opacity: 0.7 }} 
+                        />
+                        <div className="course-info-editor__upload-widget-label" style={{ fontSize: 16, fontWeight: 500, color: 'var(--text-color)' }}>{videoHover ? t('courses.add_intro_video') : t('courses.intro_video')}</div>
+                        <div className="course-info-editor__upload-widget-text" style={{ color: 'var(--text-color)' }}>{t('courses.video_limit_hint')}</div>
                       </div>) }
                       <input type="file" accept="video/*" ref={introInputRef} style={{ display:'none' }} onChange={e=>{ 
                         const f=e.target.files[0]; 
@@ -1700,7 +1665,7 @@ const isInsideLink = (element) => {
                           fontSize: '14px',
                           zIndex: 10
                         }}>
-                          {t('course.loading')}
+                          {t('courses.loading')}
                         </div>
                       )}
                     </div>
@@ -1709,19 +1674,21 @@ const isInsideLink = (element) => {
                     <div className="course-info-editor__section-heading" data-qa="course-title" style={{ marginBottom: 6 }}>
                       {/* Название курса редактируется в левом боковом меню TeachNavMenu */}
                     </div>
-                    <label htmlFor="tags" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.categories')}</label>
+                    <label htmlFor="tags" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.categories')}</label>
                     <button className="button tags-modal-selector-btn is-outlined has-icon tags-course-tags__btn" type="button" onClick={() => setCategoryModalOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '8px 0', border: `1.5px solid ${dark ? '#4485ed' : '#4485ed'}`, borderRadius: 6, background: dark ? '#23272a' : '#fff', color: dark ? '#eaf4fd' : '#4485ed', fontWeight: 500, fontSize: 15 }}>
-                      <span className="svg-icon plus-2_icon svg-icon_inline" style={{ display: 'inline-flex', alignItems: 'center' }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><use xlinkHref="https://cdn.stepik.net/static/frontend-build/icons.svg?1750845176#plus-2"></use></svg>
-                      </span>
-                      <span>{t('course.category_hint')}</span>
+                      <FontAwesomeIcon 
+                        icon={faPlus} 
+                        size="sm" 
+                        style={{ display: 'inline-flex', alignItems: 'center' }} 
+                      />
+                                              <span>{t('courses.category_hint')}</span>
                     </button>
                     
                     {/* Display selected categories */}
                     {categories.length > 0 && (
                       <div style={{ marginBottom: 16 }}>
                         <div style={{ fontSize: 14, color: 'var(--text-color)', opacity: 0.8, marginBottom: 8 }}>
-                          {t('course.selected_categories')}:
+                          {t('courses.selected_categories')}:
                         </div>
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                           {categories.map((categoryId, index) => (
@@ -1767,17 +1734,17 @@ const isInsideLink = (element) => {
                     )}
                     
                     <div className="tags-course-tags__note" style={{ fontSize: 13, color: 'var(--text-color)', opacity: 0.75, marginBottom: 12 }}>
-                      {t('course.category_hint_desc')}
+                      {t('courses.category_hint_desc')}
                     </div>
-                    <label htmlFor="short-descr" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.short_description')}</label>
-                    <textarea id="short-descr" rows={4} className="st-input w-full block" placeholder={t('course.short_description_placeholder')} maxLength={512} style={{ height: 103, marginBottom: 4, width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={shortDescr} onChange={e => {setShortDescr(e.target.value); setDirty(true);}} />
+                                          <label htmlFor="short-descr" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.short_description')}</label>
+                                          <textarea id="short-descr" rows={4} className="st-input w-full block" placeholder={t('courses.short_description_placeholder')} maxLength={512} style={{ height: 103, marginBottom: 4, width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={shortDescr} onChange={e => {setShortDescr(e.target.value); setDirty(true);}} />
                     <div className="course-info-editor__input-note" style={{ fontSize: 13, color: 'var(--text-color)', opacity: 0.75, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span>{t('course.add_info_note')}</span>
+                                              <span>{t('courses.add_info_note')}</span>
                       <span>{shortDescr.length}/512</span>
                     </div>
                     <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap:'nowrap' }}>
                       <div style={{ flex: 1, minWidth: 120 }}>
-                        <label htmlFor="lang" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('course.language')}</label>
+                        <label htmlFor="lang" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('courses.language')}</label>
                         <div style={{ position: 'relative' }}>
                           <div
                             id="lang-select"
@@ -1787,7 +1754,9 @@ const isInsideLink = (element) => {
                             tabIndex={0}
                           >
                             <span className="select-box-option__slot-item">
-                              <span className="select-box-option__content">{lang}</span>
+                              <span className="select-box-option__content">
+                                {languageOptions.find(opt => opt.value === lang)?.label || lang}
+                              </span>
                             </span>
                             <span style={{ marginLeft: 'auto', fontSize: 12 }}>▼</span>
                           </div>
@@ -1806,9 +1775,9 @@ const isInsideLink = (element) => {
                               boxShadow: '0 2px 16px rgba(0,0,0,0.12)',
                               transition: 'background 0.22s, color 0.22s, box-shadow 0.22s',
                             }}>
-                              <li hidden className="select-box-item select-box__option menu-item"><button disabled type="button"><span className="select-box-option__content" data-appearance="placeholder">{t('course.language')}</span></button></li>
+                              <li hidden className="select-box-item select-box__option menu-item"><button disabled type="button"><span className="select-box-option__content" data-appearance="placeholder">{t('courses.language')}</span></button></li>
                               {languageOptions.map(opt => (
-                                <li key={opt.value} className={`select-box-item select-box__option menu-item${lang === opt.label ? ' selected' : ''}`} data-selected={lang === opt.label ? true : undefined}>
+                                <li key={opt.value} className={`select-box-item select-box__option menu-item${lang === opt.value ? ' selected' : ''}`} data-selected={lang === opt.value ? true : undefined}>
                                   <button type="button" style={{
                                     width: '100%',
                                     textAlign: 'left',
@@ -1823,7 +1792,7 @@ const isInsideLink = (element) => {
                                   }}
                                   onMouseOver={e => e.currentTarget.style.background = 'var(--teach-hover-bg)'}
                                   onMouseOut={e => e.currentTarget.style.background = 'none'}
-                                  onClick={() => { setLang(opt.label); setLangDropdownOpen(false); }}
+                                  onClick={() => { setLang(opt.value); setLangDropdownOpen(false); }}
                                   >
                                     <span className="select-box-option__content">{opt.label}</span>
                                   </button>
@@ -1834,35 +1803,35 @@ const isInsideLink = (element) => {
                         </div>
                       </div>
                       <div style={{ flex: 1, minWidth: 120 }}>
-                        <label htmlFor="level" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('course.level')}</label>
+                        <label htmlFor="level" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('courses.level')}</label>
                         <select id="level" className="st-input w-full block" style={{ width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={level} onChange={e => {setLevel(e.target.value); setDirty(true);}}>
-                          <option value="" disabled>{t('course.choose_level')}</option>
-                          <option value="Beginner">{t('course.beginner_level')}</option>
-                          <option value="Intermediate">{t('course.intermediate_level')}</option>
-                          <option value="Advanced">{t('course.advanced_level')}</option>
+                          <option value="" disabled>{t('courses.choose_level')}</option>
+                          <option value="Beginner">{t('courses.beginner_level')}</option>
+                          <option value="Intermediate">{t('courses.intermediate_level')}</option>
+                          <option value="Advanced">{t('courses.advanced_level')}</option>
                         </select>
                       </div>
                       <div style={{ flex: 1, minWidth: 120 }}>
-                        <label htmlFor="workload" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('course.recommended_load')}</label>
-                        <input id="workload" className="st-input w-full block" placeholder={t('course.workload_placeholder')} maxLength={64} type="text" style={{ width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={workload} onChange={e => {setWorkload(e.target.value); setDirty(true);}} />
+                        <label htmlFor="workload" style={{ fontSize: 16, fontWeight: 600, marginBottom: 4, display: 'block', color: 'var(--text-color)' }}>{t('courses.recommended_load')}</label>
+                                                  <input id="workload" className="st-input w-full block" placeholder={t('courses.workload_placeholder')} maxLength={64} type="text" style={{ width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={workload} onChange={e => {setWorkload(e.target.value); setDirty(true);}} />
                       </div>
                     </div>  
-                    <label htmlFor="learning-outcomes" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.what_u_will_learn')}</label>
+                    <label htmlFor="learning-outcomes" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.what_u_will_learn')}</label>
                     <textarea
                       id="learning-outcomes"
                       rows={5}
                       className="st-input w-full block"
-                      placeholder={t('course.learning_outcomes_placeholder')}
+                      placeholder={t('courses.learning_outcomes_placeholder')}
                       maxLength={2000}
                       style={{ height: 123, marginBottom: 4, width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: '1.5px solid var(--border-color)', background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }}
                       value={learningOutcomes}
                       onChange={e => {setLearningOutcomes(e.target.value); setDirty(true);}}
                     />
                     <div className="course-info-editor__input-note" style={{ fontSize: 13, color: dark ? '#b6d4fe' : '#000', marginBottom: 12 }}>
-                      {t('course.add_info_note_point')}
+                      {t('courses.add_info_note_point')}
                       <span style={{ float: 'right' }}>{learningOutcomes.length}/2000</span>
                     </div>
-                    <label htmlFor="description" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.about')}</label>
+                    <label htmlFor="description" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.about')}</label>
                     {/* Static toolbar + textarea for target audience */}
                     <div className="custom-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px', border: `1.5px solid #4485ed`, borderBottom: 'none', borderRadius: '6px 6px 0 0', background: 'var(--teach-bg)' }}>
   {/* Undo/Redo */}
@@ -1923,7 +1892,7 @@ const isInsideLink = (element) => {
                       className="rich-text-editor__content cke_editable cke_editable_themed cke_contents_ltr cke_show_borders"
                       {...editorCommonProps(descriptionRef, setDescription)}
                       spellCheck={true}
-                      data-placeholder={t('course.description_placeholder')}
+                      data-placeholder={t('courses.description_placeholder')}
                       data-empty={!description || description.trim() === '' ? 'true' : 'false'}
                       dangerouslySetInnerHTML={{ __html: description || '' }}
                       style={{ 
@@ -1942,7 +1911,7 @@ const isInsideLink = (element) => {
                       }}
                     >
                     </div>
-                    <label htmlFor="requirements" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.requirements')}</label>
+                    <label htmlFor="requirements" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.requirements')}</label>
                     <div className="custom-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px', border: `1.5px solid #4485ed`, borderBottom: 'none', borderRadius: '6px 6px 0 0', background: 'var(--teach-bg)' }}>
   {/* Undo/Redo */}
   <span className="cke_button_icon cke_button__undo_icon" 
@@ -2002,7 +1971,7 @@ const isInsideLink = (element) => {
                       className="rich-text-editor__content cke_editable cke_editable_themed cke_contents_ltr cke_show_borders"
                       {...editorCommonProps(requirementsRef, setRequirements)}
                       spellCheck={true}
-                      data-placeholder={t('course.requirements_placeholder')}
+                      data-placeholder={t('courses.requirements_placeholder')}
                       data-empty={!requirements || requirements.trim() === '' ? 'true' : 'false'}
                       dangerouslySetInnerHTML={{ __html: requirements || '' }}
                       style={{ 
@@ -2021,7 +1990,7 @@ const isInsideLink = (element) => {
                       }}
                     >
                     </div>
-                    <label htmlFor="learning-format" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.learning_format')}</label>
+                    <label htmlFor="learning-format" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.learning_format')}</label>
                     <div className="custom-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px', border: `1.5px solid #4485ed`, borderBottom: 'none', borderRadius: '6px 6px 0 0', background: 'var(--teach-bg)' }}>
   {/* Undo/Redo */}
   <span className="cke_button_icon cke_button__undo_icon" 
@@ -2081,7 +2050,7 @@ const isInsideLink = (element) => {
                       className="rich-text-editor__content cke_editable cke_editable_themed cke_contents_ltr cke_show_borders"
                       {...editorCommonProps(learningFormatRef, setLearningFormat)}
                       spellCheck={true}
-                      data-placeholder={t('course.learning_format_placeholder')}
+                      data-placeholder={t('courses.learning_format_placeholder')}
                       data-empty={!learningFormat || learningFormat.trim() === '' ? 'true' : 'false'}
                       dangerouslySetInnerHTML={{ __html: learningFormat || '' }}
                       style={{ 
@@ -2100,7 +2069,7 @@ const isInsideLink = (element) => {
                       }}
                     >
                     </div>
-                    <label htmlFor="targeting" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.targeting')}</label>
+                    <label htmlFor="targeting" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.targeting')}</label>
                     <div className="custom-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 8px', border: `1.5px solid #4485ed`, borderBottom: 'none', borderRadius: '6px 6px 0 0', background: 'var(--teach-bg)' }}>
   {/* Undo/Redo */}
   <span className="cke_button_icon cke_button__undo_icon" 
@@ -2160,7 +2129,7 @@ const isInsideLink = (element) => {
                       className="rich-text-editor__content cke_editable cke_editable_themed cke_contents_ltr cke_show_borders"
                       {...editorCommonProps(targetingRef, setTargeting)}
                       spellCheck={true}
-                      data-placeholder={t('course.targeting_placeholder')}
+                      data-placeholder={t('courses.targeting_placeholder')}
                       data-empty={!targeting || targeting.trim() === '' ? 'true' : 'false'}
                       dangerouslySetInnerHTML={{ __html: targeting || '' }}
                       style={{ 
@@ -2180,19 +2149,14 @@ const isInsideLink = (element) => {
                     >
                     </div>
                     <div className="course-info-editor__section-heading" data-qa="acquired-assets" style={{ marginBottom: 6 }}>
-                      <label htmlFor="acquired-assets" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('course.acquired_assets')}</label>
-                      <span className="svg-icon question-filled_icon svg-icon_inline svg-icon_inline-baseline ui-help" style={{ marginLeft: 4 }}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18">
-                          <use xlinkHref="https://cdn.stepik.net/static/frontend-build/icons.svg?1750845176#question-filled"></use>
-                        </svg>
-                      </span>
+                      <label htmlFor="acquired-assets" style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-color)' }}>{t('courses.acquired_assets')}</label>
                     </div>
-                    <textarea id="acquired-assets" rows={8} className="st-input w-full block" placeholder={t('course.acquired_assets_placeholder')} maxLength={2000} style={{ height: 183, marginBottom: 18, width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: `1.5px solid var(--border-color)`, background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={acquiredAssets} onChange={e => {setAcquiredAssets(e.target.value); setDirty(true);}} />
+                                          <textarea id="acquired-assets" rows={8} className="st-input w-full block" placeholder={t('courses.acquired_assets_placeholder')} maxLength={2000} style={{ height: 183, marginBottom: 18, width: '100%', fontSize: 16, padding: 8, borderRadius: 6, border: `1.5px solid var(--border-color)`, background: 'var(--teach-bg)', color: 'var(--teach-fg)', transition: 'background 0.18s, color 0.18s' }} value={acquiredAssets} onChange={e => {setAcquiredAssets(e.target.value); setDirty(true);}} />
 
                     {/* Action buttons */}
                     <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-                      <button type="button" className="button anim-btn" onClick={handleSave} style={{ background: dark ? '#23272a' : '#54ad54', color: dark ? '#eaf4fd' : '#fff', border: 'none', borderRadius: 6, padding: '10px 24px', fontSize: 16, fontWeight: 600 }}>{t('course.save')}</button>
-                      <button type="button" onClick={()=>setShowEditInfo(false)} className="button is-outlined anim-btn" style={{ background: dark ? '#2d3038' : '#fff', color: dark ? '#eaf4fd' : '#4485ed', border: `1.5px solid ${dark ? '#4485ed' : '#4485ed'}`, borderRadius: 6, padding: '10px 24px', fontSize: 16, fontWeight: 600 }}>{t('course.return_to_preview')}</button>
+                      <button type="button" className="button anim-btn" onClick={handleSave} style={{ background: dark ? '#23272a' : '#54ad54', color: dark ? '#eaf4fd' : '#fff', border: 'none', borderRadius: 6, padding: '10px 24px', fontSize: 16, fontWeight: 600 }}>{t('courses.save')}</button>
+                      <button type="button" onClick={()=>setShowEditInfo(false)} className="button is-outlined anim-btn" style={{ background: dark ? '#2d3038' : '#fff', color: dark ? '#eaf4fd' : '#4485ed', border: `1.5px solid ${dark ? '#4485ed' : '#4485ed'}`, borderRadius: 6, padding: '10px 24px', fontSize: 16, fontWeight: 600 }}>{t('courses.return_to_preview')}</button>
                     </div>
                   </div>
                 </div>
@@ -2201,7 +2165,7 @@ const isInsideLink = (element) => {
           )}
           {section === 'syllabus' && (
             <div style={{ maxWidth: 540, width: '100%' }}>
-              <h1 style={{ marginBottom: 18 }}>{t('course.syllabus')}</h1>
+              <h1 style={{ marginBottom: 18 }}>{t('courses.syllabus')}</h1>
               <div className="course-info__actions" style={{ display: 'flex', gap: 16, marginBottom: 18 }}>
                 <button
                   onClick={() => window.open(`/teach/lessons/${id}/content`, '_blank')}
@@ -2223,12 +2187,12 @@ const isInsideLink = (element) => {
                   onMouseOut={(e) => e.target.style.background = '#4485ed'}
                 >
                   <FontAwesomeIcon icon={faEdit} />
-                  <span>{t('course.edit_syllabus')}</span>
+                  <span>{t('courses.edit_syllabus')}</span>
                 </button>
               </div>
               <div style={{ color: 'var(--text-color)', opacity: 0.85, fontSize: 16, marginTop: 12, transition:'color 0.22s' }}>
-                {t('course.syllabus_empty')}<br />
-                {t('course.syllabus_add_lesson')}
+                {t('courses.syllabus_empty')}<br />
+                {t('courses.syllabus_add_lesson')}
               </div>
             </div>
           )}
@@ -2236,22 +2200,24 @@ const isInsideLink = (element) => {
           {section === 'news' && (
             <div style={{ maxWidth: 720, width: '100%' }}>
               <header className="marco-layout__header" style={{ marginBottom: 24 }}>
-                                    <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: dark ? '#fff' : '#222' }}>{t('course.news')}</h1>
+                                    <h1 style={{ margin: 0, fontSize: 28, fontWeight: 700, color: dark ? '#fff' : '#222' }}>{t('courses.news')}</h1>
               </header>
               <p style={{ fontSize: 16, color: dark ? '#eaf4fd' : '#444', marginBottom: 18 }}>
-              {t('course.news_info')}
+              {t('courses.news_info')}
               </p>
               <p style={{ fontSize: 16, color: dark ? '#eaf4fd' : '#444', marginBottom: 18 }}>
-              {t('course.news_event')}
+              {t('courses.news_event')}
               </p>
               <p style={{ fontSize: 16, color: dark ? '#eaf4fd' : '#444', marginBottom: 32 }}>
-              {t('course.news_docs')}
+              {t('courses.news_docs')}
               </p>
               <a href="#" className="button has-icon news__add-btn" style={{ display:'inline-flex', alignItems:'center', gap:8, background:'#54ad54', color:'#fff', border:'none', borderRadius:6, padding:'10px 22px', fontWeight:600, fontSize:16 }}>
-                <span className="svg-icon plus_icon svg-icon_inline" style={{ display:'inline-flex', alignItems:'center' }}>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><use href="/static/frontend-build/icons.svg#plus" /></svg>
-                </span>
-                <span>{t('course.add_news')}</span>
+                <FontAwesomeIcon 
+                  icon={faPlus} 
+                  size="sm" 
+                  style={{ display:'inline-flex', alignItems:'center' }} 
+                />
+                <span>{t('courses.add_news')}</span>
               </a>
             </div>
           )}
@@ -2260,10 +2226,12 @@ const isInsideLink = (element) => {
               <header className="marco-layout__header course-comments__header" style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
                 <h1 style={{ margin:0, fontSize:28, fontWeight:700, color: dark ? '#fff' : '#222' }}>{t('comments.comments')}</h1>
                 <a href="#" className="btn-link has-icon course-comments__header-link" style={{ display:'flex', alignItems:'center', gap:6, color: dark ? '#8ab4ff' : '#4485ed', textDecoration:'none', fontWeight:500, fontSize:16 }}>
-                  <span className="svg-icon blacklist_icon svg-icon_inline" style={{ display:'inline-flex', alignItems:'center' }}>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><use href="/static/frontend-build/icons.svg#blacklist" /></svg>
-                  </span>
-                  <span>{t('course.blacklist')}</span>
+                  <FontAwesomeIcon 
+                    icon={faBan} 
+                    size="sm" 
+                    style={{ display:'inline-flex', alignItems:'center' }} 
+                  />
+                  <span>{t('courses.blacklist')}</span>
                 </a>
               </header>
               <ul className="tab tab--border" style={{ listStyle:'none', padding:0, margin:'0 0 24px 0', display:'flex', gap:16, borderBottom:`1.5px solid ${dark ? '#4485ed' : '#4485ed'}` }}>
@@ -2274,14 +2242,14 @@ const isInsideLink = (element) => {
                 </li>
               </ul>
               <div className="discussions__empty-placeholder" style={{ textAlign:'center', color: dark ? '#b6d4fe' : '#666', fontSize:16, padding:40, background: dark ? '#2d3038' : '#f8faff', border:`1.5px solid ${dark ? '#4485ed' : '#4485ed'}`, borderRadius:8 }}>
-                {t('course.no_discussions')}
+                {t('courses.no_discussions')}
               </div>
             </div>
           )}
           {section === 'reviews' && (
             <div style={{ maxWidth: 720, width: '100%' }}>
               <header className="marco-layout__header" style={{ marginBottom:24 }}>
-                <h1 style={{ margin:0, fontSize:28, fontWeight:700, color: dark ? '#fff' : '#222' }}>{t('course.reviews')}</h1>
+                <h1 style={{ margin:0, fontSize:28, fontWeight:700, color: dark ? '#fff' : '#222' }}>{t('courses.reviews')}</h1>
               </header>
               {/* Rating & distribution */}
               <div style={{ display:'flex', alignItems:'flex-start', gap:32, marginBottom:24 }}>
@@ -2302,11 +2270,11 @@ const isInsideLink = (element) => {
                       <div style={{ flex:1, height:4, background:'#e6e6e6', borderRadius:2 }}></div>
                     </div>
                   ))}
-                                      <div style={{ fontSize:14, color:'#666', marginTop:8 }}>{t('course.of_reviews',{count:0})}</div>
+                                      <div style={{ fontSize:14, color:'#666', marginTop:8 }}>{t('courses.of_reviews',{count:0})}</div>
                 </div>
               </div>
               <div className="user-reviews__reviews-count" style={{ fontSize:18, fontWeight:700, marginBottom:12 }}>
-                                    {t('course.review_count',{count:0})}
+                                    {t('courses.review_count',{count:0})}
               </div>
 
               {/* Divider */}
@@ -2318,12 +2286,12 @@ const isInsideLink = (element) => {
                   <span id="ember870" className="svg-icon sort_icon svg-icon_inline svg-icon_inline-baseline ember-view user-reviews__reviews-filter-ico" style={{ display:'inline-flex', alignItems:'center' }}>
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18"><use href="/static/frontend-build/icons.svg#sort" /></svg>
                   </span>
-                  {t('course.new')}
+                  {t('courses.new')}
                 </span>
               </button>
               <div className="user-reviews__reviews" style={{ textAlign:'center', color:'#666', fontSize:16, padding:40, background:'#f8faff', border:`1.5px solid ${dark ? '#4485ed' : '#4485ed'}`, borderRadius:8 }}>
                 <p className="user-reviews__empty-note" style={{ margin:0 }}>
-                  {t('course.no_reviews')}
+                  {t('courses.no_reviews')}
                 </p>
           </div>
         </div>
@@ -2692,7 +2660,7 @@ const isInsideLink = (element) => {
                     cursor: 'pointer'
                   }}
                 >
-                  Применить
+                  {t('editor.apply')}
                 </button>
               </div>
             </div>
@@ -2700,7 +2668,7 @@ const isInsideLink = (element) => {
         </div>
       )}
       
-      <Prompt when={dirty} message={t('course.message')}/>
+              <Prompt when={dirty} message={t('courses.message')}/>
       </div>
     );
 }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useHistory } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUser, faBook, faGraduationCap, faCheckCircle, faPlay, faComment, faStar, faThumbsUp, faThumbsDown } from '@fortawesome/free-solid-svg-icons';
+import { faUser, faBook, faGraduationCap, faCheckCircle, faPlay, faComment, faStar, faThumbsUp, faThumbsDown, faClock } from '@fortawesome/free-solid-svg-icons';
 import axios from '../utils/axios';
 import NavBar from '../components/NavBar';
 import Footer from '../components/Footer';
@@ -10,10 +10,13 @@ import '../admin/admin.css';
 import { useTranslation } from 'react-i18next'; // Import useTranslation
 import CourseComments from '../components/CourseComments';
 import CourseRating from '../components/CourseRating';
+import { getCourseFileUrl, getVideoUrl } from '../utils/minioUtils';
+import { toast } from 'react-toastify';
 
 const CoursePromo = () => {
     const { id } = useParams();
     const location = useLocation();
+    const history = useHistory();
     const [course, setCourse] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -25,6 +28,8 @@ const CoursePromo = () => {
     const [likePending, setLikePending] = useState(false);
     const [dislikePending, setDislikePending] = useState(false);
     const [courseReactions, setCourseReactions] = useState({ likes: 0, dislikes: 0 });
+    const [videoError, setVideoError] = useState(false);
+    const [isEnrolling, setIsEnrolling] = useState(false);
     const { theme } = useTheme();
     const dark = theme === 'dark';
     const { t } = useTranslation(); // Use the useTranslation hook
@@ -243,9 +248,25 @@ const CoursePromo = () => {
 
     useEffect(() => {
         const fetchCourse = async () => {
+            setVideoError(false); // Сбрасываем ошибку видео при смене курса
             try {
                 const res = await axios.get(`/course?id=${id}`);
+                console.log('Course data loaded:', res.data);
+                console.log('Course categories:', res.data?.categories);
+                console.log('Course courseCategories:', res.data?.courseCategories);
+                
+                // Дополнительная отладка для категорий
+                if (res.data?.categories) {
+                    console.log('Categories details:', res.data.categories.map(cat => ({
+                        id: cat.id,
+                        name: cat.name,
+                        nameRu: cat.nameRu,
+                        nameEn: cat.nameEn
+                    })));
+                }
+                
                 setCourse(res.data);
+                
                 if (res.data && typeof res.data.averageRating === 'number') {
                     setAverageRating(res.data.averageRating);
                 } else {
@@ -454,7 +475,7 @@ const CoursePromo = () => {
         );
     }
 
-    const logoUrl = course.logoUrl || null;
+    const logoUrl = course.logoUrl ? getCourseFileUrl(course.logoUrl) : null;
     const title = course.name || course.title;
     const shortDescr = course.shortDescription || course.description || '';
     
@@ -514,6 +535,63 @@ const CoursePromo = () => {
         console.log('First lecture video:', course.lectures[0].videoLink);
     }
 
+    // Функция для зачисления на курс и перехода к нему
+    const handleEnrollAndStart = async () => {
+        try {
+            setIsEnrolling(true);
+            
+            const token = localStorage.getItem('jwtToken');
+            if (!token) {
+                toast.error(t('course_catalog.please_login_enroll'));
+                history.push('/login');
+                return;
+            }
+
+            const decoded = JSON.parse(atob(token.split('.')[1]));
+            if (!decoded || !decoded.id) {
+                toast.error(t('course_catalog.user_not_authenticated'));
+                history.push('/login');
+                return;
+            }
+
+            // Зачисляем на курс
+            const response = await axios.post('/enrollment', {
+                courseId: id
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            // Показываем сообщение об успешном зачислении
+            if (response.data.message) {
+                toast.success(response.data.message);
+            } else {
+                toast.success(t('course_catalog.successfully_enrolled'));
+            }
+            
+            // Переходим к курсу
+            history.push(`/course/${id}`);
+            
+        } catch (error) {
+            console.error('Error enrolling in course:', error);
+            if (error.response?.status === 409) {
+                // Пользователь уже зачислен, просто переходим к курсу
+                toast.info(t('course_catalog.already_enrolled'));
+                history.push(`/course/${id}`);
+            } else if (error.response?.status === 401) {
+                toast.error(t('course_catalog.please_login_enroll'));
+                history.push('/login');
+            } else if (error.response?.status === 403) {
+                toast.error(error.response.data.error || 'Course is not available for enrollment');
+            } else if (error.response?.status === 404) {
+                toast.error(error.response.data.error || 'Course not found');
+            } else {
+                toast.error('Failed to enroll in course');
+            }
+        } finally {
+            setIsEnrolling(false);
+        }
+    };
+
     return (
         <div style={{ minHeight: '100vh', background: 'var(--teach-bg)', display: 'flex', flexDirection: 'column' }}>
             <style>{promoHtmlStyles}</style>
@@ -521,69 +599,266 @@ const CoursePromo = () => {
             <header style={{ background: dark ? 'var(--teach-nav-bg)' : '#4485ed', color: '#fff', padding: '48px 0', borderBottom: dark ? '1px solid var(--border-color)' : 'none' }}>
                 <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', gap: 32, alignItems: 'flex-start', flexWrap: 'wrap', padding: '0 24px' }}>
                     {logoUrl && (
-                        <img src={logoUrl} style={{ width: 160, height: 160, borderRadius: 16, objectFit: 'cover', border: dark ? '2px solid var(--border-color)' : 'none' }} alt={title} />
+                        <div style={{
+                            position: 'relative',
+                            width: 180,
+                            height: 180,
+                            borderRadius: 20,
+                            overflow: 'hidden',
+                            boxShadow: dark 
+                                ? '0 8px 32px rgba(0,0,0,0.4), 0 4px 16px rgba(68, 133, 237, 0.2)' 
+                                : '0 8px 32px rgba(0,0,0,0.15), 0 4px 16px rgba(68, 133, 237, 0.1)',
+                            border: dark 
+                                ? '2px solid rgba(255,255,255,0.1)' 
+                                : '2px solid rgba(68, 133, 237, 0.1)',
+                            background: dark 
+                                ? 'linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))' 
+                                : 'linear-gradient(135deg, rgba(68, 133, 237, 0.1), rgba(111, 66, 193, 0.1))',
+                            backdropFilter: 'blur(10px)',
+                            transform: 'perspective(1000px) rotateY(-5deg)',
+                            transition: 'all 0.3s ease'
+                        }}>
+                            <img 
+                                src={logoUrl} 
+                                style={{ 
+                                    width: '100%', 
+                                    height: '100%', 
+                                    objectFit: 'cover',
+                                    transition: 'transform 0.3s ease'
+                                }} 
+                                alt={title}
+                                onMouseEnter={(e) => {
+                                    e.target.style.transform = 'scale(1.05)';
+                                }}
+                                onMouseLeave={(e) => {
+                                    e.target.style.transform = 'scale(1)';
+                                }}
+                            />
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                background: 'linear-gradient(135deg, rgba(68, 133, 237, 0.1), rgba(111, 66, 193, 0.1))',
+                                opacity: 0,
+                                transition: 'opacity 0.3s ease'
+                            }}></div>
+                        </div>
                     )}
                     <div style={{ flex: 1, minWidth: 300 }}>
-                        <h1 style={{ fontSize: 36, marginBottom: 16, fontWeight: 700, lineHeight: 1.2, color: dark ? '#ffffff' : '#333333' }}>
+                        <h1 style={{ 
+                            fontSize: dark ? '42px' : '48px', 
+                            marginBottom: 20, 
+                            fontWeight: 800, 
+                            lineHeight: 1.1, 
+                            color: dark ? '#ffffff' : '#1a1a1a',
+                            textShadow: dark ? '0 2px 4px rgba(0,0,0,0.3)' : '0 2px 4px rgba(0,0,0,0.1)',
+                            background: dark 
+                                ? 'linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%)' 
+                                : 'linear-gradient(135deg, #1a1a1a 0%, #333333 100%)',
+                            backgroundClip: 'text',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            letterSpacing: '-0.02em',
+                            position: 'relative',
+                            paddingBottom: '8px'
+                        }}>
                             {title}
+                            <div style={{
+                                position: 'absolute',
+                                bottom: 0,
+                                left: 0,
+                                width: '60px',
+                                height: '4px',
+                                background: dark 
+                                    ? 'linear-gradient(90deg, #4485ed, #6f42c1)' 
+                                    : 'linear-gradient(90deg, #4485ed, #6f42c1)',
+                                borderRadius: '2px',
+                                boxShadow: '0 2px 8px rgba(68, 133, 237, 0.3)'
+                            }}></div>
                         </h1>
                         
-                        <p style={{ fontSize: 18, lineHeight: 1.6, marginBottom: 24, opacity: 0.9 }}>
+                        <p style={{ 
+                            fontSize: 20, 
+                            lineHeight: 1.7, 
+                            marginBottom: 28, 
+                            opacity: dark ? 0.95 : 0.9,
+                            color: dark ? '#e0e0e0' : '#333333',
+                            fontWeight: 400,
+                            maxWidth: '90%',
+                            textShadow: dark ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                            padding: '16px 20px',
+                            background: dark 
+                                ? 'rgba(255,255,255,0.05)' 
+                                : 'rgba(68, 133, 237, 0.15)',
+                            borderRadius: '12px',
+                            border: dark 
+                                ? '1px solid rgba(255,255,255,0.1)' 
+                                : '1px solid rgba(68, 133, 237, 0.25)',
+                            backdropFilter: 'blur(10px)',
+                            boxShadow: dark 
+                                ? '0 4px 20px rgba(0,0,0,0.2)' 
+                                : '0 4px 20px rgba(68, 133, 237, 0.2)'
+                        }}>
                             {shortDescr}
                         </p>
-                                                    <div style={{ display: 'flex', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
-                            {course.Category && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                    <FontAwesomeIcon icon={faBook} />
-                                    <span>{course.Category.name}</span>
-                                </div>
-                            )}
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <FontAwesomeIcon icon={faUser} />
-                                <span>ID: {course.id}</span>
+                                                    <div style={{ 
+                                                        display: 'flex', 
+                                                        gap: 20, 
+                                                        marginBottom: 32, 
+                                                        flexWrap: 'wrap',
+                                                        alignItems: 'center'
+                                                    }}>
+                            {/* Отображение категорий */}
+                            <div style={{ 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: 10,
+                                padding: '8px 16px',
+                                background: dark 
+                                    ? 'rgba(255,255,255,0.1)' 
+                                    : 'rgba(111, 66, 193, 0.2)',
+                                borderRadius: '20px',
+                                border: dark 
+                                    ? '1px solid rgba(255,255,255,0.2)' 
+                                    : '1px solid rgba(111, 66, 193, 0.35)',
+                                backdropFilter: 'blur(10px)',
+                                boxShadow: dark 
+                                    ? '0 2px 8px rgba(0,0,0,0.2)' 
+                                    : '0 2px 8px rgba(111, 66, 193, 0.25)',
+                                transition: 'all 0.3s ease'
+                            }}>
+                                <FontAwesomeIcon 
+                                    icon={faUser} 
+                                    style={{ 
+                                        color: dark ? '#6f42c1' : '#6f42c1',
+                                        fontSize: '16px'
+                                    }} 
+                                />
+                                <span style={{ 
+                                    fontWeight: 600,
+                                    color: dark ? '#ffffff' : '#333333',
+                                    fontSize: '14px'
+                                }}>
+                                    ID: {course.id}
+                                </span>
                             </div>
                             {/* Рейтинг курса */}
-<div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-    <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        gap: 8,
-        animation: 'fadeIn 0.3s ease-in-out'
-    }}
-    className="rating-section"
-    >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {[0,1,2,3,4].map((i) => {
-                const starValue = i + 1;
-                const diff = (averageRating || 0) - i;
-                const color = diff >= 1 ? '#ffc107' : diff >= 0.5 ? 'linear-gradient(90deg,#ffc107 50%, #e4e5e9 50%)' : '#e4e5e9';
-                const style = { fontSize: '16px', color: diff >= 0.5 ? '#ffc107' : '#e4e5e9' };
-                return (
-                    <span key={i} style={{ position: 'relative', width: 16, height: 16, display: 'inline-block' }}>
-                        <FontAwesomeIcon icon={faStar} style={{ color: '#e4e5e9', fontSize: '16px', position: 'absolute', left:0, top:0 }} />
-                        {diff > 0 && (
-                          <span style={{ position: 'absolute', left:0, top:0, width: `${Math.max(0, Math.min(1, diff)) * 100}%`, height: '100%', overflow: 'hidden' }}>
-                            <FontAwesomeIcon icon={faStar} style={{ color: '#ffc107', fontSize: '16px' }} />
-                          </span>
-                        )}
-                    </span>
-                );
-            })}
-        </div>
-        <span style={{ fontWeight: 600 }}>
-                            {Number(averageRating || 0).toFixed(1)}/5
-        </span>
+<div style={{ 
+    display: 'flex', 
+    alignItems: 'center', 
+    gap: 10,
+    padding: '8px 16px',
+    background: dark 
+        ? 'rgba(255,255,255,0.1)' 
+        : 'rgba(255, 193, 7, 0.25)',
+    borderRadius: '20px',
+    border: dark 
+        ? '1px solid rgba(255,255,255,0.2)' 
+        : '1px solid rgba(255, 193, 7, 0.4)',
+    backdropFilter: 'blur(10px)',
+    boxShadow: dark 
+        ? '0 2px 8px rgba(0,0,0,0.2)' 
+        : '0 2px 8px rgba(255, 193, 7, 0.3)',
+    transition: 'all 0.3s ease',
+    animation: 'fadeIn 0.3s ease-in-out'
+}}
+className="rating-section"
+>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {[0,1,2,3,4].map((i) => {
+            const starValue = i + 1;
+            const diff = (averageRating || 0) - i;
+            const color = diff >= 1 ? '#ffc107' : diff >= 0.5 ? 'linear-gradient(90deg,#ffc107 50%, #e4e5e9 50%)' : '#e4e5e9';
+            const style = { fontSize: '16px', color: diff >= 0.5 ? '#ffc107' : '#e4e5e9' };
+            return (
+                <span key={i} style={{ position: 'relative', width: 18, height: 18, display: 'inline-block' }}>
+                    <FontAwesomeIcon icon={faStar} style={{ color: '#e4e5e9', fontSize: '18px', position: 'absolute', left:0, top:0 }} />
+                    {diff > 0 && (
+                      <span style={{ position: 'absolute', left:0, top:0, width: `${Math.max(0, Math.min(1, diff)) * 100}%`, height: '100%', overflow: 'hidden' }}>
+                        <FontAwesomeIcon icon={faStar} style={{ color: '#ffc107', fontSize: '18px' }} />
+                      </span>
+                    )}
+                </span>
+            );
+        })}
     </div>
+    <span style={{ 
+        fontWeight: 700,
+        color: dark ? '#ffffff' : '#333333',
+        fontSize: '14px',
+        marginLeft: '4px'
+    }}>
+        {Number(averageRating || 0).toFixed(1)}/5
+    </span>
 </div>
                         </div>
-                        <a
-                            href={`/course/${id}`}
-                            style={{ background: '#54ad54', padding: '14px 32px', borderRadius: 8, fontSize: 18, fontWeight: 600, color: '#fff', textDecoration: 'none', display: 'inline-block', transition: 'all 0.2s ease', boxShadow: '0 4px 12px rgba(84, 173, 84, 0.3)' }}
-                            onMouseEnter={e => { e.target.style.transform = 'translateY(-2px)'; e.target.style.boxShadow = '0 6px 20px rgba(84, 173, 84, 0.4)'; }}
-                            onMouseLeave={e => { e.target.style.transform = 'none'; e.target.style.boxShadow = '0 4px 12px rgba(84, 173, 84, 0.3)'; }}
+                        <button
+                            onClick={handleEnrollAndStart}
+                            disabled={isEnrolling}
+                            style={{ 
+                                background: dark 
+                                    ? 'linear-gradient(135deg, #54ad54, #45a045)' 
+                                    : 'linear-gradient(135deg, #54ad54, #45a045)', 
+                                padding: '16px 36px', 
+                                borderRadius: '12px', 
+                                fontSize: '18px', 
+                                fontWeight: 700, 
+                                color: '#fff', 
+                                textDecoration: 'none', 
+                                display: 'inline-block', 
+                                transition: 'all 0.3s ease', 
+                                boxShadow: dark 
+                                    ? '0 6px 20px rgba(84, 173, 84, 0.4), 0 2px 8px rgba(0,0,0,0.2)' 
+                                    : '0 6px 20px rgba(84, 173, 84, 0.3), 0 2px 8px rgba(0,0,0,0.1)',
+                                border: 'none',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                letterSpacing: '0.5px',
+                                textTransform: 'uppercase',
+                                cursor: isEnrolling ? 'not-allowed' : 'pointer',
+                                opacity: isEnrolling ? 0.7 : 1
+                            }}
+                            onMouseEnter={e => { 
+                                if (!isEnrolling) {
+                                    e.target.style.transform = 'translateY(-3px) scale(1.02)'; 
+                                    e.target.style.boxShadow = dark 
+                                        ? '0 8px 25px rgba(84, 173, 84, 0.5), 0 4px 12px rgba(0,0,0,0.3)' 
+                                        : '0 8px 25px rgba(84, 173, 84, 0.4), 0 4px 12px rgba(0,0,0,0.15)'; 
+                                    // Анимация блеска
+                                    const shine = e.target.querySelector('div');
+                                    if (shine) {
+                                        shine.style.left = '100%';
+                                    }
+                                }
+                            }}
+                            onMouseLeave={e => { 
+                                if (!isEnrolling) {
+                                    e.target.style.transform = 'translateY(0) scale(1)'; 
+                                    e.target.style.boxShadow = dark 
+                                        ? '0 6px 20px rgba(84, 173, 84, 0.4), 0 2px 8px rgba(0,0,0,0.2)' 
+                                        : '0 6px 20px rgba(84, 173, 84, 0.3), 0 2px 8px rgba(0,0,0,0.1)'; 
+                                    // Сброс анимации блеска
+                                    const shine = e.target.querySelector('div');
+                                    if (shine) {
+                                        shine.style.left = '-100%';
+                                    }
+                                }
+                            }}
                         >
-                            {t('course.start_study')}
-                        </a>
+                            <FontAwesomeIcon icon={isEnrolling ? faClock : faPlay} />
+                            {isEnrolling ? t('course_catalog.enrolling') : t('course.start_study')}
+                            <div style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: '-100%',
+                                width: '100%',
+                                height: '100%',
+                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                                transition: 'left 0.5s ease'
+                            }}></div>
+                        </button>
                     </div>
                 </div>
             </header>
@@ -592,22 +867,84 @@ const CoursePromo = () => {
                     {/* Видео курса - перемещено в начало */}
                     {(course.introUrl || (course.lectures && course.lectures.length > 0 && course.lectures[0].videoLink)) && (
                         <section style={{ marginBottom: 48 }}>
-                            <div style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                            <div style={{ 
+                                background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                padding: 24, 
+                                borderRadius: 16, 
+                                border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)', 
+                                overflow: 'hidden',
+                                boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)'
+                            }}>
                                 <div style={{ position: 'relative', width: '100%', paddingBottom: '56.25%' }}>
-                                    <iframe
-                                        src={(course.lectures && course.lectures.length > 0 && course.lectures[0].videoLink) || course.introUrl}
-                                        style={{
+                                    {!videoError ? (
+                                        <video
+                                            src={(course.lectures && course.lectures.length > 0 && course.lectures[0].videoLink) ? getVideoUrl(course.lectures[0].videoLink) : getVideoUrl(course.introUrl)}
+                                            onLoadStart={() => {
+                                              const videoSrc = (course.lectures && course.lectures.length > 0 && course.lectures[0].videoLink) ? getVideoUrl(course.lectures[0].videoLink) : getVideoUrl(course.introUrl);
+                                              console.log('🎬 CoursePromo video load started:', videoSrc);
+                                            }}
+                                            style={{
+                                                position: 'absolute',
+                                                top: 0,
+                                                left: 0,
+                                                width: '100%',
+                                                height: '100%',
+                                                border: 'none',
+                                                borderRadius: 8
+                                            }}
+                                            controls
+                                            muted
+                                            onError={(e) => {
+                                              const videoElement = e.target;
+                                              console.error('❌ Video error in CoursePromo:', e);
+                                              console.error('Video error details:', {
+                                                currentSrc: videoElement.currentSrc,
+                                                networkState: videoElement.networkState,
+                                                readyState: videoElement.readyState,
+                                                error: videoElement.error
+                                              });
+                                              
+                                              if (videoElement.error) {
+                                                const error = videoElement.error;
+                                                console.error('Video error code:', error.code);
+                                                console.error('Video error message:', error.message);
+                                              }
+                                              
+                                              setVideoError(true);
+                                            }}
+                                        />
+                                    ) : (
+                                        <div style={{
                                             position: 'absolute',
                                             top: 0,
                                             left: 0,
                                             width: '100%',
                                             height: '100%',
-                                            border: 'none',
-                                            borderRadius: 8
-                                        }}
-                                        title={title}
-                                        allowFullScreen
-                                    />
+                                            background: dark ? '#2d2d2d' : '#f8f9fa',
+                                            border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+                                            borderRadius: 8,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            flexDirection: 'column',
+                                            color: dark ? '#ffffff' : '#666666'
+                                        }}>
+                                            <FontAwesomeIcon 
+                                                icon={faPlay} 
+                                                style={{ 
+                                                    fontSize: '3rem', 
+                                                    marginBottom: '15px', 
+                                                    opacity: 0.5 
+                                                }} 
+                                            />
+                                            <h4 style={{ margin: '0 0 10px 0', fontSize: '16px' }}>
+                                                {t('course.video_not_available') || 'Видео недоступно'}
+                                            </h4>
+                                            <p style={{ fontSize: '14px', margin: '0', textAlign: 'center', opacity: 0.8 }}>
+                                                {t('course.video_loading_error') || 'Не удалось загрузить видео'}
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </section>
@@ -621,7 +958,14 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', color: 'var(--text-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)',
+                                    color: 'var(--text-color)' 
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.description) }}
                             />
                         </section>
@@ -634,7 +978,13 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)'
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.learningOutcomes) }}
                             />
                         </section>
@@ -645,7 +995,13 @@ const CoursePromo = () => {
                                 <FontAwesomeIcon icon={faBook} style={{ color: 'var(--accent-color, #4485ed)' }} />
                                 {t('course.content')}
                             </h2>
-                            <div style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)' }}>
+                            <div style={{ 
+                                background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                padding: 24, 
+                                borderRadius: 16, 
+                                border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)'
+                            }}>
                                 <ol style={{ margin: 0, padding: 0, listStyle: 'none', counterReset: 'section-counter' }}>
                                     {course.courseSections.map((mod, idx) => (
                                         <li key={idx} style={{ marginBottom: 16, counterIncrement: 'section-counter', position: 'relative', paddingLeft: 40 }}>
@@ -676,7 +1032,14 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', color: 'var(--text-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)',
+                                    color: 'var(--text-color)' 
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.requirements) }}
                             />
                         </section>
@@ -689,7 +1052,14 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', color: 'var(--text-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)',
+                                    color: 'var(--text-color)' 
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.learningFormat) }}
                             />
                         </section>
@@ -703,7 +1073,13 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)'
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.targeting) }}
                             />
                         </section>
@@ -716,7 +1092,14 @@ const CoursePromo = () => {
                             </h2>
                             <div 
                                 className="promo-html"
-                                style={{ background: 'var(--teach-tile-bg)', padding: 24, borderRadius: 16, border: '1px solid var(--border-color)', color: 'var(--text-color)' }}
+                                style={{ 
+                                    background: dark ? 'var(--teach-tile-bg)' : 'rgba(255, 255, 255, 0.95)', 
+                                    padding: 24, 
+                                    borderRadius: 16, 
+                                    border: dark ? '1px solid var(--border-color)' : '1px solid rgba(68, 133, 237, 0.2)',
+                                    boxShadow: dark ? 'none' : '0 4px 20px rgba(68, 133, 237, 0.1)',
+                                    color: 'var(--text-color)' 
+                                }}
                                 dangerouslySetInnerHTML={{ __html: processHtmlContent(course.acquiredAssets) }}
                             />
                         </section>

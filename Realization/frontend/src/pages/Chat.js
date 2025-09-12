@@ -1,12 +1,20 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import io from 'socket.io-client';
 import i18n from '../i18n';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faComments, faPaperPlane, faSmile, faImage, faFile, faMicrophone, faVideo, faPhone, faEllipsisV, faSearch, faTimes, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import NavBar from '../components/NavBar';
+import Footer from '../components/Footer';
 import { FaChevronLeft, FaChevronRight, FaUser, FaGlobe, FaCode, FaBuilding, FaStar, FaRegStar, FaUserTie, FaDatabase, FaChartBar, FaProjectDiagram, FaShieldAlt, FaGamepad, FaNetworkWired, FaCloud, FaMobileAlt, FaUsers, FaCogs, FaBug, FaRobot, FaUserSecret, FaUserCog, FaUserGraduate, FaUserEdit, FaUserMd, FaUserNurse, FaUserCheck, FaUserClock, FaUserFriends, FaUserPlus, FaUserTimes, FaUserMinus, FaUserCircle, FaUserAlt, FaUserAltSlash, FaUserLock, FaUserShield, FaUserTag, FaUserSlash, FaUserAstronaut, FaUserNinja, FaUserInjured, FaUserMdChat, FaLeaf, FaJava, FaPython, FaJs, FaNodeJs, FaPhp, FaGem, FaApple, FaAndroid, FaDocker, FaCube, FaVial, FaPaintBrush, FaHeadset, FaReact, FaLinux, FaWindows, FaGitAlt, FaCodeBranch, FaLink, FaFileAlt, FaImage, FaSignOutAlt, FaFilePdf, FaFileWord, FaFileExcel, FaFileArchive, FaFileVideo, FaFileAudio, FaFileImage, FaVideo, FaMusic, FaMapMarkerAlt, FaFlag, FaBriefcase, FaIdBadge, FaBullseye, FaInfoCircle, FaEnvelope, FaQuoteLeft, FaTimes } from 'react-icons/fa';
 import Picker from '@emoji-mart/react';
 import data from '@emoji-mart/data';
 import axios from 'axios';
-import Linkify from 'react-linkify';
+
+import useTheme from '../hooks/useTheme';
+import { getAvatarUrl } from '../utils/minioUtils';
+import FileUploadProgress from '../components/FileUploadProgress';
 // import 'emoji-mart/css/emoji-mart.css'; // Удалено для emoji-mart v5+
 
 const t = i18n.t.bind(i18n);
@@ -45,14 +53,33 @@ function aggregateReactions(arr) {
 
 // Функция для рендера текста с ссылками
 function renderMessageText(text) {
+  if (!text || typeof text !== 'string') return text;
+  
+  // Регулярное выражение для поиска URL
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  // Разбиваем текст на части (ссылки и обычный текст)
+  const parts = text.split(urlRegex);
+  
   return (
-    <Linkify
-      componentDecorator={(decoratedHref, decoratedText, key) => (
-        <a href={decoratedHref} target="_blank" rel="noopener noreferrer" key={key} style={{ color: '#3976a8', textDecoration: 'underline', wordBreak: 'break-all' }}>{decoratedText}</a>
-      )}
-    >
-      {text}
-    </Linkify>
+    <span className="linkified-text">
+      {parts.map((part, index) => {
+        if (part.match(urlRegex)) {
+          return (
+            <a
+              key={index}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#3976a8', textDecoration: 'underline', wordBreak: 'break-all' }}
+            >
+              {part}
+            </a>
+          );
+        }
+        return part;
+      })}
+    </span>
   );
 }
 
@@ -74,6 +101,7 @@ function ConfirmModal({ open, onConfirm, onCancel, text }) {
 }
 
 export default function Chat() {
+  const { isAuthenticated } = useSelector((state) => state.auth);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [username, setUsername] = useState('');
@@ -101,6 +129,7 @@ export default function Chat() {
 
   // --- jobTitles массив с ключами и значениями ---
   const jobTitles = [
+    { key: 'select_job', value: 'Выбрать должность' },
     { key: 'back_end', value: 'Back End Developer/Engineer' },
     { key: 'data_scientist', value: 'Data Scientist' },
     { key: 'technology_consultant', value: 'Technology Consultant' },
@@ -379,7 +408,7 @@ export default function Chat() {
   useEffect(() => {
     if (!selectedChat) return;
     setLoadingMessages(true);
-    axios.get(`/api/chats/${selectedChat.id}/messages`).then(res => {
+    axios.get(`https://localhost:9000/api/chats/${selectedChat.id}/messages`).then(res => {
       setChatMessages(res.data || []);
       // Собираем реакции по messageId
       const reactMap = {};
@@ -415,9 +444,35 @@ export default function Chat() {
     return () => socketRef.current.off('reaction-update', handler);
   }, [selectedChat]);
 
+  // Функция для отправки сообщения с файлом
+  const handleSendFileMessage = (fileData) => {
+    const msg = {
+      userId: userId,
+      text: fileData.caption || '',
+      time: new Date().toISOString(),
+      caption: fileData.caption || '',
+      chatId: selectedChat.id,
+      fileUrl: fileData.fileUrl,
+      fileType: fileData.fileType,
+      fileName: fileData.fileName,
+      fileSize: fileData.fileSize
+    };
+    
+    socketRef.current.emit('chat-message', msg);
+    setCaption('');
+    setFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    
+    // Добавляем в My Chats при первом сообщении
+    addToMyChats(selectedChat.id);
+  };
+
+  // Обновляем handleSend для работы с файлами
   const handleSend = async e => {
     e.preventDefault();
     if (!input.trim() && !file) return;
+    
     let msg = {
       userId: userId,
       text: input,
@@ -425,32 +480,44 @@ export default function Chat() {
       caption: caption || '',
       chatId: selectedChat.id,
     };
+    
+    // Если есть файл, загружаем его сначала
     if (file) {
+      try {
         const formData = new FormData();
         formData.append('file', file);
-        try {
-          const res = await axios.post('/api/files/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-          if (res.data && res.data.url) {
-            msg.fileUrl = res.data.url;
-            msg.fileType = res.data.type;
-            msg.fileName = res.data.name;
-          msg.fileSize = res.data.size;
-          } else {
-            setToast({ visible: true, text: 'Ошибка загрузки файла' });
-            return;
-          }
-        } catch (err) {
-          setToast({ visible: true, text: 'Ошибка загрузки файла' });
-          return;
+        
+        const response = await fetch('https://localhost:9000/api/files/upload', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        msg.fileUrl = result.url;
+        msg.fileType = file.type;
+        msg.fileName = file.name;
+        msg.fileSize = file.size;
+        
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        setToast({ visible: true, text: 'Ошибка загрузки файла' });
+        return;
       }
     }
+    
+    // Отправляем сообщение
     socketRef.current.emit('chat-message', msg);
     setInput('');
     setCaption('');
     setFile(null);
     setFilePreview(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
-    // добавить в My Chats при первом сообщении
+    
+    // Добавляем в My Chats при первом сообщении
     addToMyChats(selectedChat.id);
   };
 
@@ -523,7 +590,7 @@ export default function Chat() {
       marginBottom: size > 50 ? 24 : 0,
       flexShrink: 0,
       boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
-      backgroundImage: (user.avatar && !imageError) ? `url(${user.avatar})` : 'none',
+                      backgroundImage: (user.avatar && !imageError) ? `url(${getAvatarUrl(user.avatar)})` : 'none',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
       backgroundRepeat: 'no-repeat',
@@ -536,7 +603,7 @@ export default function Chat() {
       <div style={avatarStyle} onClick={onClick}>
         {user.avatar && (
           <img
-            src={user.avatar}
+                            src={getAvatarUrl(user.avatar)}
             alt=""
             style={{ display: 'none' }}
             onError={() => setImageError(true)}
@@ -652,7 +719,7 @@ export default function Chat() {
     setContextMenu({ ...contextMenu, anim: 'out' });
     if (contextMenuTimeout) clearTimeout(contextMenuTimeout);
     setContextMenuTimeout(setTimeout(() => setContextMenu({ visible: false, x: 0, y: 0, msgIdx: null, anim: '' }), 180));
-    setToast({ visible: true, text: 'Текст скопирован!' });
+            setToast({ visible: true, text: t('chat.textCopied') || 'Текст скопирован!' });
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 1800);
   };
   // Forward handler убран, пункт меню больше не отображается
@@ -697,7 +764,7 @@ export default function Chat() {
   // Клик по уже поставленной реакции (добавить/убрать)
   const handleReactionClick = (msgId, code) => {
     if (!userId) {
-      setToast({ visible: true, text: 'Войдите, чтобы реагировать' });
+              setToast({ visible: true, text: t('chat.loginToReact') || 'Войдите, чтобы реагировать' });
       setTimeout(() => setToast(t => ({ ...t, visible: false })), 1800);
       return;
     }
@@ -776,7 +843,7 @@ export default function Chat() {
   useEffect(()=>{
     if(selectedUser && selectedUser.id){
       const token=localStorage.getItem('jwtToken');
-      axios.get(`/profile/user/${selectedUser.id}`,{headers:{Authorization:`Bearer ${token}`}})
+      axios.get(`https://localhost:9000/profile/user/${selectedUser.id}`,{headers:{Authorization:`Bearer ${token}`}})
         .then(res=>setSelectedProfile(res.data))
         .catch(()=>setSelectedProfile(null));
     } else {
@@ -827,15 +894,33 @@ export default function Chat() {
   };
 
   const getDownloadUrl = (msg, cleanedName) => {
-    const filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
+    let filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
+    
+    // Декодируем имя файла если оно закодировано
+    try {
+      filename = decodeURIComponent(filename);
+      console.log('🔤 Decoded filename in getDownloadUrl:', filename);
+    } catch (error) {
+      console.warn('Failed to decode filename in getDownloadUrl:', error);
+    }
+    
     const encoded = encodeURIComponent(cleanedName);
-    return `${SERVER_URL}/api/files/download/${filename}?name=${encoded}`;
+    return `https://localhost:9000/api/files/download/${encodeURIComponent(filename)}?name=${encoded}`;
   };
 
   const getFileDisplayUrl = (msg) => {
     try {
-      const filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
-      return `${SERVER_URL}/api/files/download/${filename}`;
+      let filename = msg.fileUrl.startsWith('/') ? msg.fileUrl.split('/').pop() : msg.fileUrl.split('/').pop();
+      
+      // Декодируем имя файла если оно закодировано
+      try {
+        filename = decodeURIComponent(filename);
+        console.log('🔤 Decoded filename in getFileDisplayUrl:', filename);
+      } catch (error) {
+        console.warn('Failed to decode filename in getFileDisplayUrl:', error);
+      }
+      
+      return `https://localhost:9000/api/files/download/${encodeURIComponent(filename)}`;
     } catch (error) {
       console.error('Error getting file display URL:', error);
       return '';
@@ -844,8 +929,17 @@ export default function Chat() {
 
   const getMediaDisplayUrl = (m) => {
     try {
-      const filename = m.fileUrl.startsWith('/') ? m.fileUrl.split('/').pop() : m.fileUrl.split('/').pop();
-      return `${SERVER_URL}/api/files/download/${filename}`;
+      let filename = m.fileUrl.startsWith('/') ? m.fileUrl.split('/').pop() : m.fileUrl.split('/').pop();
+      
+      // Декодируем имя файла если оно закодировано
+      try {
+        filename = decodeURIComponent(filename);
+        console.log('🔤 Decoded filename in getMediaDisplayUrl:', filename);
+      } catch (error) {
+        console.warn('Failed to decode filename in getMediaDisplayUrl:', error);
+      }
+      
+      return `https://localhost:9000/api/files/download/${encodeURIComponent(filename)}`;
     } catch (error) {
       console.error('Error getting media display URL:', error);
       return '';
@@ -899,7 +993,7 @@ export default function Chat() {
     const fields=[
       {label:t('profile.first_name')+':',value:profile.name},
       {label:t('profile.last_name')+':',value:profile.surname},
-      {label:'BIO:',value:profile.bio},
+      {label:t('profile.bio') + ':',value:profile.bio},
       {label:t('profile.city')+':',value:profile.city},
       {label:t('profile.country')+':',value:profile.country},
       {label:t('profile.company')+':',value:profile.company},
@@ -930,13 +1024,14 @@ export default function Chat() {
       status: 'rgb(77, 208, 225)'
     };
     const rows = [
-      {key:'city', label:t('profile.city')||'City', value:prof.city},
-      {key:'country', label:t('profile.country')||'Country', value:prof.country},
-      {key:'company', label:t('profile.company')||'Company', value:prof.company},
-      {key:'position', label:t('profile.position')||'Position', value:prof.position},
-      {key:'jobTitle', label:t('profile.job_title')||'Job', value:prof.jobTitle},
-      {key:'goal', label:t('profile.goal')||'Goal', value:prof.goal},
-      {key:'status', label:t('profile.status')||'Status', value:prof.status},
+      {key:'city', label:t('profile.city'), value:prof.city},
+      {key:'country', label:t('profile.country'), value:prof.country},
+      {key:'company', label:t('profile.company'), value:prof.company},
+      {key:'position', label:t('profile.position'), value:prof.position},
+      // Скрываем поле "Работа" если выбрано "Выбрать должность"
+      ...(prof.jobTitle && prof.jobTitle !== 'Выбрать должность' ? [{key:'jobTitle', label:t('profile.job_title'), value:prof.jobTitle}] : []),
+      {key:'goal', label:t('profile.goal'), value:prof.goal},
+      {key:'status', label:t('profile.status'), value:prof.status},
     ].filter(r=>r.value&&String(r.value).trim()!=='');
     const skills = prof.skills||[];
     const lightGradient = 'linear-gradient(135deg,#e0eafc 0%, #cfdef3 100%)';
@@ -991,20 +1086,34 @@ export default function Chat() {
           {/* skills */}
           {Array.isArray(skills)&&skills.length>0 && (
             <div style={{marginTop:18,display:'flex',flexWrap:'wrap',gap:8,justifyContent:'center'}}>
-              {skills.map((s,i)=>(<span key={i} style={{background:primaryColor,color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:13,fontWeight:700,whiteSpace:'nowrap'}}>{s}</span>))}
+              {skills.map((s,i)=>(<span key={i} style={{background:primaryColor,color:'#fff',padding:'4px 10px',borderRadius:6,fontSize:13,fontWeight:700,minWidth:'fit-content',maxWidth:'200px',wordBreak:'break-word'}}>{s}</span>))}
             </div>
           )}
           {/* info rows */}
           <div style={{marginTop:24,width:'100%'}}>
             {rows.map(r=> (
-              <div key={r.key} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,fontSize:15}}>
-                <span style={{fontSize:18,color:iconColors[r.key]||primaryColor}}>{iconMap[r.key]}</span>
-                <span style={{fontWeight:700,minWidth:90}}>{r.label}</span>
-                <span style={{flex:1}}>{r.value}</span>
-              </div>
+              r.key === 'goal' ? (
+                // Специальное отображение для цели
+                <div key={r.key} style={{marginBottom:12,fontSize:15}}>
+                  <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}>
+                    <span style={{fontSize:18,color:iconColors[r.key]||primaryColor}}>{iconMap[r.key]}</span>
+                    <span style={{fontWeight:700}}>{r.label}</span>
+                  </div>
+                  <div style={{marginLeft:28,color:dark?'#cfd8dc':'#666',fontSize:14,lineHeight:'1.4'}}>
+                    {r.value}
+                  </div>
+                </div>
+              ) : (
+                // Обычное отображение для остальных полей
+                <div key={r.key} style={{display:'flex',alignItems:'center',gap:10,marginBottom:10,fontSize:15}}>
+                  <span style={{fontSize:18,color:iconColors[r.key]||primaryColor}}>{iconMap[r.key]}</span>
+                  <span style={{fontWeight:700,minWidth:90}}>{r.label}</span>
+                  <span style={{flex:1}}>{r.value}</span>
+                </div>
+              )
             ))}
           </div>
-          <button onClick={()=>setSelectedUser(null)} style={{background: dark? 'linear-gradient(90deg,#3976a8 0%, #36607e 100%)':'linear-gradient(90deg,#3976a8 0%, #b6d4fe 100%)',color:'#fff',border:'none',borderRadius:14,padding:'12px 38px',fontWeight:700,fontSize:17,marginTop:8,alignSelf:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.1)',cursor:'pointer',letterSpacing:1,transition:'background 0.2s'}}>Back</button>
+          <button onClick={()=>setSelectedUser(null)} style={{background: dark? 'linear-gradient(90deg,#3976a8 0%, #36607e 100%)':'linear-gradient(90deg,#3976a8 0%, #b6d4fe 100%)',color:'#fff',border:'none',borderRadius:14,padding:'12px 38px',fontWeight:700,fontSize:17,marginTop:8,alignSelf:'center',boxShadow:'0 2px 8px rgba(0,0,0,0.1)',cursor:'pointer',letterSpacing:1,transition:'background 0.2s'}}>{t('common.back')}</button>
         </div>
       </>
     );
@@ -1056,8 +1165,150 @@ export default function Chat() {
     localStorage.setItem('language', lang);
   }, [lang]);
 
+  // Listen for language changes from other components
+  useEffect(() => {
+    const handleLanguageChange = (e) => {
+      console.log('Chat: Language change event received:', e.detail);
+      setLang(e.detail);
+    };
+
+    const handleI18nLanguageChange = (lng) => {
+      console.log('Chat: i18n language changed to:', lng);
+      if (lang !== lng) {
+        setLang(lng);
+      }
+    };
+
+    window.addEventListener('languageChanged', handleLanguageChange);
+    i18n.on('languageChanged', handleI18nLanguageChange);
+
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+      i18n.off('languageChanged', handleI18nLanguageChange);
+    };
+  }, [lang, i18n]);
+
+  // Authentication check
+  if (!isAuthenticated) {
   return (
-    <div style={{ minHeight: '100vh', background: pageBg, color: fieldColor }}>
+      <div style={{ 
+        minHeight: '100vh', 
+        background: dark ? '#1a1a1a' : '#f8f9fa',
+        color: dark ? '#ffffff' : '#333333'
+      }}>
+        <NavBar />
+        
+        <div style={{ 
+          maxWidth: '1200px', 
+          margin: '0 auto', 
+          padding: '40px 20px',
+          minHeight: 'calc(100vh - 200px)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
+        }}>
+          {/* Заголовок страницы */}
+          <div style={{ 
+            textAlign: 'center', 
+            marginBottom: '40px' 
+          }}>
+            <h1 style={{ 
+              fontSize: '2.5rem', 
+              fontWeight: '700', 
+              marginBottom: '10px',
+              color: dark ? '#ffffff' : '#333333'
+            }}>
+              {t('chat.title')}
+            </h1>
+          </div>
+
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '60px 20px',
+            background: dark ? '#2d2d2d' : '#ffffff',
+            borderRadius: '12px',
+            border: `1px solid ${dark ? '#404040' : '#e9ecef'}`,
+            maxWidth: '500px'
+          }}>
+            <FontAwesomeIcon 
+              icon={faComments} 
+              style={{ 
+                fontSize: '3rem', 
+                color: '#6c757d', 
+                marginBottom: '20px' 
+              }} 
+            />
+            <h3 style={{ 
+              fontSize: '1.3rem', 
+              fontWeight: '600', 
+              marginBottom: '10px',
+              color: dark ? '#ffffff' : '#333333'
+            }}>
+              {t('auth.login_required')}
+            </h3>
+            <p style={{ 
+              color: dark ? '#cccccc' : '#666666',
+              marginBottom: '30px',
+              fontSize: '1rem',
+              lineHeight: '1.6',
+              maxWidth: '400px'
+            }}>
+              {t('chat.login_to_chat_description')}
+            </p>
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              gap: '15px',
+              flexWrap: 'wrap'
+            }}>
+              <button
+                onClick={() => history.push('/login')}
+                style={{
+                  padding: '12px 24px',
+                  background: '#007bff',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#0056b3'}
+                onMouseOut={(e) => e.target.style.background = '#007bff'}
+              >
+                {t('auth.login')}
+              </button>
+              <button
+                onClick={() => history.push('/register')}
+                style={{
+                  padding: '12px 24px',
+                  background: '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '6px',
+                  fontSize: '1rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={(e) => e.target.style.background = '#218838'}
+                onMouseOut={(e) => e.target.style.background = '#28a745'}
+              >
+                {t('auth.register')}
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <Footer />
+      </div>
+    );
+  }
+
+  return (
+    <div key={`chat-${lang}`} style={{ minHeight: '100vh', background: pageBg, color: fieldColor }}>
       {/* Sidebar + Toggle Button */}
       {sidebarOpen && (
         <div style={sidebarStyle}>
@@ -1100,12 +1351,12 @@ export default function Chat() {
             <select
               aria-label="Select language"
               style={{ padding: '0.35rem 0.8rem', borderRadius: 16, border: `1px solid ${borderColor}`, background: dark ? '#213747' : '#f9fafd', color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 'bold', cursor: 'pointer', fontSize: '0.9rem', marginRight: 8 }}
-              value={i18n.language}
+              value={lang}
               onChange={e => {
-                const lang = e.target.value;
-                i18n.changeLanguage(lang);
-                localStorage.setItem('language', lang);
-                // не делаем setLang, не делаем window.location.reload()
+                const newLang = e.target.value;
+                setLang(newLang);
+                // Dispatch custom event to notify other components
+                window.dispatchEvent(new CustomEvent('languageChanged', { detail: newLang }));
               }}
             >
               {langOptions.map(opt => (
@@ -1149,7 +1400,7 @@ export default function Chat() {
         justifyContent: 'center',
         transition: 'background 0.18s, left 0.22s',
         padding: 0,
-      }} onClick={() => setSidebarOpen(v => !v)} aria-label={sidebarOpen ? 'Скрыть панель' : 'Показать панель'}>
+              }} onClick={() => setSidebarOpen(v => !v)} aria-label={sidebarOpen ? (t('chat.hidePanel') || 'Скрыть панель') : (t('chat.showPanel') || 'Показать панель')}>
         {sidebarOpen ? <FaChevronLeft size={18} /> : <FaChevronRight size={18} />}
       </button>
       {/* Header */}
@@ -1169,7 +1420,12 @@ export default function Chat() {
             aria-label="Select language"
             style={{ padding: '0.4rem 1rem', borderRadius: 20, border: `1px solid ${borderColor}`, background: formBg, color: dark ? '#eaf4fd' : '#3976a8', fontWeight: 'bold', cursor: 'pointer', fontSize: '1rem' }}
             value={lang}
-            onChange={e => setLang(e.target.value)}
+            onChange={e => {
+              const newLang = e.target.value;
+              setLang(newLang);
+              // Dispatch custom event to notify other components
+              window.dispatchEvent(new CustomEvent('languageChanged', { detail: newLang }));
+            }}
           >
             {langOptions.map(opt => (
               <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -1287,8 +1543,11 @@ export default function Chat() {
                           const cleaned = raw.replace(/-[0-9]{10,}-[0-9]+(?=\.)/, '')  // убираем -timestamp-rand если есть
                                                       .replace(/-[0-9]+(?=\.)/, '');
                           const displayName = msg.fileName || cleaned;
+                          
                           return (
-                            <a href={getDownloadUrl(msg, displayName)} download={displayName} target="_blank" rel="noopener noreferrer">{displayName}</a>
+                            <a href={getDownloadUrl(msg, displayName)} download={displayName} target="_blank" rel="noopener noreferrer">
+                              {displayName}
+                            </a>
                           );
                         })()}
                       </div>
@@ -1392,20 +1651,28 @@ export default function Chat() {
             />
             <button type="button" onClick={() => fileInputRef.current && fileInputRef.current.click()} style={{ background: '#eaf4fd', color: '#3976a8', border: 'none', borderRadius: 10, padding: '0 14px', fontWeight: 700, fontSize: 22, height: 44, cursor: 'pointer' }}>📎</button>
             <button type="submit" style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 14, padding: '0 32px', fontWeight: 700, fontSize: 17, height: 52, boxShadow: '0 2px 8px rgba(0,0,0,0.10)', transition: 'background 0.2s', letterSpacing: 1 }}>
-              {t('chat.send')}
+              {t('common.send')}
             </button>
           </form>
           {/* Предпросмотр файла */}
           {file && (
-            <div style={{ marginTop: 8, marginBottom: 4, background: dark ? '#213747' : '#f9fafd', border: `1.5px solid ${borderColor}`, borderRadius: 10, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
-              {filePreview && file.type.startsWith('image/') && <img src={filePreview} alt="preview" style={{ maxWidth: 80, maxHeight: 80, borderRadius: 8 }} />}
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600 }}>{file.name}</div>
-                <div style={{ fontSize: 13, color: '#888' }}>{(file.size/1024).toFixed(1)} KB</div>
-                <input type="text" value={caption} onChange={e => setCaption(e.target.value)} placeholder={t('chat.caption')} style={{ marginTop: 6, borderRadius: 8, border: `1px solid ${borderColor}`, padding: '6px 10px', fontSize: 15, width: '100%' }} />
-              </div>
-              <button type="button" onClick={resetFile} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '6px 14px', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>{t('common.reset')}</button>
-            </div>
+            <FileUploadProgress
+              file={file}
+              dark={dark}
+              onUploadComplete={(uploadResult) => {
+                // Файл успешно загружен, можно отправить сообщение
+                console.log('File upload completed:', uploadResult);
+                // Здесь можно добавить логику для автоматической отправки сообщения
+              }}
+              onUploadError={(error) => {
+                console.error('File upload error:', error);
+                setToast({ visible: true, text: t('chat.fileUploadError') || 'Ошибка загрузки файла' });
+              }}
+              onCancel={() => {
+                resetFile();
+              }}
+              onSendMessage={handleSendFileMessage}
+            />
           )}
         </div>
       </div>
@@ -1469,6 +1736,8 @@ export default function Chat() {
           opacity: 0 !important;
           transform: scale(0.85) !important;
         }
+        
+
       `}</style>
       {/* Правая панель участников и вкладки */}
       {showRightPanel && (
@@ -1648,7 +1917,23 @@ export default function Chat() {
                     onMouseOut={e=>e.currentTarget.style.background='none'}
                   >
                     <span style={{fontSize:26,flexShrink:0,opacity:0.85}}>{getFileIcon(m.fileName||m.fileUrl||'')}</span>
-                    <a href={getDownloadUrl(m, m.fileName || decodeURIComponent(m.fileUrl.split('/').pop()))} target="_blank" rel="noopener noreferrer" style={{color: dark ? '#7ecbff' : '#3976a8',fontWeight:600,wordBreak:'break-all',flex:1}}>{m.fileName || decodeURIComponent(m.fileUrl.split('/').pop())}</a>
+                    <a href={getDownloadUrl(m, m.fileName || (() => {
+                      try {
+                        const decoded = decodeURIComponent(m.fileUrl.split('/').pop());
+                        console.log('🔤 Decoded filename in shared files modal:', decoded);
+                        return decoded;
+                      } catch (error) {
+                        console.warn('Failed to decode filename in shared files modal:', error);
+                        return m.fileUrl.split('/').pop();
+                      }
+                    })())} target="_blank" rel="noopener noreferrer" style={{color: dark ? '#7ecbff' : '#3976a8',fontWeight:600,wordBreak:'break-all',flex:1}}>{m.fileName || (() => {
+                      try {
+                        const decoded = decodeURIComponent(m.fileUrl.split('/').pop());
+                        return decoded;
+                      } catch (error) {
+                        return m.fileUrl.split('/').pop();
+                      }
+                    })()}</a>
                     <span style={{color:'#888',fontSize:13,minWidth:60,textAlign:'right'}}>{m.fileSize ? ((m.fileSize/1024).toFixed(1)+' KB') : ''}</span>
                     <span style={{color:'#888',fontSize:13,minWidth:90,textAlign:'right'}}>{m.sentAt ? (new Date(m.sentAt).toLocaleDateString()) : (m.time ? (new Date(m.time).toLocaleDateString()) : '')}</span>
                   </li>
@@ -1719,6 +2004,25 @@ export default function Chat() {
       
       {/* Модальное окно с информацией о пользователе - отображается поверх всего интерфейса */}
       {selectedUser && <UserProfileModal/>}
+      
+      {/* CSS стили для кнопки выхода */}
+      <style jsx>{`
+        .logout-btn {
+          background: none;
+          border: none;
+          font-size: 18px;
+          cursor: pointer;
+          color: ${dark ? '#ffffff' : '#333333'};
+          margin-left: 8px;
+          transition: all 0.1s ease;
+          padding: 8px;
+          border-radius: 6px;
+        }
+        .logout-btn:hover {
+          background: ${dark ? '#36607e' : '#f0f0f0'};
+          color: ${dark ? '#ffffff' : '#333333'};
+        }
+      `}</style>
     </div>
   );
 } 

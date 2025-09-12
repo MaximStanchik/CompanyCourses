@@ -1,34 +1,19 @@
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs");
+const { uploadFile, BUCKETS } = require('../utils/minioClient');
 
-// Убедимся, что папка static существует
-const videoStoragePath = path.join(__dirname, "../../static");
-if (!fs.existsSync(videoStoragePath)) {
-  fs.mkdirSync(videoStoragePath, { recursive: true });
-}
-
-// Настройка multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, videoStoragePath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    const ext = path.extname(file.originalname);
-    cb(null, `video-${uniqueSuffix}${ext}`);
-  },
-});
-
+// Настройка multer для временного хранения файлов в памяти
 const upload = multer({
-  storage: storage,
-  limits: { fileSize: 1024 * 1024 * 100 }, // 100MB
+  storage: multer.memoryStorage(),
+  limits: { 
+    fileSize: 50 * 1024 * 1024 * 1024 // 50GB для больших видеофайлов
+  },
 }).single("video");
 
 // Функция, возвращающая относительный путь
-const uploadVideo = (req) => {
+const uploadVideo = async (req) => {
   return new Promise((resolve, reject) => {
-    upload(req, null, (err) => {
+    upload(req, null, async (err) => {
       if (err) {
         console.error("Multer error:", err);
         return reject(err);
@@ -38,9 +23,25 @@ const uploadVideo = (req) => {
         return resolve(null);
       }
 
-      const relativePath = `/static/${req.file.filename}`;
-      console.log("File uploaded successfully:", relativePath);
-      resolve(relativePath);
+      try {
+        // Загружаем видео в MinIO
+        const fileName = `video-${Date.now()}${path.extname(req.file.originalname)}`;
+        
+        console.log('📤 Uploading video to MinIO:', {
+          bucket: BUCKETS.UPLOADS,
+          fileName,
+          originalName: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        });
+        
+        const videoPath = await uploadFile(BUCKETS.UPLOADS, fileName, req.file.buffer, req.file.mimetype);
+        console.log("✅ File uploaded successfully to MinIO:", videoPath);
+        resolve(videoPath);
+      } catch (uploadError) {
+        console.error("❌ MinIO upload error:", uploadError);
+        reject(uploadError);
+      }
     });
   });
 };

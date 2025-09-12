@@ -16,4 +16,7 @@ router.put('/lessons/:id/steps/:stepId', lessonController.updateStep.bind(lesson
 router.delete('/lessons/:id/steps/:stepId', lessonController.deleteStep.bind(lessonController));
 router.put('/lessons/:id/steps/reorder', lessonController.reorderSteps.bind(lessonController));
 
+// Debug endpoint
+router.get('/lessons-debug', lessonController.debug.bind(lessonController));
+
 module.exports = router; 

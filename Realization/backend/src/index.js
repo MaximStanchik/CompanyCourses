@@ -1,4 +1,4 @@
-require("dotenv").config({ path: "D:/User/Documents/GitHub/CompanyCourses/Realization/backend/.env" });
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -7,19 +7,31 @@ const bodyParser = require("body-parser");
 const { initWS } = require("./ws/websocket.js");
 const { passport } = require('./config/passport');
 const multer = require('multer');
+const { initializeBuckets } = require('./utils/minioClient');
 
 console.log("Private Key Path:", process.env.PRIVATE_KEY_PATH);
 console.log("Primary Cert Path:", process.env.PRIMARY_CERT_PATH);
 
-var key = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
-var cert = fs.readFileSync(process.env.PRIMARY_CERT_PATH, "utf8");
+// Проверяем, есть ли SSL сертификаты
+let useHttps = false;
+let httpsOptions = {};
 
-var options = {
-  key: key,
-  cert: cert,
-};
-
-var https = require("https");
+if (process.env.PRIVATE_KEY_PATH && process.env.PRIMARY_CERT_PATH) {
+  try {
+    var key = fs.readFileSync(process.env.PRIVATE_KEY_PATH, "utf8");
+    var cert = fs.readFileSync(process.env.PRIMARY_CERT_PATH, "utf8");
+    httpsOptions = {
+      key: key,
+      cert: cert,
+    };
+    useHttps = true;
+    console.log("SSL certificates loaded successfully");
+  } catch (error) {
+    console.log("SSL certificates not found, using HTTP");
+  }
+} else {
+  console.log("SSL certificates not configured, using HTTP");
+}
 
 // Создание приложения express
 const app = express();
@@ -27,7 +39,9 @@ app.set('trust proxy', true);
 
 // Создаем CORS middleware для обработки с учетом учетных данных
 const corsOptions = {
-  origin: "https://localhost:3000",  // точный домен, с которого разрешены запросы
+  origin: process.env.NODE_ENV === 'development' 
+    ? ["http://localhost:3000", "https://localhost:3000"]  // разрешаем и HTTP и HTTPS в dev
+    : "https://localhost:3000",  // только HTTPS в prod
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true,  // включаем поддержку cookies и авторизационных заголовков
@@ -37,66 +51,14 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Использование других middleware
-app.use(bodyParser.urlencoded({ extended: false, limit: '5mb' }));
-app.use(express.json({ limit: '5mb' }));
+app.use(bodyParser.urlencoded({ extended: false, limit: '100mb' }));
+app.use(express.json({ limit: '100mb' }));
 app.use(passport.initialize());
 
-// Путь к директории со статическими файлами
-const staticPath = path.resolve(__dirname, "../static"); // на уровень выше
-console.log("Путь к static: " + staticPath);
+// Настройка сервера для обслуживания статических файлов из папки public
+app.use('/assets', express.static(path.join(__dirname, '..', 'frontend', 'public', 'assets')));
 
-// Проверяем и создаем папку uploads если она не существует
-const uploadsPath = path.join(staticPath, "uploads");
-if (!fs.existsSync(uploadsPath)) {
-  try {
-    fs.mkdirSync(uploadsPath, { recursive: true });
-    console.log("Создана папка uploads:", uploadsPath);
-  } catch (err) {
-    console.error("Ошибка при создании папки uploads:", err);
-  }
-} else {
-  console.log("Папка uploads уже существует:", uploadsPath);
-}
-
-// Проверяем права на запись в папку uploads
-try {
-  fs.accessSync(uploadsPath, fs.constants.W_OK);
-  console.log("Права на запись в папку uploads подтверждены");
-} catch (err) {
-  console.error("Нет прав на запись в папку uploads:", err);
-}
-
-// Настройка статики для всех файлов
-app.use('/static', express.static(staticPath, {
-  setHeaders: (res, filePath) => {
-    if (filePath.endsWith('.mp4')) {
-      res.set('Content-Type', 'video/mp4');
-    } else if (filePath.endsWith('.webm')) {
-      res.set('Content-Type', 'video/webm');
-    } else if (filePath.endsWith('.ogg') || filePath.endsWith('.ogv')) {
-      res.set('Content-Type', 'video/ogg');
-    } else if (filePath.endsWith('.mov') || filePath.endsWith('.qt')) {
-      // QuickTime MOV
-      res.set('Content-Type', 'video/quicktime');
-    } else if (filePath.endsWith('.mkv')) {
-      // MKV может не поддерживаться нативно, но зададим общий тип
-      res.set('Content-Type', 'video/x-matroska');
-    }
-    // Включаем поддержу диапазонных запросов для потокового воспроизведения
-    res.set('Accept-Ranges', 'bytes');
-  }
-}));
-
-// Фоллбек: обслуживаем прямые запросы к изображениям без префикса /static
-app.get(/^\/[^\/]+\.(png|jpg|jpeg|gif|webp|svg)$/i, (req, res, next) => {
-  const requested = req.path.replace(/^\//, '');
-  const candidate = path.join(staticPath, requested);
-  fs.access(candidate, fs.constants.R_OK, (err) => {
-    if (err) return next();
-    res.sendFile(candidate);
-  });
-});
-
+// Подключение роутеров
 const authRouter = require("./Routes/authRouter");
 const categoryRouter = require("./Routes/categoryRouter");
 const courseRouter = require("./Routes/courseRouter");
@@ -115,6 +77,7 @@ const lessonRouter = require("./Routes/lessonRouter");
 const studentsRouter = require("./Routes/studentsRouter");
 const courseRatingRouter = require("./Routes/courseRatingRouter");
 const courseCommentRouter = require("./Routes/courseCommentRouter");
+const minioRouter = require("./Routes/minioRouter");
 
 app.use("/auth", authRouter);
 app.use(categoryRouter);
@@ -134,6 +97,7 @@ app.use(favoriteRouter);
 app.use(lessonRouter);
 app.use(courseRatingRouter);
 app.use(courseCommentRouter);
+app.use('/api/minio', minioRouter);
 
 // Middleware для обработки ошибок multer
 app.use((error, req, res, next) => {
@@ -179,15 +143,38 @@ app.use((error, req, res, next) => {
   next(error);
 });
 
-// Настройка сервера для обслуживания статических файлов из папки public
-app.use('/assets', express.static(path.join(__dirname, '..', 'frontend', 'public', 'assets')));
+// Создание и запуск сервера (HTTPS или HTTP)
+let server;
 
-// Создание и запуск HTTPS сервера
-const httpsServer = https
-  .createServer(options, app)
-  .listen(process.env.PORT, () => {
-    console.log(`Server started on port: ${process.env.PORT}`);
-  });
+if (useHttps) {
+  const https = require("https");
+  server = https.createServer(httpsOptions, app);
+  console.log("Starting HTTPS server...");
+} else {
+  const http = require("http");
+  server = http.createServer(app);
+  console.log("Starting HTTP server...");
+}
+
+server.listen(process.env.PORT, async () => {
+  console.log(`Server started on port: ${process.env.PORT}`);
+  
+  // Инициализируем MinIO бакеты
+  try {
+    await initializeBuckets();
+    console.log('MinIO buckets initialized successfully');
+  } catch (error) {
+    console.error('Failed to initialize MinIO buckets:', error);
+  }
+  
+  // Запускаем миграцию видео URL (только один раз при запуске)
+  try {
+    const { migrateVideoUrls } = require('./utils/migrateVideoUrls');
+    await migrateVideoUrls();
+  } catch (error) {
+    console.error('Failed to migrate video URLs:', error);
+  }
+});
 
 app.use((req, res, next) => {
   console.log(`Request: ${req.method} ${req.url}`);
@@ -195,7 +182,7 @@ app.use((req, res, next) => {
 });
   
 // Инициализация WebSocket сервера
-const wsServer = initWS(httpsServer);
+const wsServer = initWS(server);
 
 // Общий обработчик ошибок
 app.use((error, req, res, next) => {

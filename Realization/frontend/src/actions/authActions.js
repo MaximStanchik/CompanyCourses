@@ -41,7 +41,23 @@ export const loginUser = (userData) => async (dispatch) => {
         dispatch(setCurrentUser(decoded));
     } catch (err) {
         console.error("Ошибка входа:", err.response?.data || err.message);
-        dispatch({ type: GET_ERRORS, payload: err.response?.data || { error: "Ошибка входа" } });
+        
+        let errorMessage = "Ошибка входа";
+        
+        if (err.response?.data) {
+            if (err.response.data.email) {
+                errorMessage = err.response.data.email;
+            } else if (err.response.data.password) {
+                errorMessage = err.response.data.password;
+            } else if (err.response.data.message) {
+                errorMessage = err.response.data.message;
+            }
+        }
+        
+        dispatch({ 
+            type: GET_ERRORS, 
+            payload: { message: errorMessage } 
+        });
     }
 };
 

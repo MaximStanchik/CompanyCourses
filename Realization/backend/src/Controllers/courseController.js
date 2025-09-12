@@ -261,18 +261,30 @@ class courseController {
           where: { courseId: course.id }
         });
 
-        // Создаем массив категорий как в enrollmentController
-        const categories = [];
+        // Создаем массив категорий как в getPublicCourses
+        const categoriesArray = [];
         if (course.Category) {
-          categories.push(course.Category);
+          categoriesArray.push(course.Category);
         }
         if (course.courseCategories && Array.isArray(course.courseCategories)) {
           course.courseCategories.forEach(cc => {
-            if (cc.category && !categories.find(c => c.id === cc.category.id)) {
-              categories.push(cc.category);
+            if (cc.category && !categoriesArray.find(c => c.id === cc.category.id)) {
+              categoriesArray.push(cc.category);
             }
           });
         }
+        course.categories = categoriesArray;
+        
+        console.log('Course categories debug:', {
+          courseId: course.id,
+          courseCategories: course.courseCategories,
+          categories: course.categories
+        });
+        
+        // Add rating stats to course
+        course.averageRating = ratingStats._avg.rating || 0;
+        course.totalRatings = ratingStats._count.rating || 0;
+        course.commentCount = commentCount;
 
         return {
           ...course,
@@ -280,7 +292,7 @@ class courseController {
           averageRating: ratingStats._avg.rating || 0,
           totalRatings: ratingStats._count.rating || 0,
           commentCount: commentCount,
-          categories: categories
+          categories: categoriesArray
         };
       }));
 
@@ -505,6 +517,74 @@ class courseController {
       await DbClient.course.update({ where:{ id }, data:{ name: name.trim() } });
       res.json({ id, name: name.trim() });
     } catch (e) { console.error(e); res.status(500).json(e);}  }
+
+// ===== API: delete module from syllabus =====
+async deleteCourseModule(req, res) {
+  try {
+    const courseId = Number(req.params.id);
+    const moduleId = Number(req.params.moduleId);
+    
+    if (!courseId || isNaN(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID' });
+    }
+    
+    if (!moduleId || isNaN(moduleId)) {
+      return res.status(400).json({ message: 'Invalid module ID' });
+    }
+
+    // Basic admin auth check
+    const authorizationHeader = req.headers.authorization;
+    if (!authorizationHeader) {
+      return res.status(401).json({ message: 'Auth header missing' });
+    }
+    
+    const [_bearer, token] = authorizationHeader.split(' ');
+    let decodedToken;
+    try { 
+      decodedToken = jwt.verify(token, process.env.SECRET); 
+    } catch (_) { 
+      return res.status(401).json({ message: 'Invalid token' }); 
+    }
+    
+    if (!(decodedToken.roles || []).includes('ADMIN')) {
+      return res.status(403).json({ message: "You don't have enough rights" });
+    }
+
+    // Read meta, find and remove module
+    const meta = readSyllabusMeta(courseId);
+    const modulesArr = Array.isArray(meta.syllabus) ? meta.syllabus : [];
+    
+    // Find module index
+    const moduleIndex = modulesArr.findIndex(m => Number(m.id) === moduleId);
+    if (moduleIndex === -1) {
+      return res.status(404).json({ message: 'Module not found' });
+    }
+    
+    // Get module info before deletion (for logging)
+    const moduleToDelete = modulesArr[moduleIndex];
+    console.log(`Deleting module: ${moduleToDelete.title || moduleToDelete.name} (ID: ${moduleId})`);
+    
+    // Remove module from array
+    modulesArr.splice(moduleIndex, 1);
+    meta.syllabus = modulesArr;
+    
+    // Save updated meta
+    writeSyllabusMeta(courseId, meta);
+    
+    // Log success
+    console.log(`Module ${moduleId} deleted successfully from course ${courseId}`);
+    
+    return res.status(200).json({ 
+      message: 'Module deleted successfully',
+      deletedModuleId: moduleId,
+      remainingModules: modulesArr.length
+    });
+    
+  } catch (e) {
+    console.error('deleteCourseModule error:', e);
+    return res.status(500).json({ message: 'Server error deleting module' });
+  }
+}
 
   async updateCourseFields(req, res) {
     try {
@@ -797,6 +877,7 @@ class courseController {
 
   async uploadFile(req, res) {
     try {
+      console.log('=== UPLOAD FILE START ===');
       console.log('Upload request received:', {
         courseId: req.params.id,
         type: req.query.type,
@@ -807,7 +888,7 @@ class courseController {
           filename: req.file.filename
         } : null
       });
-
+  
       const authorizationHeader = req.headers.authorization;
       if (!authorizationHeader) {
         return res.status(401).json({ message: "Authorization header missing" });
@@ -830,12 +911,12 @@ class courseController {
       if (!roles || !roles.includes("ADMIN")) {
         return res.status(403).json({ message: "You don't have enough rights" });
       }
-
+  
       const courseId = Number(req.params.id);
       if (!courseId || isNaN(courseId)) {
         return res.status(400).json({ message: "Invalid course ID" });
       }
-
+  
       // Проверяем существование курса
       const existingCourse = await DbClient.course.findUnique({
         where: { id: courseId }
@@ -844,23 +925,23 @@ class courseController {
       if (!existingCourse) {
         return res.status(404).json({ message: "Course not found" });
       }
-
+  
       const { type } = req.query;
-      if (!type || !['logo', 'intro', 'image', 'video'].includes(type)) {
-        return res.status(400).json({ message: "Invalid file type. Must be 'logo', 'intro', 'image', or 'video'" });
+      if (!type || !['logo', 'intro', 'image', 'video', 'file'].includes(type)) {
+        return res.status(400).json({ message: "Invalid file type. Must be 'logo', 'intro', 'image', 'video', or 'file'" });
       }
-
+  
       // Проверяем, что файл был загружен
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
       }
-
+  
       // Проверяем размер файла (максимум 15GB для больших видеофайлов)
       const maxSize = 15 * 1024 * 1024 * 1024; // 15GB
       if (req.file.size > maxSize) {
         return res.status(400).json({ message: "File size too large. Maximum size is 15GB" });
       }
-
+  
       // Multer уже проверил тип файла, поэтому дополнительная проверка не нужна
       // Просто логируем информацию о файле для отладки
       console.log('File validation passed by multer:', {
@@ -869,18 +950,50 @@ class courseController {
         filename: req.file.filename,
         size: req.file.size
       });
-
-      // Создаем правильный URL для загруженного файла
-      const baseUrl = `https://localhost:${process.env.PORT || 3001}`;
-      const fileUrl = `${baseUrl}/static/uploads/${req.file.filename}`;
+  
+      // Импортируем MinIO клиент
+      const { uploadFile: uploadToMinio, BUCKETS } = require('../utils/minioClient');
       
-      // Проверяем что файл действительно был создан
-      const filePath = path.join(__dirname, '../../static/uploads', req.file.filename);
-      if (!fs.existsSync(filePath)) {
-        throw new Error('File was not created on disk');
+      // Определяем бакет и имя файла для MinIO
+      let bucketName = BUCKETS.COURSE_FILES;
+      let objectName;
+      
+      if (type === 'logo') {
+        objectName = `course-${courseId}-logo-${req.file.filename}`;
+      } else if (type === 'intro') {
+        objectName = `course-${courseId}-intro-${req.file.filename}`;
+      } else if (type === 'image') {
+        objectName = `course-${courseId}-image-${req.file.filename}`;
+      } else if (type === 'video') {
+        objectName = `course-${courseId}-video-${req.file.filename}`;
+      } else if (type === 'file') {
+        objectName = `course-${courseId}-file-${req.file.filename}`;
+      } else {
+        return res.status(400).json({ message: `Unsupported file type: ${type}` });
       }
       
-      console.log('File created successfully at:', filePath);
+      console.log('File will be stored as:', { bucketName, objectName });
+      
+      // Читаем файл из временного места
+      const fileBuffer = fs.readFileSync(req.file.path);
+      
+      // Загружаем файл в MinIO
+      console.log('📤 Uploading file to MinIO:', {
+        bucketName,
+        objectName,
+        contentType: req.file.mimetype,
+        size: fileBuffer.length
+      });
+      
+      const minioPath = await uploadToMinio(bucketName, objectName, fileBuffer, req.file.mimetype);
+      console.log('✅ File uploaded to MinIO:', minioPath);
+      
+      // Удаляем временный файл
+      fs.unlinkSync(req.file.path);
+      console.log('��️ Temporary file deleted:', req.file.path);
+      
+      // Создаем правильный URL для MinIO
+      const fileUrl = `/api/minio/file/${bucketName}/${objectName}`;
       
       // Обновляем курс с новым URL только для logo и intro
       const updateData = {};
@@ -889,8 +1002,8 @@ class courseController {
       } else if (type === 'intro') {
         updateData.introUrl = fileUrl;
       }
-      // Для типа 'image' не обновляем курс, так как это изображения для редактора
-
+      // Для типов 'image', 'video' и 'file' не обновляем курс, так как это файлы для редактора
+  
       let updatedCourse;
       if (type === 'logo' || type === 'intro') {
         updatedCourse = await DbClient.course.update({
@@ -898,18 +1011,19 @@ class courseController {
           data: updateData
         });
       }
-
+  
       res.json({ 
         url: fileUrl, 
-        filename: req.file.filename,
-        message: `${type === 'logo' ? 'Logo' : type === 'intro' ? 'Intro video' : type === 'video' ? 'Video' : 'Image'} uploaded successfully` 
+        filename: objectName,
+        message: `${type === 'logo' ? 'Logo' : type === 'intro' ? 'Intro video' : type === 'video' ? 'Video' : type === 'file' ? 'File' : 'Image'} uploaded successfully` 
       });
       
       console.log('File uploaded successfully:', {
         courseId,
         type,
         fileUrl,
-        filename: req.file.filename
+        filename: objectName,
+        minioPath
       });
     } catch (e) {
       console.error('File upload error:', e);
@@ -1015,33 +1129,15 @@ class courseController {
       const meta = readSyllabusMeta(courseId);
       const existingModules = Array.isArray(meta.syllabus) ? meta.syllabus : [];
 
-      // Если модулей нет, создаем временные модули на основе лекций
-      let modules = existingModules;
-      if (existingModules.length === 0 && lectures.length > 0) {
-        // Создаем временные модули (каждые 3 лекции = 1 модуль)
-        const moduleCount = Math.ceil(lectures.length / 3);
-        modules = Array.from({ length: moduleCount }, (_, index) => ({
-          id: index + 1,
-          title: `Module ${index + 1}`,
-          description: `Auto-generated module ${index + 1}`,
-          order: index + 1,
-          lessons: []
-        }));
-      }
-
       // Распределяем лекции по модулям
       const lessonsByModule = {};
       lectures.forEach((lecture, index) => {
-        // Если есть существующие модули, используем их структуру
+        // Используем реальный moduleId из базы данных
         let moduleId;
-        if (existingModules.length > 0) {
-          // Ищем модуль, который содержит эту лекцию
-          const foundModule = existingModules.find(module => 
-            module.lessons && module.lessons.some(lesson => lesson.id === lecture.id)
-          );
-          moduleId = foundModule ? foundModule.id : Math.floor(index / 3) + 1;
+        if (lecture.moduleId) {
+          moduleId = Number(lecture.moduleId);
         } else {
-          // Используем автоматическое распределение
+          // Fallback: если moduleId нет, используем автоматическое распределение
           moduleId = Math.floor(index / 3) + 1;
         }
 
@@ -1053,6 +1149,7 @@ class courseController {
         console.log(`Лекция ${lecture.id} (${lecture.name}):`, {
           id: lecture.id,
           name: lecture.name,
+          moduleId: lecture.moduleId,
           videoLink: lecture.videoLink,
           stepsCount: lecture.steps ? lecture.steps.length : 0,
           steps: lecture.steps ? lecture.steps.map(step => ({
@@ -1080,6 +1177,38 @@ class courseController {
           })) : []
         });
       });
+
+      // Получаем уникальные moduleId из лекций
+      const uniqueModuleIds = [...new Set(lectures
+        .filter(lecture => lecture.moduleId)
+        .map(lecture => Number(lecture.moduleId))
+      )];
+
+      console.log('Уникальные moduleId из лекций:', uniqueModuleIds);
+
+      // Если есть реальные модули из meta файла, используем их
+      let modules = existingModules;
+
+      // Если модулей нет в meta, но есть лекции с moduleId, создаем модули на основе реальных moduleId
+      if (existingModules.length === 0 && uniqueModuleIds.length > 0) {
+        modules = uniqueModuleIds.map((moduleId, index) => ({
+          id: moduleId,
+          title: `Module ${index + 1}`,
+          description: `Auto-generated module ${index + 1}`,
+          order: index + 1,
+          lessons: []
+        }));
+      } else if (existingModules.length === 0 && lectures.length > 0) {
+        // Fallback: создаем временные модули (каждые 3 лекции = 1 модуль)
+        const moduleCount = Math.ceil(lectures.length / 3);
+        modules = Array.from({ length: moduleCount }, (_, index) => ({
+          id: index + 1,
+          title: `Module ${index + 1}`,
+          description: `Auto-generated module ${index + 1}`,
+          order: index + 1,
+          lessons: []
+        }));
+      }
 
       // Объединяем модули с уроками
       const modulesWithLessons = modules.map(module => ({
@@ -1162,146 +1291,106 @@ class courseController {
   // Получить прогресс пользователя по курсу
   async getUserProgress(req, res) {
     try {
-      const courseId = Number(req.params.id); // Используем id вместо courseId
-      const userId = Number(req.params.userId);
+      const { id: courseId, userId } = req.params;
+      const token = req.headers.authorization?.replace('Bearer ', '');
       
-      console.log(`=== ЗАГРУЗКА ПРОГРЕССА ПОЛЬЗОВАТЕЛЯ ===`);
-      console.log(`Курс ID: ${courseId}, Пользователь ID: ${userId}`);
-      console.log(`req.params:`, req.params);
-
-      if (!courseId || isNaN(courseId) || !userId || isNaN(userId)) {
-        console.log('Недопустимые параметры:', { courseId, userId });
-        return res.status(400).json({ message: 'Invalid course ID or user ID' });
+      if (!token) {
+        return res.status(401).json({ message: 'Token required' });
       }
-
-      // Проверяем, что курс существует
-      const course = await DbClient.course.findUnique({
-        where: { id: courseId }
-      });
-
-      if (!course) {
-        return res.status(404).json({ message: 'Course not found' });
+      
+      const decodedToken = jwt.verify(token, process.env.SECRET);
+      const requestingUserId = decodedToken.id;
+      
+      // Проверяем, что пользователь запрашивает свой прогресс или это админ
+      if (parseInt(userId) !== requestingUserId && decodedToken.role !== 'ADMIN') {
+        return res.status(403).json({ message: 'Access denied' });
       }
-
+      
+      console.log('=== ЗАГРУЗКА ПРОГРЕССА ПОЛЬЗОВАТЕЛЯ ===');
+      console.log('Курс ID:', courseId, 'Пользователь ID:', userId);
+      console.log('req.params:', req.params);
+      
       // Проверяем, что пользователь записан на курс
       const enrollment = await DbClient.enrollment.findFirst({
         where: {
-          course_id: courseId,
-          user_id: userId
+          user_id: parseInt(userId),
+          course_id: parseInt(courseId)
         }
       });
-
+      
       if (!enrollment) {
         return res.status(403).json({ message: 'User is not enrolled in this course' });
       }
-
-      // Получаем завершенные шаги пользователя
-      const stepCompletions = await DbClient.stepCompletion.findMany({
-        where: {
-          user_id: userId,
-          course_id: courseId,
-        },
-        select: { lesson_id: true, step_index: true }
-      });
-
-      // Получаем попытки тестов
+      
+      // Получаем попытки тестов пользователя
       const testAttempts = await DbClient.testAttempt.findMany({
         where: {
-          user_id: userId,
-          course_id: courseId
+          user_id: parseInt(userId),
+          course_id: parseInt(courseId)
         },
-        select: {
-          lesson_id: true,
-          step_index: true,
+        select: { 
+          lesson_id: true, 
+          step_index: true, 
           attempts: true,
           lastScore: true,
           lastPassed: true,
-          lastAnswers: true
+          lastAnswers: true,
+          updatedAt: true
         }
       });
-
-      // Получаем завершенные уроки
-      const lessonCompletions = await DbClient.lessonCompletion.findMany({
-        where: {
-          user_id: userId,
-          course_id: courseId
-        },
-        select: {
-          lecture_id: true,
-          completedAt: true
-        }
+      
+      console.log('Test attempts found:', testAttempts.length);
+      
+      // Преобразуем данные в camelCase для frontend
+      const formattedTestAttempts = testAttempts.map(attempt => ({
+        lessonId: attempt.lesson_id,
+        stepIndex: attempt.step_index,
+        attempts: attempt.attempts,
+        lastScore: attempt.lastScore,
+        lastPassed: attempt.lastPassed,
+        lastAnswers: attempt.lastAnswers,
+        updatedAt: attempt.updatedAt
+      }));
+      
+      // Получаем уроки курса
+      const lessons = await DbClient.lecture.findMany({
+        where: { course_id: parseInt(courseId) },
+        include: { steps: true }
       });
-
-      // Получаем прогресс уроков из ModuleProgress
-      const lessonProgresses = await DbClient.moduleProgress.findMany({
-        where: {
-          user_id: userId,
-          course_id: courseId,
-          module_key: {
-            startsWith: 'lesson:'
+      
+      // Подсчитываем общий прогресс (только на основе завершенных тестов на 100%)
+      let totalSteps = 0;
+      let completedSteps = 0;
+      
+      lessons.forEach(lesson => {
+        totalSteps += lesson.steps.length;
+        lesson.steps.forEach((step, stepIndex) => {
+          if (step.type === 'test' || step.type === 'quiz') {
+            const testAttempt = testAttempts.find(ta => 
+              ta.lesson_id === lesson.id && ta.step_index === stepIndex
+            );
+            if (testAttempt && testAttempt.lastScore >= 100) {
+              completedSteps++;
+            }
           }
-        },
-        select: {
-          module_key: true,
-          progress: true,
-          updatedAt: true
-        }
+        });
       });
-
-      // Получаем общий прогресс курса
-      const courseProgress = await DbClient.moduleProgress.findFirst({
-        where: {
-          user_id: userId,
-          course_id: courseId,
-          module_key: `course:${courseId}`
-        },
-        select: {
-          progress: true,
-          updatedAt: true
-        }
+      
+      const totalProgress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
+      
+      console.log('Progress calculated:', { totalSteps, completedSteps, totalProgress });
+      
+      res.json({
+        courseId: parseInt(courseId),
+        userId: parseInt(userId),
+        totalProgress,
+        testAttempts: formattedTestAttempts, // Используем отформатированные данные
+        message: 'Progress loaded successfully'
       });
-
-      console.log('Данные из БД:');
-      console.log('- Step completions:', stepCompletions.length);
-      console.log('- Test attempts:', testAttempts.length);
-      console.log('- Lesson completions:', lessonCompletions.length);
-      console.log('- Lesson progresses:', lessonProgresses.length);
-      console.log('- Course progress:', courseProgress);
-
-      const progress = {
-        stepCompletions: stepCompletions.map(sc => ({
-          lessonId: sc.lesson_id,
-          stepIndex: sc.step_index
-        })),
-        testAttempts: testAttempts.map(a => ({
-          lessonId: a.lesson_id,
-          stepIndex: a.step_index,
-          attempts: a.attempts,
-          lastScore: a.lastScore,
-          lastPassed: a.lastPassed,
-          lastAnswers: a.lastAnswers
-        })),
-        completedLessonIds: lessonCompletions.map(lc => lc.lecture_id),
-        lessonProgresses: lessonProgresses.map(lp => ({
-          lessonId: Number(lp.module_key.replace('lesson:', '')),
-          progress: lp.progress,
-          updatedAt: lp.updatedAt
-        })),
-        courseProgress: courseProgress ? {
-          progress: courseProgress.progress,
-          updatedAt: courseProgress.updatedAt
-        } : null,
-        totalProgress: courseProgress ? courseProgress.progress : 0
-      };
-
-      console.log('Отправляем прогресс:', progress);
-      console.log(`=== КОНЕЦ ЗАГРУЗКИ ПРОГРЕССА ===`);
-
-      res.json(progress);
-
+      
     } catch (error) {
       console.error('Error in getUserProgress:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   }
 
@@ -1483,128 +1572,47 @@ class courseController {
   // Завершить шаг урока
   async completeStep(req, res) {
     try {
-      const courseId = Number(req.params.id);
-      const lessonId = Number(req.params.lessonId);
-      const stepIndex = Number(req.params.stepIndex);
-      
-      console.log(`=== ЗАВЕРШЕНИЕ ШАГА В BACKEND ===`);
-      console.log(`Курс ID: ${courseId}, Урок ID: ${lessonId}, Шаг: ${stepIndex}`);
-      console.log(`Тело запроса:`, req.body);
-      console.log(`testResult:`, req.body.testResult);
-      console.log(`testResult.score:`, req.body.testResult?.score);
-      
-      if (!courseId || isNaN(courseId) || !lessonId || isNaN(lessonId) || isNaN(stepIndex) || stepIndex < 0) {
-        console.log('Недопустимые параметры:', { courseId, lessonId, stepIndex });
-        return res.status(400).json({ message: 'Invalid course ID, lesson ID, or step index' });
-      }
-
-      // Проверяем авторизацию
-      const authorizationHeader = req.headers.authorization;
-      if (!authorizationHeader) {
-        console.log('Отсутствует заголовок авторизации');
-        return res.status(401).json({ message: "Authorization header missing" });
-      }
-      
-      const tokenArray = authorizationHeader.split(" ");
-      if (tokenArray.length !== 2) {
-        console.log('Неверный формат авторизации');
-        return res.status(401).json({ message: "Invalid authorization format" });
-      }
-      
-      const token = tokenArray[1];
-      let decodedToken;
-      try {
-        decodedToken = jwt.verify(token, process.env.SECRET);
-        console.log('Токен валиден, пользователь ID:', decodedToken.id);
-      } catch (err) {
-        console.log('Неверный токен:', err.message);
-        return res.status(401).json({ message: "Invalid token" });
-      }
-
-      // Проверяем, что курс существует
-      const course = await DbClient.course.findUnique({
-        where: { id: courseId }
+      const { courseId, lessonId, stepIndex } = req.params;
+      const decodedToken = jwt.verify(req.headers.authorization.replace('Bearer ', ''), process.env.SECRET);
+      const userId = decodedToken.id;
+  
+      console.log('=== ЗАВЕРШЕНИЕ ШАГА ===');
+      console.log('Данные:', { courseId, lessonId, stepIndex, userId });
+  
+      // Получаем урок
+      const targetLesson = await DbClient.lecture.findUnique({
+        where: { id: parseInt(lessonId) },
+        include: { steps: true }
       });
-
-      if (!course) {
-        console.log('Курс не найден:', courseId);
-        return res.status(404).json({ message: 'Course not found' });
-      }
-
-      // Проверяем, что пользователь записан на курс
-      const enrollment = await DbClient.enrollment.findFirst({
-        where: {
-          course_id: courseId,
-          user_id: decodedToken.id
-        }
-      });
-
-      if (!enrollment) {
-        console.log('Пользователь не записан на курс:', { userId: decodedToken.id, courseId });
-        return res.status(403).json({ message: 'User is not enrolled in this course' });
-      }
-
-      console.log('Курс и запись пользователя найдены');
-
-      // Читаем модули курса для получения информации о шагах
-      const meta = readSyllabusMeta(courseId);
-      const modules = Array.isArray(meta.syllabus) ? meta.syllabus : [];
-      
-      // Находим урок и его шаги
-      let targetLesson = null;
-      let lessonModule = null;
-      
-      for (const module of modules) {
-        if (Array.isArray(module.lessons)) {
-          const lesson = module.lessons.find(l => l.id === lessonId);
-          if (lesson) {
-            targetLesson = lesson;
-            lessonModule = module;
-            break;
-          }
-        }
-      }
-
+  
       if (!targetLesson) {
-        // fallback: попробуем найти урок в базе напрямую и создать заглушку steps
-        const lectureDb = await DbClient.lecture.findFirst({ where: { id: lessonId, course_id: courseId } });
-        if (!lectureDb) {
-          return res.status(404).json({ message: 'Lesson not found' });
-        }
-        targetLesson = { id: lectureDb.id, steps: Array(stepIndex + 1).fill({}) };
-        lessonModule = { id: 'none', lessons: [targetLesson] };
+        return res.status(404).json({ message: 'Lesson not found' });
       }
-
-      if (!Array.isArray(targetLesson.steps) || stepIndex >= targetLesson.steps.length) {
-        // расширяем steps если пришёл индекс больше текущего
-        if (!Array.isArray(targetLesson.steps)) targetLesson.steps = [];
-        while (targetLesson.steps.length <= stepIndex) {
-          targetLesson.steps.push({});
-        }
-      }
-
+  
       // Если это тестовый шаг, фиксируем попытку
       try {
         const testResult = req.body && req.body.testResult;
-        console.log('Processing test result:', { testResult, lessonId, stepIndex, userId: decodedToken.id });
+        console.log('Processing test result:', { testResult, lessonId, stepIndex, userId });
+        
         if (testResult && typeof testResult === 'object') {
           try {
             const prev = await DbClient.testAttempt.findUnique({
               where: {
                 user_id_lesson_id_step_index: {
-                  user_id: decodedToken.id,
-                  lesson_id: lessonId,
-                  step_index: stepIndex
+                  user_id: userId,
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex)
                 }
               }
             });
-
-                      console.log('Previous attempt found:', prev);
-          const attempts = (prev?.attempts || 0) + 1;
-          console.log('Saving test attempt:', {
-              userId: decodedToken.id,
-              lessonId,
-              stepIndex,
+  
+            console.log('Previous attempt found:', prev);
+            const attempts = (prev?.attempts || 0) + 1;
+            
+            console.log('Saving test attempt:', {
+              userId,
+              lessonId: parseInt(lessonId),
+              stepIndex: parseInt(stepIndex),
               attempts,
               lastScore: Math.max(0, Math.min(100, Number(testResult.score) || 0)),
               lastPassed: !!testResult.isPassed,
@@ -1615,21 +1623,21 @@ class courseController {
             const existingAttempt = await DbClient.testAttempt.findUnique({
               where: {
                 user_id_lesson_id_step_index: {
-                  user_id: decodedToken.id,
-                  lesson_id: lessonId,
-                  step_index: stepIndex
+                  user_id: userId,
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex)
                 }
               }
             });
-
+  
             if (existingAttempt) {
               console.log(`Обновляем существующую попытку для шага ${stepIndex} урока ${lessonId}`);
               await DbClient.testAttempt.update({
                 where: {
                   user_id_lesson_id_step_index: {
-                    user_id: decodedToken.id,
-                    lesson_id: lessonId,
-                    step_index: stepIndex
+                    user_id: userId,
+                    lesson_id: parseInt(lessonId),
+                    step_index: parseInt(stepIndex)
                   }
                 },
                 data: {
@@ -1643,10 +1651,10 @@ class courseController {
               console.log(`Создаем новую попытку для шага ${stepIndex} урока ${lessonId}`);
               await DbClient.testAttempt.create({
                 data: {
-                  user_id: decodedToken.id,
-                  course_id: courseId,
-                  lesson_id: lessonId,
-                  step_index: stepIndex,
+                  user_id: userId,
+                  course_id: parseInt(courseId),
+                  lesson_id: parseInt(lessonId),
+                  step_index: parseInt(stepIndex),
                   attempts,
                   lastScore: Math.max(0, Math.min(100, Number(testResult.score) || 0)),
                   lastPassed: !!testResult.isPassed,
@@ -1654,169 +1662,41 @@ class courseController {
                 }
               });
             }
-          } catch (innerError) {
-            console.warn('Failed to upsert test attempt:', innerError?.message);
-          }
-
-          // Для тестов отмечаем шаг как завершенный только если результат 100%
-          if (testResult.score >= 100) {
-            console.log(`Тест пройден на 100%, отмечаем шаг как завершенный`);
-          } else {
-            console.log(`=== ТЕСТ НЕ ПРОЙДЕН НА 100% ===`);
-            console.log(`Тест пройден на ${testResult.score}%, шаг НЕ завершен`);
-            console.log(`Возвращаем ответ без завершения шага`);
-            // Возвращаем ответ с информацией о попытке, но без завершения шага
+  
+            // Для тестов возвращаем результат без завершения шага
+            console.log(`=== РЕЗУЛЬТАТ ТЕСТА СОХРАНЕН ===`);
+            console.log(`Тест пройден на ${testResult.score}%`);
+            
             return res.json({ 
-              lessonId, 
+              lessonId: parseInt(lessonId), 
               lessonProgress: 0, 
               totalProgress: 0, 
               testAttempt: { attempts },
-              message: 'Тест не пройден на 100%',
+              message: 'Test result saved successfully',
               testResult: testResult
             });
+            
+          } catch (innerError) {
+            console.warn('Failed to save test attempt:', innerError?.message);
+            return res.status(500).json({ message: 'Failed to save test result', error: innerError.message });
           }
         }
       } catch (e) {
         console.warn('Failed to record test attempt', e?.message);
+        return res.status(500).json({ message: 'Failed to process test result', error: e.message });
       }
-
-      // Проверяем тип шага
-      const currentStep = targetLesson.steps[stepIndex];
-      const stepType = currentStep?.type || 'text';
-      console.log(`Тип шага ${stepIndex}: ${stepType}`);
-
-      // Для тестовых шагов НЕ создаем stepCompletion записи
-      if (stepType === 'test' || stepType === 'quiz') {
-        console.log(`=== ТЕСТОВЫЙ ШАГ - НЕ СОЗДАЕМ STEP COMPLETION ===`);
-        console.log(`Шаг ${stepIndex} является тестовым (${stepType}), пропускаем создание stepCompletion`);
-      } else {
-        // Проверяем, не был ли шаг уже завершен (только для нетекстовых шагов)
-        const existingStepCompletion = await DbClient.stepCompletion.findUnique({
-          where: {
-            user_id_lesson_id_step_index: {
-              user_id: decodedToken.id,
-              lesson_id: lessonId,
-              step_index: stepIndex,
-            }
-          }
-        });
-
-        if (existingStepCompletion) {
-          console.log(`=== ШАГ УЖЕ ЗАВЕРШЕН ===`);
-          console.log(`Шаг ${stepIndex} урока ${lessonId} уже был завершен в ${existingStepCompletion.completedAt}`);
-          console.log(`Это может быть причиной неправильного прогресса!`);
-          // Возвращаем существующий прогресс без создания новой записи
-        } else {
-          console.log(`=== СОЗДАЕМ НОВУЮ ЗАПИСЬ ===`);
-          console.log(`Создаем новую запись о завершении шага ${stepIndex} урока ${lessonId}`);
-          // Фиксируем завершение шага в БД (только для нетекстовых шагов)
-          await DbClient.stepCompletion.create({
-            data: {
-              user_id: decodedToken.id,
-              course_id: courseId,
-              lesson_id: lessonId,
-              step_index: stepIndex,
-              completedAt: new Date(),
-            }
-          });
-        }
-      }
-
-      // Подсчитываем прогресс урока
-      const totalSteps = targetLesson.steps.length;
-      const completedSteps = await DbClient.stepCompletion.count({
-        where: {
-          user_id: decodedToken.id,
-          lesson_id: lessonId,
-        }
-      });
-
-      const lessonProgress = Math.round((completedSteps / totalSteps) * 100);
-      const lessonCompleted = lessonProgress >= 100;
-
-      // Сохраняем прогресс урока как snapshot в ModuleProgress c ключом lesson:<lessonId>
-      try {
-        // Проверяем существующий прогресс модуля
-        const existingModuleProgress = await DbClient.moduleProgress.findUnique({
-          where: {
-            user_id_course_id_module_key: {
-              user_id: decodedToken.id,
-              course_id: courseId,
-              module_key: `lesson:${lessonId}`,
-            }
-          }
-        });
-
-        if (existingModuleProgress) {
-          console.log(`Обновляем прогресс модуля lesson:${lessonId} с ${existingModuleProgress.progress}% до ${lessonProgress}%`);
-          await DbClient.moduleProgress.update({
-            where: {
-              user_id_course_id_module_key: {
-                user_id: decodedToken.id,
-                course_id: courseId,
-                module_key: `lesson:${lessonId}`,
-              }
-            },
-            data: { progress: lessonProgress }
-          });
-        } else {
-          console.log(`Создаем новый прогресс модуля lesson:${lessonId}: ${lessonProgress}%`);
-          await DbClient.moduleProgress.create({
-            data: {
-              user_id: decodedToken.id,
-              course_id: courseId,
-              module_key: `lesson:${lessonId}`,
-              progress: lessonProgress,
-            }
-          });
-        }
-
-        console.log(`Прогресс урока ${lessonId} сохранен: ${lessonProgress}%`);
-      } catch (error) {
-        console.error('Ошибка при сохранении прогресса модуля:', error);
-      }
-
-      // Если урок полностью завершен, отмечаем его как завершенный
-      if (lessonCompleted) {
-        console.log(`Урок ${lessonId} полностью завершен, отмечаем как завершенный`);
-        try {
-          await DbClient.lessonCompletion.upsert({
-            where: {
-              user_id_lecture_id: {
-                user_id: decodedToken.id,
-                lecture_id: lessonId,
-              }
-            },
-            update: { completedAt: new Date() },
-            create: {
-              user_id: decodedToken.id,
-              course_id: courseId,
-              lecture_id: lessonId,
-              completedAt: new Date(),
-            }
-          });
-          console.log(`Урок ${lessonId} отмечен как завершенный`);
-        } catch (error) {
-          console.error('Ошибка при отметке урока как завершенного:', error);
-        }
-      }
-
-      console.log(`=== КОНЕЦ ЗАВЕРШЕНИЯ ШАГА ===`);
-      console.log(`Шаг ${stepIndex} урока ${lessonId} успешно завершен`);
-      console.log(`Прогресс урока: ${lessonProgress}%`);
-      console.log(`Урок завершен: ${lessonCompleted}`);
-
+  
+      // Если это не тест, возвращаем успех без сохранения прогресса
       res.json({ 
-        lessonId, 
-        lessonProgress, 
+        lessonId: parseInt(lessonId), 
+        lessonProgress: 0, 
         totalProgress: 0, 
-        message: 'Шаг успешно завершен',
-        stepCompleted: true
+        message: 'Step processed successfully'
       });
-
+  
     } catch (error) {
       console.error('Ошибка в completeStep:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   }
 
@@ -2075,7 +1955,113 @@ class courseController {
     }
   }
 
-  // Сохранить прогресс урока
+// Новый метод только для сохранения результатов тестов
+async saveTestResult(req, res) {
+  try {
+    const { courseId, lessonId, stepIndex } = req.params;
+    const { testResult } = req.body;
+    
+    // Проверяем токен
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    if (!token) {
+      return res.status(401).json({ message: 'Token required' });
+    }
+    
+    const decodedToken = jwt.verify(token, process.env.SECRET);
+    const userId = decodedToken.id;
+    
+    console.log('=== СОХРАНЕНИЕ РЕЗУЛЬТАТА ТЕСТА ===');
+    console.log('Данные:', { courseId, lessonId, stepIndex, userId, testResult });
+    
+    if (!testResult || typeof testResult !== 'object') {
+      return res.status(400).json({ message: 'Invalid test result data' });
+    }
+    
+    // Проверяем существующую попытку
+    console.log('Ищем существующую попытку...');
+    const existingAttempt = await DbClient.testAttempt.findUnique({
+      where: {
+        user_id_lesson_id_step_index: {
+          user_id: userId,
+          lesson_id: parseInt(lessonId),
+          step_index: parseInt(stepIndex)
+        }
+      }
+    });
+    
+    console.log('Найдена существующая попытка:', existingAttempt);
+    
+    const attempts = (existingAttempt?.attempts || 0) + 1;
+    const score = Math.max(0, Math.min(100, Number(testResult.score) || 0));
+    const isPassed = !!testResult.isPassed;
+    const answers = testResult.answers || {};
+    
+    console.log('Данные для сохранения:', {
+      userId,
+      courseId: parseInt(courseId),
+      lessonId: parseInt(lessonId),
+      stepIndex: parseInt(stepIndex),
+      attempts,
+      score,
+      isPassed,
+      answers
+    });
+    
+    if (existingAttempt) {
+      console.log('Обновляем существующую попытку...');
+      // Обновляем существующую попытку
+      const updatedAttempt = await DbClient.testAttempt.update({
+        where: {
+          user_id_lesson_id_step_index: {
+            user_id: userId,
+            lesson_id: parseInt(lessonId),
+            step_index: parseInt(stepIndex)
+          }
+        },
+        data: {
+          attempts,
+          lastScore: score,
+          lastPassed: isPassed,
+          lastAnswers: answers
+        }
+      });
+      
+      console.log('Попытка обновлена успешно:', updatedAttempt);
+      res.json({ 
+        message: 'Test result saved successfully',
+        attempt: updatedAttempt
+      });
+    } else {
+      console.log('Создаем новую попытку...');
+      // Создаем новую попытку
+      const newAttempt = await DbClient.testAttempt.create({
+        data: {
+          user_id: userId,
+          course_id: parseInt(courseId),
+          lesson_id: parseInt(lessonId),
+          step_index: parseInt(stepIndex),
+          attempts,
+          lastScore: score,
+          lastPassed: isPassed,
+          lastAnswers: answers
+        }
+      });
+      
+      console.log('Новая попытка создана успешно:', newAttempt);
+      res.json({ 
+        message: 'Test result saved successfully',
+        attempt: newAttempt
+      });
+    }
+    
+  } catch (error) {
+    console.error('Ошибка при сохранении результата теста:', error);
+    console.error('Детали ошибки:', error.message);
+    console.error('Стек ошибки:', error.stack);
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+}
+
   async saveLessonProgress(req, res) {
     try {
       const courseId = Number(req.params.id);
@@ -2560,6 +2546,104 @@ class courseController {
     } catch (error) {
       console.error('Ошибка при очистке тестовых записей:', error);
       res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+  async saveTestResult(req, res) {
+    try {
+      const { courseId, lessonId, stepIndex } = req.params;
+      const { testResult } = req.body;
+      
+      // Проверяем токен
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) {
+        return res.status(401).json({ message: 'Token required' });
+      }
+      
+      const decodedToken = jwt.verify(token, process.env.SECRET);
+      const userId = decodedToken.id;
+      
+      console.log('=== СОХРАНЕНИЕ РЕЗУЛЬТАТА ТЕСТА ===');
+      console.log('Данные:', { courseId, lessonId, stepIndex, userId, testResult });
+      
+      if (!testResult || typeof testResult !== 'object') {
+        return res.status(400).json({ message: 'Invalid test result data' });
+      }
+      
+      // Проверяем существующую попытку
+      const existingAttempt = await DbClient.testAttempt.findUnique({
+        where: {
+          user_id_lesson_id_step_index: {
+            user_id: userId,
+            lesson_id: parseInt(lessonId),
+            step_index: parseInt(stepIndex)
+          }
+        }
+      });
+      
+      const attempts = (existingAttempt?.attempts || 0) + 1;
+      const score = Math.max(0, Math.min(100, Number(testResult.score) || 0));
+      const isPassed = !!testResult.isPassed;
+      const answers = testResult.answers || {};
+      
+      console.log('Сохранение попытки:', {
+        userId,
+        courseId: parseInt(courseId),
+        lessonId: parseInt(lessonId),
+        stepIndex: parseInt(stepIndex),
+        attempts,
+        score,
+        isPassed,
+        answers
+      });
+      
+      if (existingAttempt) {
+        // Обновляем существующую попытку
+        const updatedAttempt = await DbClient.testAttempt.update({
+          where: {
+            user_id_lesson_id_step_index: {
+              user_id: userId,
+              lesson_id: parseInt(lessonId),
+              step_index: parseInt(stepIndex)
+            }
+          },
+          data: {
+            attempts,
+            lastScore: score,
+            lastPassed: isPassed,
+            lastAnswers: answers
+          }
+        });
+        
+        console.log('Попытка обновлена:', updatedAttempt);
+        res.json({ 
+          message: 'Test result saved successfully',
+          attempt: updatedAttempt
+        });
+      } else {
+        // Создаем новую попытку
+        const newAttempt = await DbClient.testAttempt.create({
+          data: {
+            user_id: userId,
+            course_id: parseInt(courseId),
+            lesson_id: parseInt(lessonId),
+            step_index: parseInt(stepIndex),
+            attempts,
+            lastScore: score,
+            lastPassed: isPassed,
+            lastAnswers: answers
+          }
+        });
+        
+        console.log('Новая попытка создана:', newAttempt);
+        res.json({ 
+          message: 'Test result saved successfully',
+          attempt: newAttempt
+        });
+      }
+      
+    } catch (error) {
+      console.error('Ошибка при сохранении результата теста:', error);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   }
 }

@@ -11,6 +11,7 @@ import Modal from '../components/Modal';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './admin.css';
+import { getCourseFileUrl } from '../../utils/minioUtils';
 
 const ShowAllCoursesAdmin = ({ match }) => {
   const { t } = useTranslation();
@@ -325,7 +326,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
 
                     {/* Cover image or placeholder */}
                     {course.logoUrl ? (
-                      <img src={course.logoUrl} alt={course.name} style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, objectFit: 'cover' }} />
+                      <img src={getCourseFileUrl(course.logoUrl)} alt={course.name} style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, objectFit: 'cover' }} />
                     ) : (
                       <div style={{ gridArea: 'cover', width: 64, height: 64, borderRadius: 4, background: '#eaeaea', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#777' }}>
                         <FontAwesomeIcon icon={faQuestion} />
@@ -437,7 +438,7 @@ const ShowAllCoursesAdmin = ({ match }) => {
                             width: '100%',
                             textAlign: 'left'
                           }} onClick={(e) => { e.stopPropagation(); changeCourseStatus(course.id, 'published'); }}>
-                            ✅ Опубликовать
+                            ✅  {t('courses.publish')}
                           </button>
                         )}
                         {course.status !== 'inactive' && (

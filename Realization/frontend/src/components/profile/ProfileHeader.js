@@ -1,5 +1,6 @@
 import React from "react";
 import PropTypes from "prop-types";
+import { getAvatarUrl } from "../../utils/minioUtils";
 
 const ProfileHeader = ({ profile }) => {
   return (
@@ -8,7 +9,7 @@ const ProfileHeader = ({ profile }) => {
         <div className="col-4 col-md-3 m-auto">
           <img
             className="rounded-circle"
-            src={profile.user.avatar}
+            src={getAvatarUrl(profile.user.avatar)}
             alt=""
           />
         </div>

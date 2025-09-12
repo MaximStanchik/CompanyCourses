@@ -311,15 +311,15 @@ export default function NewPost() {
         </button>
         <textarea ref={textareaRef} className="rich-editor__textarea form-control" id="reachEditorInputId" style={{ minHeight: 300, height: 300, borderRadius: 12, padding: '12px 18px', border: `1.5px solid ${borderColor}`, width: '100%', fontSize: 16, marginBottom: 18, background: fieldBg, color: fieldColor }} />
         <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end', marginTop: 18 }}>
-          <button type="button" onClick={()=>setPreviewOpen(true)} className="button button--info button--md" style={{ background: dark ? '#eaf4fd' : '#3976a8', color: dark ? '#3976a8' : '#fff', border: 'none', borderRadius: 22, padding: '10px 32px', fontWeight: 600, fontSize: 17 }}>{t('editor.preview') || 'Предпросмотр'}</button>
-          <button type="submit" className="button button--apply-alt button--md button--bold" style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 22, padding: '10px 32px', fontWeight: 600, fontSize: 17 }}>{t('editor.publish') || 'Опубликовать'}</button>
+          <button type="button" onClick={()=>setPreviewOpen(true)} className="button button--info button--md" style={{ background: dark ? '#eaf4fd' : '#3976a8', color: dark ? '#3976a8' : '#fff', border: 'none', borderRadius: 22, padding: '10px 32px', fontWeight: 600, fontSize: 17 }}>{t('editor.preview')}</button>
+          <button type="submit" className="button button--apply-alt button--md button--bold" style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 22, padding: '10px 32px', fontWeight: 600, fontSize: 17 }}>{t('editor.publish')}</button>
         </div>
       </form>
       {/* Модальное окно для вставки ссылки */}
       {linkModal.open && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.25)', zIndex: 20000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: dark ? '#23272f' : '#fff', color: dark ? '#eaf4fd' : '#23272f', borderRadius: 16, padding: 32, minWidth: 340, boxShadow: '0 4px 32px rgba(0,0,0,0.18)', position: 'relative' }}>
-            <button onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label={t('common.close') || 'Закрыть'}>×</button>
+            <button onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', fontSize: 22, color: '#888', cursor: 'pointer' }} aria-label={t('common.close')}>×</button>
             <h3 style={{ margin: '0 0 18px 0', fontWeight: 700, fontSize: 20 }}>{t('editor.insertLink') }</h3>
             <div style={{ marginBottom: 14 }}>
               <label style={{ fontWeight: 600, fontSize: 15 }}>{t('editor.linkUrl') }</label>
@@ -331,7 +331,7 @@ export default function NewPost() {
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
               <button type="button" onClick={() => setLinkModal({ open: false, url: '', text: '' })} style={{ background: '#eee', color: '#3976a8', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.cancel')}</button>
-              <button type="button" onClick={handleInsertLink} style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.insert') || 'Вставить'}</button>
+              <button type="button" onClick={handleInsertLink} style={{ background: '#3976a8', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 22px', fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>{t('common.insert') }</button>
             </div>
           </div>
         </div>

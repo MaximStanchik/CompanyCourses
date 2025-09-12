@@ -6,7 +6,7 @@
   width: 32px;
   height: 32px;
   border: none;
-  background: #f8f9fa;
+  background: var(--teach-tile-bg, #f8f9fa);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -14,13 +14,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   z-index: 10;
-  color: #6c757d;
+  color: var(--teach-fg-secondary, #6c757d);
   font-size: 16px;
 }
 
 .enrollment-close-btn:hover {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--teach-hover-bg, #e9ecef);
+  color: var(--teach-fg, #495057);
   transform: scale(1.1);
 }
 
@@ -63,7 +63,7 @@
 /* Контент модального окна */
 .enrollment-content {
   position: relative;
-  background: white;
+  background: var(--teach-tile-bg, white);
   border-radius: 12px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   max-width: 600px;
@@ -82,15 +82,16 @@
 .enrollment-select {
   width: 100%;
   padding: 10px;
-  border: 1px solid #95c4e2;
+  border: 1px solid var(--border-color, #95c4e2);
   border-radius: 5px;
-  background: white;
+  background: var(--teach-tile-bg, white);
+  color: var(--teach-fg, #333333);
   font-size: 14px;
   line-height: 1.4;
   max-height: 200px;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: #95c4e2 #f0f0f0;
+  scrollbar-color: var(--border-color, #95c4e2) var(--teach-bg, #f0f0f0);
 }
 
 .enrollment-select::-webkit-scrollbar {
@@ -98,33 +99,35 @@
 }
 
 .enrollment-select::-webkit-scrollbar-track {
-  background: #f0f0f0;
+  background: var(--teach-bg, #f0f0f0);
   border-radius: 4px;
 }
 
 .enrollment-select::-webkit-scrollbar-thumb {
-  background: #95c4e2;
+  background: var(--border-color, #95c4e2);
   border-radius: 4px;
 }
 
 .enrollment-select::-webkit-scrollbar-thumb:hover {
-  background: #7bb3d1;
+  background: var(--teach-hover-bg, #7bb3d1);
 }
 
 /* Стили для опций */
 .enrollment-select option {
   padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--border-color, #f0f0f0);
   transition: background-color 0.2s ease;
+  background: var(--teach-tile-bg, white);
+  color: var(--teach-fg, #333333);
 }
 
 .enrollment-select option:hover {
-  background-color: #f8f9fa;
+  background-color: var(--teach-hover-bg, #f8f9fa);
 }
 
 .enrollment-select option:checked {
-  background-color: #e3f2fd;
-  color: #1976d2;
+  background-color: var(--teach-selected-bg, #e3f2fd);
+  color: var(--teach-link-color, #1976d2);
   font-weight: 600;
 }
 
@@ -241,7 +244,7 @@
 /* Стили для лейблов */
 .enrollment-content label {
   font-weight: 600;
-  color: #333;
+  color: var(--teach-fg, #333);
   margin-bottom: 8px;
   display: block;
 }
@@ -250,11 +253,11 @@
 .enrollment-content p {
   margin: 8px 0;
   padding: 8px 12px;
-  background: #f8f9fa;
+  background: var(--teach-bg, #f8f9fa);
   border-radius: 4px;
-  border-left: 3px solid #17a2b8;
+  border-left: 3px solid var(--teach-link-color, #17a2b8);
   font-size: 14px;
-  color: #495057;
+  color: var(--teach-fg, #495057);
 }
 
 /* Анимация для ToastContainer */

@@ -1,0 +1,113 @@
+/* Стили для компонента LessonViewer */
+
+/* Приоритетные стили для темной темы */
+[data-theme="dark"] .external-video-container {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .external-video-container h4 {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .external-video-container p {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .external-video-container .video-icon {
+  color: #ffffff !important;
+}
+
+/* Дополнительные стили для темной темы */
+[data-theme="dark"] .external-video-container {
+  background: #2d2d2d !important;
+  border-color: #404040 !important;
+}
+
+[data-theme="dark"] .external-video-container:hover {
+  background: #353535 !important;
+  border-color: #505050 !important;
+}
+
+/* Стили для светлой темы */
+[data-theme="light"] .external-video-container {
+  color: #333333 !important;
+}
+
+[data-theme="light"] .external-video-container h4 {
+  color: #333333 !important;
+}
+
+[data-theme="light"] .external-video-container p {
+  color: #666666 !important;
+}
+
+[data-theme="light"] .external-video-container .video-icon {
+  color: #666666 !important;
+}
+
+/* Дополнительные стили для светлой темы */
+[data-theme="light"] .external-video-container {
+  background: #f8f9fa !important;
+  border-color: #e9ecef !important;
+}
+
+[data-theme="light"] .external-video-container:hover {
+  background: #e9ecef !important;
+  border-color: #dee2e6 !important;
+}
+
+/* Стили для иконки видео */
+.video-icon {
+  transition: all 0.3s ease;
+}
+
+.external-video-container:hover .video-icon {
+  opacity: 0.8 !important;
+  transform: scale(1.1);
+}
+
+/* Общие стили */
+.external-video-container {
+  transition: all 0.3s ease;
+}
+
+/* Дополнительные стили для текста */
+.external-video-container h4,
+.external-video-container p {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.external-video-container h4 {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.external-video-container p {
+  opacity: 0.9;
+}
+
+.external-video-container:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="dark"] .external-video-container:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Стили для кнопки */
+.video-link-btn {
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+
+.video-link-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
+  background: #0056b3 !important;
+}
+
+[data-theme="dark"] .video-link-btn:hover {
+  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.5);
+} 

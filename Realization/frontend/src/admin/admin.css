@@ -823,11 +823,67 @@ body.dark-theme .promo-html td,
 body.dark-theme .promo-html th {
   border-color: #404040;
 }
+
+/* Принудительное применение жирного текста */
 .promo-html strong,
 .promo-html b {
-  font-weight: 700;
+  font-weight: 700 !important;
+  font-weight: bold !important;
 }
-.promo-html { color: var(--text-color); }
+
+/* Дополнительные правила для жирного текста */
+.promo-html strong *,
+.promo-html b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Принудительное применение жирного текста */
+.promo-html [style*="font-weight: bold"],
+.promo-html [style*="font-weight:bold"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Дополнительные теги для жирного текста */
+.promo-html h1,
+.promo-html h2,
+.promo-html h3,
+.promo-html h4,
+.promo-html h5,
+.promo-html h6 {
+  font-weight: 600 !important;
+}
+
+/* Принудительное применение стилей для всех элементов с жирным текстом */
+.promo-html *[style*="font-weight"] {
+  font-weight: inherit !important;
+}
+
+.promo-html *[style*="font-weight: bold"],
+.promo-html *[style*="font-weight:bold"],
+.promo-html *[style*="font-weight: 700"],
+.promo-html *[style*="font-weight:700"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+.promo-html { 
+  color: var(--text-color, #333333); 
+  font-family: inherit;
+  line-height: 1.6;
+}
+
+/* Fallback для темной темы */
+body.dark-theme .promo-html,
+body[data-theme="dark"] .promo-html {
+  color: var(--text-color, #eaf4fd);
+}
+
+/* Fallback для светлой темы */
+body:not(.dark-theme):not([data-theme="dark"]) .promo-html {
+  color: var(--text-color, #333333);
+}
 
 /* Hide CKEditor image button everywhere */
 .cke_button__image_icon,
@@ -889,4 +945,157 @@ span[class*="_image_icon"] { display:none !important; }
   color: #333333 !important;
   background-color: transparent !important;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+}
+
+/* Более специфичные правила для Course.js */
+.course .promo-html strong,
+.course .promo-html b,
+div.promo-html strong,
+div.promo-html b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Принудительное применение для всех элементов внутри promo-html в Course.js */
+.course .promo-html strong *,
+.course .promo-html b *,
+div.promo-html strong *,
+div.promo-html b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Переопределение любых inline стилей в Course.js */
+.course .promo-html [style*="font-weight"],
+div.promo-html [style*="font-weight"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Дополнительная специфичность для Course.js */
+.course .promo-html *[style*="font-weight: bold"],
+.course .promo-html *[style*="font-weight:bold"],
+div.promo-html *[style*="font-weight: bold"],
+div.promo-html *[style*="font-weight:bold"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Принудительное применение для всех элементов с жирным текстом в Course.js */
+.course .promo-html *[style*="font-weight: 700"],
+.course .promo-html *[style*="font-weight:700"],
+div.promo-html *[style*="font-weight: 700"],
+div.promo-html *[style*="font-weight:700"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* CSS правила для CourseCatalog */
+.course-description strong,
+.course-description b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+.course-description strong *,
+.course-description b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+.course-description [style*="font-weight: bold"],
+.course-description [style*="font-weight:bold"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+.course-description *[style*="font-weight: 700"],
+.course-description *[style*="font-weight:700"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Универсальные правила для всех элементов с dangerouslySetInnerHTML */
+[class*="description"] strong,
+[class*="description"] b,
+div[class*="description"] strong,
+div[class*="description"] b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+[class*="description"] strong *,
+[class*="description"] b *,
+div[class*="description"] strong *,
+div[class*="description"] b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+[class*="description"] [style*="font-weight: bold"],
+[class*="description"] [style*="font-weight:bold"],
+div[class*="description"] [style*="font-weight: bold"],
+div[class*="description"] [style*="font-weight:bold"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+[class*="description"] *[style*="font-weight: 700"],
+[class*="description"] *[style*="font-weight:700"],
+div[class*="description"] *[style*="font-weight: 700"],
+div[class*="description"] *[style*="font-weight:700"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Дополнительные правила для элементов без класса */
+div strong,
+div b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+div strong *,
+div b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Максимально широкие правила для жирного текста */
+* strong,
+* b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+* strong *,
+* b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Принудительное применение для всех элементов с inline стилями */
+*[style*="font-weight: bold"],
+*[style*="font-weight:bold"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+*[style*="font-weight: 700"],
+*[style*="font-weight:700"] {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+/* Дополнительная специфичность для всех элементов */
+body * strong,
+body * b {
+  font-weight: 700 !important;
+  font-weight: bold !important;
+}
+
+body * strong *,
+body * b * {
+  font-weight: 700 !important;
+  font-weight: bold !important;
 }

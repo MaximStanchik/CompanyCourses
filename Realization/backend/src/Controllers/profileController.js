@@ -7,41 +7,22 @@ const path = require("path");
 const fs = require("fs");
 const bcrypt = require('bcryptjs');
 const NotificationService = require('../utils/notificationService');
+const { uploadFile, BUCKETS, deleteFile } = require('../utils/minioClient');
 
-// Ensure static directory exists
-const avatarStoragePath = path.join(__dirname, "../../static/avatar");
-if (!fs.existsSync(avatarStoragePath)) {
-  fs.mkdirSync(avatarStoragePath, { recursive: true });
-}
-
-const avatarStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, avatarStoragePath);
-  },
-  filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now();
-    const ext = path.extname(file.originalname);
-    cb(null, `avatar-${uniqueSuffix}${ext}`);
-  },
-});
-
+// Настройка multer для временного хранения файлов
 const uploadAvatarMulter = multer({
-  storage: avatarStorage,
-  limits: { fileSize: 1024 * 1024 * 5 }, // 5MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1024 * 1024 * 50 }, // 50MB для аватаров
 }).single("avatar");
 
 class ProfileController {
   async addProfile(req, res) {
     try {
-      const authorizationHeader = req.headers.authorization;
-      if (!authorizationHeader)
-        return res.status(401).json({ error: "Unauthorized" });
-
-      const token = authorizationHeader.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
+      // Используем req.user из middleware
+      const userId = parseInt(req.user.id);
 
       const user = await DbClient.user.findUnique({
-        where: { id: parseInt(decodedToken.id) },
+        where: { id: userId },
       });
 
       if (!user) return res.status(404).json({ error: "User not found" });
@@ -87,7 +68,13 @@ class ProfileController {
         jobTitle: req.body.jobTitle,
         goal: req.body.goal,
         aboutMe: req.body.aboutMe,
+        language: req.body.language,
       };
+      
+      console.log('=== ОБНОВЛЕНИЕ ПРОФИЛЯ ===');
+      console.log('Пользователь ID:', user.id);
+      console.log('Данные профиля:', profileFields);
+      console.log('Язык из запроса:', req.body.language);
 
       const existingProfile = await DbClient.profile.findUnique({
         where: { userId: user.id },
@@ -98,14 +85,30 @@ class ProfileController {
           where: { userId: user.id },
           data: profileFields,
         });
+        console.log('✅ Профиль обновлен:', updatedProfile);
         const freshUser = await DbClient.user.findUnique({ where: { id: user.id }, select: { id: true, username: true, email: true, avatar: true } });
-        return res.json({ ...updatedProfile, user: freshUser });
+        
+        // Обрабатываем путь к аватару - возвращаем только имя файла
+        const userWithProcessedAvatar = {
+          ...freshUser,
+          avatar: freshUser.avatar ? freshUser.avatar.split('/').pop() : null
+        };
+        
+        return res.json({ ...updatedProfile, user: userWithProcessedAvatar });
       } else {
         const createdProfile = await DbClient.profile.create({
           data: profileFields,
         });
+        console.log('✅ Профиль создан:', createdProfile);
         const freshUser = await DbClient.user.findUnique({ where: { id: user.id }, select: { id: true, username: true, email: true, avatar: true } });
-        return res.json({ ...createdProfile, user: freshUser });
+        
+        // Обрабатываем путь к аватару - возвращаем только имя файла
+        const userWithProcessedAvatar = {
+          ...freshUser,
+          avatar: freshUser.avatar ? freshUser.avatar.split('/').pop() : null
+        };
+        
+        return res.json({ ...createdProfile, user: userWithProcessedAvatar });
       }
     } catch (err) {
       console.error(err);
@@ -115,10 +118,8 @@ class ProfileController {
 
   async getAllProfiles(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
-
-      if (!decodedToken.roles.includes("ADMIN")) {
+      // Используем req.user из middleware
+      if (!req.user.roles || !req.user.roles.includes("ADMIN")) {
         return res.status(403).json("You don't have enough rights");
       }
 
@@ -138,8 +139,8 @@ class ProfileController {
 
   async getProfileByCurrentUser(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
+      // Используем req.user из middleware
+      const userId = parseInt(req.user.id);
 
       // Определяем IP
       let ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.connection?.remoteAddress || req.ip;
@@ -147,7 +148,7 @@ class ProfileController {
       if (typeof ip === 'string' && ip.includes(',')) ip = ip.split(',')[0];
       // Обновляем lastActivityTime и lastIP
       await DbClient.user.update({
-        where: { id: parseInt(decodedToken.id) },
+        where: { id: userId },
         data: {
           lastActivityTime: new Date(),
           lastIP: ip,
@@ -155,7 +156,7 @@ class ProfileController {
       });
 
       const user = await DbClient.user.findUnique({
-        where: { id: parseInt(decodedToken.id) },
+        where: { id: userId },
         select: {
           id: true,
           username: true,
@@ -186,7 +187,13 @@ class ProfileController {
           .status(404)
           .json({ noprofile: "There is no profile for this user" });
 
-      return res.json({ ...profile, user });
+      // Обрабатываем путь к аватару - возвращаем только имя файла
+      const userWithProcessedAvatar = {
+        ...user,
+        avatar: user.avatar ? user.avatar.split('/').pop() : null
+      };
+
+      return res.json({ ...profile, user: userWithProcessedAvatar });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Server error" });
@@ -195,9 +202,8 @@ class ProfileController {
 
   async adminUpdateProfile(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
-      if (!decodedToken.roles || !decodedToken.roles.includes('ADMIN')) {
+      // Используем req.user из middleware
+      if (!req.user.roles || !req.user.roles.includes('ADMIN')) {
         return res.status(403).json({ error: "Forbidden" });
       }
 
@@ -206,11 +212,30 @@ class ProfileController {
 
       // Обрабатываем загрузку файла аватара, если он есть
       if (req.file) {
-        const relativePath = `/static/avatar/${req.file.filename}`;
-        await DbClient.user.update({
-          where: { id: targetUserId },
-          data: { avatar: relativePath },
-        });
+        try {
+          const fileName = `avatar-${targetUserId}-${Date.now()}${path.extname(req.file.originalname)}`;
+          const avatarPath = await uploadFile(BUCKETS.AVATARS, fileName, req.file.buffer, req.file.mimetype);
+          
+          // Удаляем старый аватар, если он существует
+          const existingUser = await DbClient.user.findUnique({ where: { id: targetUserId } });
+          if (existingUser && existingUser.avatar) {
+            try {
+              // Извлекаем имя файла из пути MinIO
+              const oldAvatarPath = existingUser.avatar.split('/').pop();
+              await deleteFile(BUCKETS.AVATARS, oldAvatarPath);
+            } catch (deleteError) {
+              console.error('Error deleting old avatar:', deleteError);
+            }
+          }
+          
+          await DbClient.user.update({
+            where: { id: targetUserId },
+            data: { avatar: avatarPath },
+          });
+        } catch (uploadError) {
+          console.error('Error uploading avatar to MinIO:', uploadError);
+          return res.status(500).json({ error: 'Failed to upload avatar' });
+        }
       }
 
       // Update username/email if provided (unique username enforced)
@@ -227,6 +252,14 @@ class ProfileController {
         if (Object.keys(data).length) {
           await DbClient.user.update({ where: { id: targetUserId }, data });
         }
+      }
+
+      // Update user role if provided
+      if (req.body.role) {
+        await DbClient.user.update({
+          where: { id: targetUserId },
+          data: { role: req.body.role }
+        });
       }
 
       const profileFields = {
@@ -258,7 +291,7 @@ class ProfileController {
       
       // Отправляем уведомление пользователю
       try {
-        const adminUser = await DbClient.user.findUnique({ where: { id: decodedToken.id } });
+        const adminUser = await DbClient.user.findUnique({ where: { id: req.user.id } });
         await NotificationService.notifyProfileUpdated(targetUserId, adminUser.username || 'Администратор');
       } catch (notificationError) {
         console.error('Ошибка при отправке уведомления:', notificationError);
@@ -266,7 +299,14 @@ class ProfileController {
       }
       
       const freshUser = await DbClient.user.findUnique({ where: { id: targetUserId }, select: { id: true, username: true, email: true, avatar: true, role: true } });
-      return res.json({ profile: out, user: freshUser });
+      
+      // Обрабатываем путь к аватару - возвращаем только имя файла
+      const userWithProcessedAvatar = {
+        ...freshUser,
+        avatar: freshUser.avatar ? freshUser.avatar.split('/').pop() : null
+      };
+      
+      return res.json({ profile: out, user: userWithProcessedAvatar });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: 'Server error' });
@@ -277,7 +317,14 @@ class ProfileController {
     try {
       const profile = await DbClient.profile.findFirst({
         where: { userId: Number(req.params.user_id) },
-        include: { user: { select: { username: true } } },
+        include: { 
+          user: { 
+            select: { 
+              username: true,
+              avatar: true
+            } 
+          } 
+        },
       });
 
       if (!profile)
@@ -285,7 +332,16 @@ class ProfileController {
           .status(404)
           .json({ noprofile: "There is no profile for this user" });
 
-      return res.json(profile);
+      // Обрабатываем путь к аватару - возвращаем только имя файла
+      const profileWithProcessedAvatar = {
+        ...profile,
+        user: {
+          ...profile.user,
+          avatar: profile.user.avatar ? profile.user.avatar.split('/').pop() : null
+        }
+      };
+
+      return res.json(profileWithProcessedAvatar);
     } catch (err) {
       console.error(err);
       return res
@@ -307,6 +363,7 @@ class ProfileController {
             select: {
               username: true,
               email: true,
+              avatar: true,
             },
           },
         },
@@ -317,40 +374,56 @@ class ProfileController {
           .status(404)
           .json({ noprofile: "There is no profile for this user" });
 
-      return res.json(profile);
+      // Обрабатываем путь к аватару - возвращаем только имя файла
+      const profileWithProcessedAvatar = {
+        ...profile,
+        user: {
+          ...profile.user,
+          avatar: profile.user.avatar ? profile.user.avatar.split('/').pop() : null
+        }
+      };
+
+      return res.json(profileWithProcessedAvatar);
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Failed to fetch profile" });
     }
   }
 
-  async deleteProfile(req, res) {
+  async changePassword(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
+      const { currentPassword, newPassword } = req.body;
+      const userId = parseInt(req.user.id);
 
+      // Получаем пользователя с хешированным паролем
       const user = await DbClient.user.findUnique({
-        where: { id: Number(decodedToken.id) },
+        where: { id: userId }
       });
 
-      if (!user) return res.status(401).json({ error: "Unauthorized" });
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
-      const profile = await DbClient.profile.findUnique({
-        where: { userId: user.id },
+      // Проверяем текущий пароль
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ error: "Current password is incorrect" });
+      }
+
+      // Хешируем новый пароль
+      const saltRounds = 10;
+      const hashedNewPassword = await bcrypt.hash(newPassword, saltRounds);
+
+      // Обновляем пароль
+      await DbClient.user.update({
+        where: { id: userId },
+        data: { password: hashedNewPassword }
       });
 
-      if (!profile)
-        return res.status(404).json({ error: "Profile not found" });
-
-      await DbClient.profile.delete({ where: { id: profile.id } });
-      await DbClient.user.delete({ where: { id: user.id } });
-
-      return res.json({ success: true });
+      return res.json({ message: "Password changed successfully" });
     } catch (err) {
-      console.error(err);
-      return res
-        .status(500)
-        .json({ error: "Failed to delete profile and user" });
+      console.error('Error changing password:', err);
+      return res.status(500).json({ error: "Failed to change password" });
     }
   }
 
@@ -405,14 +478,31 @@ class ProfileController {
 
   async uploadUserAvatar(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
-      const user = await DbClient.user.findUnique({ where: { id: parseInt(decodedToken.id) } });
+      // Используем req.user из middleware
+      const userId = parseInt(req.user.id);
+      const user = await DbClient.user.findUnique({ where: { id: userId } });
       if (!user) return res.status(404).json({ error: "User not found" });
       if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-      const avatarPath = `/static/avatar/${req.file.filename}`;
+      
+      // Загружаем аватар в MinIO
+      const fileName = `avatar-${userId}-${Date.now()}${path.extname(req.file.originalname)}`;
+      const avatarPath = await uploadFile(BUCKETS.AVATARS, fileName, req.file.buffer, req.file.mimetype);
+      
+      // Удаляем старый аватар, если он существует
+      if (user.avatar) {
+        try {
+          const oldAvatarPath = user.avatar.split('/').pop();
+          await deleteFile(BUCKETS.AVATARS, oldAvatarPath);
+        } catch (deleteError) {
+          console.error('Error deleting old avatar:', deleteError);
+        }
+      }
+      
       await DbClient.user.update({ where: { id: user.id }, data: { avatar: avatarPath } });
-      return res.json({ avatar: avatarPath });
+      
+      // Возвращаем только имя файла
+      const avatarFileName = avatarPath.split('/').pop();
+      return res.json({ avatar: avatarFileName });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: "Server error" });
@@ -421,61 +511,18 @@ class ProfileController {
 
   async updateUserIp(req, res) {
     try {
-      const token = req.headers.authorization?.split(" ")[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
+      // Используем req.user из middleware
+      const userId = parseInt(req.user.id);
       const { ip } = req.body;
       if (!ip) return res.status(400).json({ error: 'IP is required' });
       await DbClient.user.update({
-        where: { id: parseInt(decodedToken.id) },
+        where: { id: userId },
         data: { lastIP: ip, lastActivityTime: new Date() },
       });
       return res.json({ success: true });
     } catch (err) {
       console.error(err);
       return res.status(500).json({ error: 'Server error' });
-    }
-  }
-
-  async changePassword(req, res) {
-    try {
-      const token = req.headers.authorization?.split(' ')[1];
-      const decodedToken = jwt.verify(token, process.env.SECRET);
-      const user = await DbClient.user.findUnique({ where: { id: parseInt(decodedToken.id) } });
-      console.log('changePassword: decodedToken.id:', decodedToken.id);
-      if (user) console.log('changePassword: user.email:', user.email);
-      const { currentPassword, newPassword } = req.body;
-      console.log('changePassword: currentPassword:', currentPassword);
-      console.log('changePassword: user.password:', user ? user.password : 'NO_USER');
-      if (!user) return res.status(404).json({ error: 'User not found' });
-      if (!currentPassword) return res.status(400).json({ error: 'All fields are required' });
-      // Проверка текущего пароля
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
-      console.log('changePassword: isMatch:', isMatch);
-      if (!isMatch) return res.status(400).json({ error: 'Текущий пароль неверный' });
-      // Если только проверка текущего пароля (newPassword === '___dummy___')
-      if (newPassword === '___dummy___') {
-        return res.json({ success: true });
-      }
-      // Валидация нового пароля (как при регистрации)
-      let score = 0;
-      if (newPassword.length >= 8) score++;
-      if (/[A-Z]/.test(newPassword)) score++;
-      if (/[a-z]/.test(newPassword)) score++;
-      if (/\d/.test(newPassword)) score++;
-      if (/[@$!%*?&#^()_+\-=\[\]{};':"\\|,.<>\/?]/.test(newPassword)) score++;
-      console.log('changePassword: newPassword:', newPassword);
-      console.log('changePassword: password strength score:', score);
-      if (score < 3) {
-        return res.status(400).json({ error: 'Пароль слишком простой. Минимум 8 символов, буквы верхнего и нижнего регистра, цифры и спецсимволы.' });
-      }
-      // Хешируем и сохраняем новый пароль
-      const salt = await bcrypt.genSalt(5);
-      const hash = await bcrypt.hash(newPassword, salt);
-      await DbClient.user.update({ where: { id: user.id }, data: { password: hash } });
-      return res.json({ success: true });
-    } catch (err) {
-      console.error(err);
-      return res.status(500).json({ error: 'Ошибка сервера' });
     }
   }
 }
@@ -487,7 +534,6 @@ module.exports = {
   getProfileByCurrentUser: controller.getProfileByCurrentUser.bind(controller),
   profileByUserId: controller.profileByUserId.bind(controller),
   profileByUsername: controller.profileByUsername.bind(controller),
-  deleteProfile: controller.deleteProfile.bind(controller),
   checkUsername: controller.checkUsername.bind(controller),
   uploadUserAvatar: controller.uploadUserAvatar.bind(controller),
   uploadAvatarMulter,

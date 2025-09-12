@@ -440,7 +440,7 @@ const Support = () => {
             }}
             disabled={loading}
           >
-            {loading ? (t('support.sending') || 'Отправка...') : (t('support.send') || 'Отправить')}
+            {loading ? (t('support.sending') ) : (t('support.send'))}
           </button>
         </div>
         {success && <div style={{ color: '#27ae60', fontWeight: 500, marginTop: 12 }}>{success}</div>}
