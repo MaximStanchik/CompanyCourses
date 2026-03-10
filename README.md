@@ -1,14 +1,14 @@
  # Company Courses
  
- Веб‑платформа для размещения и прохождения IT‑курсов.
+ A web platform for publishing and taking IT courses.
  
- Проект состоит из:
+ The project consists of:
  
- - **Backend**: Node.js (Express) + Prisma + PostgreSQL, JWT‑аутентификация, хранение файлов в **MinIO**
- - **Frontend**: React приложение
- - **Инфраструктура**: Docker Compose (PostgreSQL + MinIO + backend + frontend)
+ - **Backend**: Node.js (Express) + Prisma + PostgreSQL, JWT authentication, file storage in **MinIO**
+ - **Frontend**: React application
+ - **Infrastructure**: Docker Compose (PostgreSQL + MinIO + backend + frontend)
  
- ## Диаграммы
+ ## Diagrams
  
  ### Use Case Diagram
  
@@ -22,23 +22,23 @@
  
  ![Database diagram](Documentation/diagrams/images/database-diagram.png)
  
- ## Быстрый старт (Docker Compose)
+ ## Quick start (Docker Compose)
  
- Docker‑конфигурация находится в папке `Realization`.
+ The Docker configuration is located in the `Realization` folder.
  
- 1. Запуск всех сервисов:
+ 1. Start all services:
  
  ```bash
  docker-compose up -d --build
  ```
  
- 2. Проверка статуса:
+ 2. Check status:
  
  ```bash
  docker-compose ps
  ```
  
- После запуска будут доступны:
+ After startup, the following will be available:
  
  - **Frontend**: http://localhost:3000
  - **Backend**: http://localhost:9000
@@ -46,18 +46,18 @@
  - **MinIO Console**: http://localhost:9001
  - **PostgreSQL**: localhost:5433
  
- Дополнительные инструкции по Docker (логи, перезапуск, troubleshooting) есть в `Realization/DOCKER_README.md`.
+ Additional Docker instructions (logs, restart, troubleshooting) are available in `Realization/DOCKER_README.md`.
  
- ## Технологический стек
+ ## Tech stack
  
  - **Backend**
    - Node.js 18
    - Express
    - Prisma (`Realization/backend/prisma/schema.prisma`)
    - PostgreSQL
-   - MinIO (S3‑совместимое хранилище)
+   - MinIO (S3-compatible object storage)
    - JWT (`jsonwebtoken`)
-   - OAuth через `passport` (Google/Facebook/Yandex/Dribbble)
+   - OAuth via `passport` (Google/Facebook/Yandex/Dribbble)
    - WebSocket: `socket.io`
    - Email: `nodemailer`
  - **Frontend**
@@ -66,34 +66,34 @@
    - Bootstrap / Reactstrap
    - i18next
  
- ## Основные сущности (по схеме БД)
+ ## Core entities (from the DB schema)
  
- - **Пользователи и профиль**: `User`, `Profile`
- - **Курсы и категории**: `Course`, `Category`, `CourseCategory`
- - **Обучение**: `Enrollment`, `Lecture`, `Step`, `TestAttempt`
- - **Взаимодействия**: `CourseComment`, `CourseRating`, `FavoriteCourse`, реакции
- - **Коммуникации**: `Chat`, `Message`, `Reaction`, `Notification`, `SupportMessage`
+ - **Users and profile**: `User`, `Profile`
+ - **Courses and categories**: `Course`, `Category`, `CourseCategory`
+ - **Learning flow**: `Enrollment`, `Lecture`, `Step`, `TestAttempt`
+ - **Engagement**: `CourseComment`, `CourseRating`, `FavoriteCourse`, reactions
+ - **Communication**: `Chat`, `Message`, `Reaction`, `Notification`, `SupportMessage`
  
- ## Структура репозитория
+ ## Repository structure
  
- - `Documentation/` — документация и диаграммы
- - `Realization/` — реализация проекта
+ - `Documentation/` — documentation and diagrams
+ - `Realization/` — project implementation
    - `backend/` — Node.js API
-   - `frontend/` — React приложение
-   - `docker-compose.yml` — запуск всей системы
-   - `database/`, `testData/` — вспомогательные данные
+   - `frontend/` — React application
+   - `docker-compose.yml` — full system startup
+   - `database/`, `testData/` — auxiliary data
  
- ## Переменные окружения (важное)
+ ## Environment variables (important)
  
- Основные переменные уже заданы в `Realization/docker-compose.yml`. Если запускаете сервисы не через compose, обратите внимание на:
+ Most variables are already set in `Realization/docker-compose.yml`. If you run services outside compose, pay attention to:
  
  - `DATABASE_URL`
  - `JWT_SECRET`
  - `MINIO_ENDPOINT`, `MINIO_PORT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`
  
- ## Запуск без Docker (локально)
+ ## Running without Docker (local)
  
- 1. Поднимите PostgreSQL и MinIO (можно через Docker Compose).
+ 1. Start PostgreSQL and MinIO (you can use Docker Compose).
  2. Backend:
  
  ```bash
